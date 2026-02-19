@@ -1,0 +1,14 @@
+# Credentials niemals ins Image!
+workspace/config.json
+workspace/sessions/
+workspace/memory.json
+workspace/offset.txt
+
+# Unnötiges nicht kopieren
+.git/
+.gitignore
+*.md
+plugins/
+dist/
+*.exe
+fluxbot

@@ -1,0 +1,38 @@
+[Unit]
+Description=FluxBot – Multi-Channel AI Agent by KI-WERKE
+Documentation=https://github.com/ki-werke/fluxbot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=fluxbot
+Group=fluxbot
+WorkingDirectory=/opt/fluxbot
+
+# Startet FluxBot mit der Konfigurationsdatei im Workspace
+ExecStart=/usr/local/bin/fluxbot --config /opt/fluxbot/workspace/config.json
+
+# Automatisch neustarten bei Absturz (nicht bei systemctl stop)
+Restart=on-failure
+RestartSec=10s
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Logging (journalctl -u fluxbot -f)
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fluxbot
+
+# Sicherheits-Härtung
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/fluxbot/workspace
+ProtectHome=true
+
+# Umgebungsvariablen (optional – alternativ alles in config.json)
+# Environment="FLUXBOT_DEBUG=false"
+
+[Install]
+WantedBy=multi-user.target

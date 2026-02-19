@@ -1,0 +1,53 @@
+# FluxBot – Produktions-Compose für End-User
+# ─────────────────────────────────────────────────────────────────────────────
+# Verwendung (einmaliger Befehl):
+#   Windows:  irm https://fluxbot.ki-werke.de/install.ps1 | iex
+#   Linux:    curl -fsSL https://fluxbot.ki-werke.de/install.sh | bash
+#   macOS:    curl -fsSL https://fluxbot.ki-werke.de/install.sh | bash
+#
+# Beim ersten Start öffnet sich der Einrichtungsassistent automatisch im Browser:
+#   → http://localhost:8090
+#
+# Daten (config, Skills, Gedächtnis) werden im Unterordner ./fluxbot-data
+# gespeichert und bleiben auch nach Updates erhalten.
+# ─────────────────────────────────────────────────────────────────────────────
+
+version: "3.9"
+
+services:
+  fluxbot:
+    image: ghcr.io/ki-werke/fluxbot:latest
+    container_name: fluxbot
+    restart: unless-stopped
+
+    ports:
+      # Dashboard & Einrichtungsassistent
+      - "8090:8090"
+
+    volumes:
+      # Persistente Daten: config.json, Skills, Gedächtnis
+      - ./fluxbot-data:/app/workspace
+
+    environment:
+      # Teilt FluxBot mit, dass es im Docker-Container läuft
+      # (kein Auto-Browser, fester Port 8090, 0.0.0.0 Binding)
+      - FLUXBOT_DOCKER=1
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── Optional: Lokale KI-Modelle (Ollama) ──────────────────────────────────
+  # Auskommentieren um lokale Modelle (Llama, Mistral usw.) zu aktivieren.
+  # Erfordert eine GPU oder schnelle CPU; benötigt ca. 4–8 GB Speicher.
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: fluxbot_ollama
+  #   restart: unless-stopped
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ./fluxbot-ollama:/root/.ollama

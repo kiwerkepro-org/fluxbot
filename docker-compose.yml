@@ -1,0 +1,78 @@
+version: "3.8"
+
+# FluxBot – Multi-Channel AI Agent
+# Credentials: Bitte workspace/config.json ausfüllen (KEINE Credentials hier eintragen!)
+# Kopiere workspace/config.example.json → workspace/config.json
+
+services:
+  fluxbot:
+    build: .
+    container_name: fluxbot_ai
+    ports:
+      - "8090:8090"
+    volumes:
+      # Workspace enthält config.json, Gedächtnis, Skills
+      - ./workspace:/app/workspace
+    networks:
+      - fluxnet
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Lokale KI-Modelle via Ollama (optional – für Voice und lokale LLMs)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - fluxnet
+    ports:
+      - "11434:11434"
+    restart: unless-stopped
+
+  # WordPress Test-Umgebung (für KI-WERKE WordPress-Skills)
+  wordpress:
+    image: wordpress:latest
+    container_name: wp_test_env
+    ports:
+      - "8080:80"
+    volumes:
+      - wp_data:/var/www/html
+      - ./plugins:/var/www/html/wp-content/plugins
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wp_user
+      WORDPRESS_DB_PASSWORD: wp_password
+      WORDPRESS_DB_NAME: wp_db
+    networks:
+      - fluxnet
+    depends_on:
+      - db
+    restart: always
+
+  db:
+    image: mariadb:10.6
+    container_name: wp_db
+    volumes:
+      - db_data:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: wp_db
+      MYSQL_USER: wp_user
+      MYSQL_PASSWORD: wp_password
+      MYSQL_ROOT_PASSWORD: root_password
+    networks:
+      - fluxnet
+    restart: always
+
+networks:
+  fluxnet:
+    driver: bridge
+
+volumes:
+  ollama_data:
+  wp_data:
+  db_data:

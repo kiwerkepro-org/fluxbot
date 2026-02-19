@@ -1,0 +1,77 @@
+{
+  "_comment": "FluxBot Konfiguration – Kopiere diese Datei nach config.json und fülle die Felder aus",
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "token": "DEIN_TELEGRAM_BOT_TOKEN",
+      "allowFrom": ["DEINE_TELEGRAM_USER_ID"]
+    },
+    "discord": {
+      "_setup": "1) discord.com/developers → Neue App → Bot → Token kopieren | 2) Privileged Gateway Intents: MESSAGE CONTENT INTENT aktivieren | 3) OAuth2 → URL Generator → bot + Send Messages + Read Messages → Bot einladen",
+      "enabled": false,
+      "token": "DEIN_DISCORD_BOT_TOKEN",
+      "allowFrom": []
+    },
+    "slack": {
+      "enabled": false,
+      "botToken": "xoxb-DEIN-BOT-TOKEN",
+      "appToken": "xapp-DEIN-APP-TOKEN",
+      "signingSecret": "DEIN_SLACK_SIGNING_SECRET",
+      "webhookPort": 3000,
+      "allowFrom": []
+    },
+    "matrix": {
+      "enabled": false,
+      "homeServer": "https://matrix.org",
+      "userId": "@fluxbot:matrix.org",
+      "token": "DEIN_MATRIX_ACCESS_TOKEN",
+      "allowFrom": []
+    },
+    "whatsapp": {
+      "enabled": false,
+      "provider": "meta",
+      "phoneNumber": "+49XXXXXXXX",
+      "phoneNumberId": "DEINE_META_PHONE_NUMBER_ID",
+      "apiKey": "DEIN_META_ACCESS_TOKEN",
+      "webhookSecret": "DEIN_GEHEIMSCHLÜSSEL",
+      "webhookPort": 8443,
+      "allowFrom": []
+    }
+  },
+  "providers": {
+    "default": "openrouter",
+    "openrouter": {
+      "apiKey": "DEIN_OPENROUTER_API_KEY",
+      "models": {
+        "default": "anthropic/claude-sonnet-4-5-20250929",
+        "opus": "anthropic/claude-opus-4-5-20251101",
+        "image": "google/gemini-2.0-flash-exp",
+        "search": "perplexity/sonar-reasoning-pro",
+        "ocr": "mistralai/pixtral-12b"
+      }
+    }
+  },
+  "workspace": {
+    "path": "./workspace"
+  },
+  "imageGen": {
+    "enabled": false,
+    "provider": "fal",
+    "apiKey": "DEIN_FAL_API_KEY",
+    "model": "fal-ai/flux/schnell",
+    "size": "landscape",
+    "quality": "standard"
+  },
+  "voice": {
+    "enabled": false,
+    "provider": "groq",
+    "apiKey": "DEIN_GROQ_API_KEY",
+    "language": "de",
+    "ollamaUrl": "http://ollama:11434"
+  },
+  "dashboard": {
+    "enabled": false,
+    "port": 8080,
+    "password": ""
+  }
+}

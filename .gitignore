@@ -1,0 +1,57 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  NIEMALS committen: Credentials, API-Keys, persönliche Daten
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Kompletter workspace/ - enthält API-Keys, persönliche Daten, Gesprächsverläufe
+# Einzige Ausnahme: config.example.json als Vorlage für neue Nutzer
+workspace/*
+!workspace/config.example.json
+
+# Entwicklungs-Archiv (interne Notizen, alte Plugin-Experimente)
+Z10000-Archiv/
+CHANNELS_FILES.txt
+CHANNELS_SETUP.md
+IMPLEMENTATION_SUMMARY.md
+NOTES_FOR_README.md
+QUICK_START_CHANNELS.md
+
+# Temporäre Build-Dateien
+fluxbot-go-tmp-umask
+
+# Umgebungsvariablen
+.env
+*.env
+.env.*
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Docker-Daten (Produktionsdaten, die lokal auf dem Rechner liegen)
+# ─────────────────────────────────────────────────────────────────────────────
+fluxbot-data/
+FluxBot/
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Build-Artefakte
+# ─────────────────────────────────────────────────────────────────────────────
+fluxbot
+fluxbot.exe
+/dist/
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Go
+# ─────────────────────────────────────────────────────────────────────────────
+*.test
+*.out
+vendor/
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  IDE & OS
+# ─────────────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
+/tmp/

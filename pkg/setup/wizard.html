@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FluxBot Einrichtung</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2a2d3a;
+      --text: #e4e6f0;
+      --muted: #8b8fa8;
+      --accent: #5b8dee;
+      --accent-hover: #4a7ce0;
+      --success: #4caf7d;
+      --error: #e05b5b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .logo {
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .logo span { color: var(--accent); }
+
+    .tagline {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+
+    /* ── Progress ───────────────────────────────────────────────────────────── */
+    .progress-wrap {
+      width: 100%;
+      max-width: 480px;
+      margin-bottom: 24px;
+    }
+
+    .progress-dots {
+      display: flex;
+      align-items: center;
+    }
+
+    .dot {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--border);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--muted);
+      transition: all 0.3s;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    .dot.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .dot.done {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+
+    .line {
+      flex: 1;
+      height: 2px;
+      background: var(--border);
+      transition: background 0.3s;
+    }
+
+    .line.done { background: var(--success); }
+
+    .progress-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 6px;
+    }
+
+    .progress-labels span {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-align: center;
+      flex: 1;
+    }
+
+    /* ── Card ───────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px 28px 24px;
+      width: 100%;
+      max-width: 480px;
+      display: none;
+    }
+
+    .card.active { display: block; }
+
+    .card h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.88rem;
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
+
+    /* ── Form ───────────────────────────────────────────────────────────────── */
+    .form-group { margin-bottom: 14px; }
+
+    .form-group label {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .req { color: var(--error); }
+
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 9px 13px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.92rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus { border-color: var(--accent); }
+
+    .hint {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 5px;
+      line-height: 1.4;
+    }
+
+    .hint a { color: var(--accent); text-decoration: none; }
+    .hint a:hover { text-decoration: underline; }
+
+    /* ── Buttons ────────────────────────────────────────────────────────────── */
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      padding: 9px 18px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover { color: var(--text); border-color: var(--muted); }
+
+    /* ── Channel Grid ───────────────────────────────────────────────────────── */
+    .channel-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin-bottom: 16px;
+    }
+
+    .ch-card {
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      transition: all 0.2s;
+      user-select: none;
+    }
+
+    .ch-card:hover { border-color: var(--muted); }
+    .ch-card.sel { border-color: var(--accent); background: rgba(91,141,238,0.08); }
+
+    .ch-icon { font-size: 1.3rem; }
+    .ch-name { font-size: 0.88rem; font-weight: 600; }
+
+    .ch-check {
+      margin-left: auto;
+      width: 17px;
+      height: 17px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .ch-card.sel .ch-check {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ── Channel Config ─────────────────────────────────────────────────────── */
+    .ch-config {
+      display: none;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+
+    .ch-config.open { display: block; }
+
+    .ch-config-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--muted);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Toggle ─────────────────────────────────────────────────────────────── */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .toggle-row:last-of-type { border-bottom: none; }
+
+    .toggle-lbl { font-size: 0.9rem; }
+    .toggle-desc { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+    .switch {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .switch input { opacity: 0; width: 0; height: 0; }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border);
+      border-radius: 11px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .slider:before {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: #fff;
+      border-radius: 50%;
+      top: 3px;
+      left: 3px;
+      transition: 0.2s;
+    }
+
+    .switch input:checked + .slider { background: var(--accent); }
+    .switch input:checked + .slider:before { transform: translateX(18px); }
+
+    /* ── Checklist (Schritt 1) ──────────────────────────────────────────────── */
+    .checklist {
+      list-style: none;
+      margin: 14px 0 20px;
+    }
+
+    .checklist li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .checklist li:last-child { border-bottom: none; }
+    .checklist .ico { font-size: 1.05rem; }
+
+    /* ── Error ──────────────────────────────────────────────────────────────── */
+    .err {
+      color: var(--error);
+      font-size: 0.8rem;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .err.show { display: block; }
+
+    /* ── Success ────────────────────────────────────────────────────────────── */
+    .success-icon {
+      font-size: 3.5rem;
+      text-align: center;
+      margin-bottom: 14px;
+    }
+
+    .dash-link {
+      display: block;
+      text-align: center;
+      margin-top: 16px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    .dash-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">⚡ Flux<span>Bot</span></div>
+  <div class="tagline">Einrichtungsassistent · von KI-WERKE</div>
+</div>
+
+<!-- Progress -->
+<div class="progress-wrap">
+  <div class="progress-dots">
+    <div class="dot active" id="d1">1</div>
+    <div class="line" id="l1"></div>
+    <div class="dot" id="d2">2</div>
+    <div class="line" id="l2"></div>
+    <div class="dot" id="d3">3</div>
+    <div class="line" id="l3"></div>
+    <div class="dot" id="d4">4</div>
+  </div>
+  <div class="progress-labels">
+    <span>Willkommen</span>
+    <span>API Key</span>
+    <span>Messenger</span>
+    <span>Fertig</span>
+  </div>
+</div>
+
+<!-- ── Schritt 1: Willkommen ───────────────────────────────────────────────── -->
+<div class="card active" id="s1">
+  <h2>Willkommen bei FluxBot! 👋</h2>
+  <p class="subtitle">
+    Dein persönlicher KI-Assistent für Telegram, Discord und mehr. Die Einrichtung dauert ca. 5 Minuten.
+  </p>
+
+  <ul class="checklist">
+    <li>
+      <span class="ico">🔑</span>
+      <span>
+        OpenRouter API Key
+        <span style="display:block;font-size:0.78rem;margin-top:2px">
+          Kostenlos unter <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--accent);text-decoration:none">openrouter.ai</a>
+        </span>
+      </span>
+    </li>
+    <li>
+      <span class="ico">💬</span>
+      <span>Mindestens einen Messenger (Telegram, Discord, Slack oder Matrix)</span>
+    </li>
+    <li>
+      <span class="ico">⏱️</span>
+      <span>Ca. 5 Minuten Zeit</span>
+    </li>
+  </ul>
+
+  <div class="btn-row" style="justify-content:center">
+    <button class="btn btn-primary" onclick="go2(2)">Los geht's →</button>
+  </div>
+</div>
+
+<!-- ── Schritt 2: Provider + API Key ──────────────────────────────────────── -->
+<div class="card" id="s2">
+  <h2>🔑 KI-Provider & API Key</h2>
+  <p class="subtitle">
+    Wähle deinen KI-Anbieter aus und gib deinen API Key ein.
+    Du kannst jeden Anbieter nutzen – oder bei mehreren Anbietern registriert sein.
+  </p>
+
+  <div class="form-group">
+    <label>KI-Anbieter <span class="req">*</span></label>
+    <select id="providerSelect" onchange="onProviderChange()">
+      <optgroup label="── Empfohlen ──────────────────────────">
+        <option value="openrouter">🌐  OpenRouter – alle Modelle über eine API</option>
+      </optgroup>
+      <optgroup label="── Führende Anbieter ──────────────────">
+        <option value="anthropic">🧠  Anthropic – Claude Sonnet / Opus</option>
+        <option value="openai">🤖  OpenAI – GPT-4o / o1 / o3</option>
+        <option value="google">🔵  Google – Gemini 2.0 / 1.5 Pro</option>
+        <option value="xai">✖️   xAI – Grok 2 / Grok 3</option>
+        <option value="groq">⚡  Groq – Llama 3.3 (kostenloser Tier)</option>
+        <option value="mistral">🌊  Mistral AI – Mistral Large / Codestral</option>
+        <option value="together">🤝  Together AI – viele Open-Source-Modelle</option>
+        <option value="deepseek">🔍  DeepSeek – V3 / R1</option>
+        <option value="perplexity">🔎  Perplexity – Sonar Pro (mit Websuche)</option>
+        <option value="cohere">🔗  Cohere – Command R+</option>
+      </optgroup>
+      <optgroup label="── Weitere Anbieter ───────────────────">
+        <option value="fireworks">🎆  Fireworks AI</option>
+        <option value="novita">🆕  NovitaAI</option>
+        <option value="deepinfra">🏗️  DeepInfra</option>
+        <option value="cerebras">🧠  Cerebras – sehr schnelle Inference</option>
+        <option value="lepton">⚛️  Lepton AI</option>
+        <option value="anyscale">📡  Anyscale Endpoints</option>
+        <option value="replicate">♻️  Replicate</option>
+        <option value="ollama">🏠  Ollama – lokale Modelle (kein API-Key)</option>
+      </optgroup>
+      <optgroup label="── Benutzerdefiniert ──────────────────">
+        <option value="custom">⚙️  Eigener Provider (beliebige OpenAI-kompatible API)</option>
+      </optgroup>
+    </select>
+    <div class="hint" id="providerHint">
+      Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr – alles mit einem Key. →
+      <a href="https://openrouter.ai/keys" target="_blank">Kostenlos unter openrouter.ai</a>
+    </div>
+  </div>
+
+  <div class="form-group" id="customUrlRow" style="display:none">
+    <label>API Base-URL <span class="req">*</span></label>
+    <input type="text" id="customUrl" placeholder="https://mein-anbieter.com/v1/chat/completions">
+    <div class="hint">Die vollständige URL zum Chat-Completions-Endpunkt</div>
+  </div>
+
+  <div class="form-group" id="customNameRow" style="display:none">
+    <label>Anbieter-Name</label>
+    <input type="text" id="customName" placeholder="z.B. MeinLLM">
+  </div>
+
+  <div class="form-group" id="defaultModelRow" style="display:none">
+    <label>Standard-Modell <span class="req">*</span></label>
+    <input type="text" id="defaultModel" placeholder="z.B. gpt-4o oder llama-3.3-70b">
+    <div class="hint">Die genaue Modell-ID die dein Anbieter erwartet</div>
+  </div>
+
+  <div class="form-group">
+    <label id="apiKeyLabel">API Key <span class="req">*</span></label>
+    <input type="password" id="apiKey" placeholder="sk-or-v1-..." autocomplete="off">
+  </div>
+
+  <div class="err" id="e2">Bitte wähle einen Anbieter und gib deinen API Key ein.</div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="go2(1)">← Zurück</button>
+    <button class="btn btn-primary" onclick="v2()">Weiter →</button>
+  </div>
+</div>
+
+<!-- ── Schritt 3: Messenger ────────────────────────────────────────────────── -->
+<div class="card" id="s3">
+  <h2>💬 Messenger auswählen</h2>
+  <p class="subtitle">
+    Wähle mindestens einen Messenger aus und gib die benötigten Zugangsdaten ein.
+    Du kannst später im Dashboard weitere hinzufügen.
+  </p>
+
+  <div class="channel-grid">
+    <div class="ch-card" onclick="tog('telegram')" id="cc-telegram">
+      <span class="ch-icon">✈️</span>
+      <span class="ch-name">Telegram</span>
+      <span class="ch-check" id="ck-telegram"></span>
+    </div>
+    <div class="ch-card" onclick="tog('discord')" id="cc-discord">
+      <span class="ch-icon">🎮</span>
+      <span class="ch-name">Discord</span>
+      <span class="ch-check" id="ck-discord"></span>
+    </div>
+    <div class="ch-card" onclick="tog('slack')" id="cc-slack">
+      <span class="ch-icon">💼</span>
+      <span class="ch-name">Slack</span>
+      <span class="ch-check" id="ck-slack"></span>
+    </div>
+    <div class="ch-card" onclick="tog('matrix')" id="cc-matrix">
+      <span class="ch-icon">🔷</span>
+      <span class="ch-name">Matrix</span>
+      <span class="ch-check" id="ck-matrix"></span>
+    </div>
+  </div>
+
+  <!-- Telegram -->
+  <div class="ch-config" id="cfg-telegram">
+    <div class="ch-config-title">✈️ Telegram</div>
+    <div class="form-group">
+      <label>Bot Token <span class="req">*</span></label>
+      <input type="password" id="tg-token" placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11" autocomplete="off">
+      <div class="hint">
+        Erstelle einen Bot bei <a href="https://t.me/BotFather" target="_blank">@BotFather</a>
+        auf Telegram → Befehl: /newbot
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Deine Telegram User-ID <span class="req">*</span></label>
+      <input type="text" id="tg-uid" placeholder="123456789">
+      <div class="hint">
+        Schreib <a href="https://t.me/userinfobot" target="_blank">@userinfobot</a>
+        auf Telegram – er antwortet mit deiner ID
+      </div>
+    </div>
+  </div>
+
+  <!-- Discord -->
+  <div class="ch-config" id="cfg-discord">
+    <div class="ch-config-title">🎮 Discord</div>
+    <div class="form-group">
+      <label>Bot Token <span class="req">*</span></label>
+      <input type="password" id="dc-token" placeholder="MTI3..." autocomplete="off">
+      <div class="hint">
+        <a href="https://discord.com/developers/applications" target="_blank">discord.com/developers →</a>
+        Neue App → Bot → Token Reset → kopieren.<br>
+        Danach unter „Privileged Gateway Intents" das <strong>MESSAGE CONTENT INTENT</strong> aktivieren.
+      </div>
+    </div>
+  </div>
+
+  <!-- Slack -->
+  <div class="ch-config" id="cfg-slack">
+    <div class="ch-config-title">💼 Slack</div>
+    <div class="form-group">
+      <label>Bot Token <span class="req">*</span></label>
+      <input type="password" id="sl-bot" placeholder="xoxb-..." autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label>App Token <span class="req">*</span></label>
+      <input type="password" id="sl-app" placeholder="xapp-..." autocomplete="off">
+      <div class="hint">
+        <a href="https://api.slack.com/apps" target="_blank">api.slack.com/apps →</a>
+        Neue App erstellen, Socket Mode aktivieren
+      </div>
+    </div>
+  </div>
+
+  <!-- Matrix -->
+  <div class="ch-config" id="cfg-matrix">
+    <div class="ch-config-title">🔷 Matrix</div>
+    <div class="form-group">
+      <label>Homeserver</label>
+      <input type="text" id="mx-srv" placeholder="https://matrix.org">
+    </div>
+    <div class="form-group">
+      <label>User ID</label>
+      <input type="text" id="mx-uid" placeholder="@fluxbot:matrix.org">
+    </div>
+    <div class="form-group">
+      <label>Access Token <span class="req">*</span></label>
+      <input type="password" id="mx-token" placeholder="syt_..." autocomplete="off">
+    </div>
+  </div>
+
+  <div class="err" id="e3"></div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="go2(2)">← Zurück</button>
+    <button class="btn btn-primary" onclick="v3()">Weiter →</button>
+  </div>
+</div>
+
+<!-- ── Schritt 4: Fertig ───────────────────────────────────────────────────── -->
+<div class="card" id="s4">
+  <h2>🎉 Fast fertig!</h2>
+  <p class="subtitle">
+    Optionale Features – du kannst alles auch später im Dashboard jederzeit aktivieren.
+  </p>
+
+  <!-- Dashboard -->
+  <div class="toggle-row">
+    <div>
+      <div class="toggle-lbl">📊 Dashboard</div>
+      <div class="toggle-desc">Web-Oberfläche zum Verwalten von FluxBot</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="dashOn" checked onchange="onDashToggle()">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div id="dashPortRow" class="form-group" style="margin:10px 0 6px">
+    <label>Dashboard Port</label>
+    <input type="number" id="dashPort" value="8090" min="1024" max="65535" oninput="updateDashUrl()">
+    <div class="hint">Erreichbar unter <span id="dashUrl">http://localhost:8090</span></div>
+  </div>
+
+  <!-- Voice -->
+  <div class="toggle-row" style="margin-top:4px">
+    <div>
+      <div class="toggle-lbl">🎤 Spracherkennung</div>
+      <div class="toggle-desc">Groq API Key erforderlich (kostenlos)</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="voiceOn" onchange="onVoiceToggle()">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div id="voiceCfg" style="display:none;margin-top:10px">
+    <div class="form-group">
+      <label>Groq API Key</label>
+      <input type="password" id="voiceKey" placeholder="gsk_..." autocomplete="off">
+      <div class="hint">
+        <a href="https://console.groq.com/keys" target="_blank">Kostenlos unter console.groq.com →</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="btn-row" style="margin-top:22px">
+    <button class="btn btn-secondary" onclick="go2(3)">← Zurück</button>
+    <button class="btn btn-primary" id="finBtn" onclick="finish()">⚡ FluxBot starten</button>
+  </div>
+</div>
+
+<!-- ── Erfolg ───────────────────────────────────────────────────────────────── -->
+<div class="card" id="sDone">
+  <div class="success-icon">✅</div>
+  <h2 style="text-align:center">FluxBot wird gestartet!</h2>
+  <p class="subtitle" style="text-align:center;margin-bottom:0">
+    Deine Konfiguration wurde gespeichert.<br>
+    FluxBot startet jetzt im Hintergrund.<br><br>
+    Dieses Fenster kann geschlossen werden.
+  </p>
+  <a id="dashLink" class="dash-link" href="#" target="_blank" style="display:none">
+    → Dashboard öffnen
+  </a>
+</div>
+
+<script>
+  let step = 1;
+  const sel = new Set();
+
+  const providerMeta = {
+    openrouter: { ph: 'sk-or-v1-...',  hint: 'Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr – alles mit einem Key.',  link: 'https://openrouter.ai/keys',                      linkText: 'Kostenlos unter openrouter.ai',           keyLabel: 'API Key' },
+    anthropic:  { ph: 'sk-ant-...',    hint: 'Direkter Zugang zu Claude Sonnet und Claude Opus.',                            link: 'https://console.anthropic.com/settings/keys',    linkText: 'API Key auf console.anthropic.com',       keyLabel: 'API Key' },
+    openai:     { ph: 'sk-...',        hint: 'Direkter Zugang zu GPT-4o, o1, o3 und weiteren OpenAI-Modellen.',              link: 'https://platform.openai.com/api-keys',           linkText: 'API Key auf platform.openai.com',         keyLabel: 'API Key' },
+    google:     { ph: 'AIza...',       hint: 'Gemini 2.0 Flash, Gemini 1.5 Pro und weitere Google-Modelle.',                  link: 'https://aistudio.google.com/app/apikey',         linkText: 'API Key auf aistudio.google.com',         keyLabel: 'API Key' },
+    xai:        { ph: 'xai-...',       hint: 'Grok 2 und Grok 3 von xAI (Elon Musks KI-Unternehmen).',                       link: 'https://console.x.ai/',                          linkText: 'API Key auf console.x.ai',                keyLabel: 'API Key' },
+    groq:       { ph: 'gsk_...',       hint: 'Kostenloser Tier verfügbar. Sehr schnelle Inference mit Llama 3.3 70B.',        link: 'https://console.groq.com/keys',                  linkText: 'Kostenlos unter console.groq.com',        keyLabel: 'API Key' },
+    mistral:    { ph: '...',           hint: 'Mistral Large, Mistral Small, Codestral und weitere Mistral-Modelle.',          link: 'https://console.mistral.ai/api-keys/',           linkText: 'API Key auf console.mistral.ai',          keyLabel: 'API Key' },
+    together:   { ph: '...',           hint: 'Zugang zu Llama, Qwen, Gemma und vielen weiteren Open-Source-Modellen.',       link: 'https://api.together.ai/settings/api-keys',      linkText: 'API Key auf api.together.ai',             keyLabel: 'API Key' },
+    deepseek:   { ph: 'sk-...',        hint: 'DeepSeek V3 und DeepSeek R1 – günstiger Preis, starke Leistung.',               link: 'https://platform.deepseek.com/api_keys',         linkText: 'API Key auf platform.deepseek.com',       keyLabel: 'API Key' },
+    perplexity: { ph: 'pplx-...',      hint: 'Sonar Pro mit Echtzeit-Websuche – ideal für aktuelle Informationen.',          link: 'https://www.perplexity.ai/settings/api',         linkText: 'API Key auf perplexity.ai',               keyLabel: 'API Key' },
+    cohere:     { ph: '...',           hint: 'Command R+ – spezialisiert auf RAG und lange Kontexte.',                        link: 'https://dashboard.cohere.com/api-keys',          linkText: 'API Key auf dashboard.cohere.com',        keyLabel: 'API Key' },
+    fireworks:  { ph: 'fw_...',        hint: 'Schnelle Inference für viele Open-Source-Modelle.',                             link: 'https://fireworks.ai/account/api-keys',          linkText: 'API Key auf fireworks.ai',                keyLabel: 'API Key' },
+    novita:     { ph: '...',           hint: 'Günstiger Zugang zu vielen Open-Source-Modellen.',                              link: 'https://novita.ai/settings?tab=key-management',  linkText: 'API Key auf novita.ai',                   keyLabel: 'API Key' },
+    deepinfra:  { ph: '...',           hint: 'Kosteneffiziente Inference für Open-Source-Modelle.',                           link: 'https://deepinfra.com/dash/api_keys',             linkText: 'API Key auf deepinfra.com',               keyLabel: 'API Key' },
+    cerebras:   { ph: '...',           hint: 'Extrem schnelle Inference auf Cerebras-Hardware.',                              link: 'https://cloud.cerebras.ai/',                     linkText: 'API Key auf cloud.cerebras.ai',           keyLabel: 'API Key' },
+    lepton:     { ph: '...',           hint: 'Einfache Inference-API für Open-Source-Modelle.',                               link: 'https://dashboard.lepton.ai/',                   linkText: 'API Key auf dashboard.lepton.ai',         keyLabel: 'API Key' },
+    anyscale:   { ph: 'esecret_...',   hint: 'Anyscale Endpoints für skalierbare Modell-Deployments.',                       link: 'https://app.endpoints.anyscale.com/',            linkText: 'API Key auf endpoints.anyscale.com',      keyLabel: 'API Key' },
+    replicate:  { ph: 'r8_...',        hint: 'Zugang zu tausenden Modellen auf der Replicate-Plattform.',                    link: 'https://replicate.com/account/api-tokens',       linkText: 'API Key auf replicate.com',               keyLabel: 'API Token' },
+    ollama:     { ph: '(kein Key)',    hint: 'Lokale Modelle auf deinem eigenen Rechner – kein API-Key und keine Kosten.',    link: 'https://ollama.ai',                              linkText: 'Mehr Infos auf ollama.ai',                keyLabel: 'API Key (nicht nötig)' },
+    custom:     { ph: '...',           hint: 'Jede OpenAI-kompatible API funktioniert – einfach Base-URL und Key eintragen.', link: '',                                               linkText: '',                                        keyLabel: 'API Key' },
+  };
+
+  function onProviderChange() {
+    const p   = document.getElementById('providerSelect').value;
+    const m   = providerMeta[p] || providerMeta.custom;
+    const isCustom  = p === 'custom';
+    const isOllama  = p === 'ollama';
+
+    document.getElementById('apiKey').placeholder = m.ph;
+    document.getElementById('apiKeyLabel').innerHTML = m.keyLabel + (isOllama ? '' : ' <span class="req">*</span>');
+
+    document.getElementById('providerHint').innerHTML =
+      m.hint + (m.link ? ' → <a href="' + m.link + '" target="_blank">' + m.linkText + '</a>' : '');
+
+    // Custom-Felder ein-/ausblenden
+    document.getElementById('customUrlRow').style.display   = isCustom ? 'block' : 'none';
+    document.getElementById('customNameRow').style.display  = isCustom ? 'block' : 'none';
+    document.getElementById('defaultModelRow').style.display = isCustom ? 'block' : 'none';
+  }
+
+  function go2(n) {
+    document.getElementById('s' + step).classList.remove('active');
+
+    // Progress-Dots aktualisieren
+    for (let i = 1; i <= 4; i++) {
+      const d = document.getElementById('d' + i);
+      const l = document.getElementById('l' + i);
+      if (i < n) {
+        d.className = 'dot done';
+        d.textContent = '✓';
+        if (l) l.className = 'line done';
+      } else if (i === n) {
+        d.className = 'dot active';
+        d.textContent = i;
+      } else {
+        d.className = 'dot';
+        d.textContent = i;
+        if (l) l.className = 'line';
+      }
+    }
+
+    step = n;
+    const card = document.getElementById('s' + n);
+    if (card) card.classList.add('active');
+  }
+
+  function tog(name) {
+    const card = document.getElementById('cc-' + name);
+    const cfg  = document.getElementById('cfg-' + name);
+    const chk  = document.getElementById('ck-' + name);
+    if (sel.has(name)) {
+      sel.delete(name);
+      card.classList.remove('sel');
+      cfg.classList.remove('open');
+      chk.textContent = '';
+    } else {
+      sel.add(name);
+      card.classList.add('sel');
+      cfg.classList.add('open');
+      chk.textContent = '✓';
+    }
+  }
+
+  function showErr(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+
+  function hideErr(id) {
+    document.getElementById(id).classList.remove('show');
+  }
+
+  function v2() {
+    const p = document.getElementById('providerSelect').value;
+    const k = document.getElementById('apiKey').value.trim();
+    const isOllama = p === 'ollama';
+    const isCustom = p === 'custom';
+
+    if (!k && !isOllama) {
+      showErr('e2', 'Bitte gib deinen API Key ein.');
+      return;
+    }
+    if (isCustom) {
+      if (!document.getElementById('customUrl').value.trim()) {
+        showErr('e2', 'Bitte gib die Base-URL deines Anbieters ein.');
+        return;
+      }
+      if (!document.getElementById('defaultModel').value.trim()) {
+        showErr('e2', 'Bitte gib das Standard-Modell ein.');
+        return;
+      }
+    }
+    hideErr('e2');
+    go2(3);
+  }
+
+  function v3() {
+    if (sel.size === 0) {
+      showErr('e3', 'Bitte wähle mindestens einen Messenger aus.');
+      return;
+    }
+    if (sel.has('telegram')) {
+      if (!document.getElementById('tg-token').value.trim() ||
+          !document.getElementById('tg-uid').value.trim()) {
+        showErr('e3', 'Bitte fülle alle Telegram-Felder aus (Token + User-ID).');
+        return;
+      }
+    }
+    if (sel.has('discord') && !document.getElementById('dc-token').value.trim()) {
+      showErr('e3', 'Bitte gib deinen Discord Bot Token ein.');
+      return;
+    }
+    if (sel.has('slack') &&
+        (!document.getElementById('sl-bot').value.trim() ||
+         !document.getElementById('sl-app').value.trim())) {
+      showErr('e3', 'Bitte fülle alle Slack-Felder aus.');
+      return;
+    }
+    if (sel.has('matrix') && !document.getElementById('mx-token').value.trim()) {
+      showErr('e3', 'Bitte gib deinen Matrix Access Token ein.');
+      return;
+    }
+    hideErr('e3');
+    go2(4);
+  }
+
+  function onDashToggle() {
+    document.getElementById('dashPortRow').style.display =
+      document.getElementById('dashOn').checked ? 'block' : 'none';
+  }
+
+  function onVoiceToggle() {
+    document.getElementById('voiceCfg').style.display =
+      document.getElementById('voiceOn').checked ? 'block' : 'none';
+  }
+
+  function updateDashUrl() {
+    const p = document.getElementById('dashPort').value || '8090';
+    document.getElementById('dashUrl').textContent = 'http://localhost:' + p;
+  }
+
+  function buildCfg() {
+    const tgUid       = document.getElementById('tg-uid').value.trim();
+    const dashEnabled = document.getElementById('dashOn').checked;
+    const dashPort    = parseInt(document.getElementById('dashPort').value) || 8090;
+    const voiceEnabled = document.getElementById('voiceOn').checked;
+    const provider    = document.getElementById('providerSelect').value;
+    const apiKey      = document.getElementById('apiKey').value.trim();
+
+    // Modelle je nach Provider
+    const modelsByProvider = {
+      openrouter: {
+        default: 'anthropic/claude-sonnet-4-5-20250929',
+        opus: 'anthropic/claude-opus-4-5-20251101',
+        image: 'google/gemini-2.0-flash-exp',
+        search: 'perplexity/sonar-reasoning-pro',
+        ocr: 'mistralai/pixtral-12b'
+      },
+      anthropic: {
+        default: 'claude-sonnet-4-5-20250929',
+        opus: 'claude-opus-4-5-20251101',
+        image: 'claude-sonnet-4-5-20250929',
+        search: 'claude-sonnet-4-5-20250929',
+        ocr: 'claude-sonnet-4-5-20250929'
+      },
+      openai: {
+        default: 'gpt-4o',
+        opus: 'gpt-4o',
+        image: 'gpt-4o',
+        search: 'gpt-4o',
+        ocr: 'gpt-4o'
+      },
+      groq: {
+        default: 'llama-3.3-70b-versatile',
+        opus: 'llama-3.3-70b-versatile',
+        image: 'llama-3.3-70b-versatile',
+        search: 'llama-3.3-70b-versatile',
+        ocr: 'llama-3.3-70b-versatile'
+      }
+    };
+
+    const models = modelsByProvider[provider] || modelsByProvider.openrouter;
+
+    return {
+      channels: {
+        telegram: {
+          enabled:   sel.has('telegram'),
+          token:     sel.has('telegram') ? document.getElementById('tg-token').value.trim() : '',
+          allowFrom: sel.has('telegram') && tgUid ? [tgUid] : []
+        },
+        discord: {
+          enabled:   sel.has('discord'),
+          token:     sel.has('discord') ? document.getElementById('dc-token').value.trim() : '',
+          allowFrom: []
+        },
+        slack: {
+          enabled:       sel.has('slack'),
+          botToken:      sel.has('slack') ? document.getElementById('sl-bot').value.trim() : '',
+          appToken:      sel.has('slack') ? document.getElementById('sl-app').value.trim() : '',
+          signingSecret: '',
+          webhookPort:   3000,
+          allowFrom:     []
+        },
+        matrix: {
+          enabled:    sel.has('matrix'),
+          homeServer: sel.has('matrix') ? (document.getElementById('mx-srv').value.trim() || 'https://matrix.org') : 'https://matrix.org',
+          userId:     sel.has('matrix') ? document.getElementById('mx-uid').value.trim() : '',
+          token:      sel.has('matrix') ? document.getElementById('mx-token').value.trim() : '',
+          allowFrom:  []
+        },
+        whatsapp: {
+          enabled:       false,
+          provider:      'meta',
+          phoneNumber:   '',
+          phoneNumberId: '',
+          apiKey:        '',
+          webhookSecret: '',
+          webhookPort:   8443,
+          allowFrom:     []
+        }
+      },
+      providers: {
+        default: provider,
+        openrouter: { apiKey: provider === 'openrouter' ? apiKey : '', models: provider === 'openrouter' ? models : {} },
+        anthropic:  { apiKey: provider === 'anthropic'  ? apiKey : '' },
+        openai:     { apiKey: provider === 'openai'     ? apiKey : '' },
+        google:     { apiKey: provider === 'google'     ? apiKey : '' },
+        xai:        { apiKey: provider === 'xai'        ? apiKey : '' },
+        groq:       { apiKey: provider === 'groq'       ? apiKey : '' },
+        mistral:    { apiKey: provider === 'mistral'    ? apiKey : '' },
+        together:   { apiKey: provider === 'together'   ? apiKey : '' },
+        deepseek:   { apiKey: provider === 'deepseek'   ? apiKey : '' },
+        perplexity: { apiKey: provider === 'perplexity' ? apiKey : '' },
+        cohere:     { apiKey: provider === 'cohere'     ? apiKey : '' },
+        fireworks:  { apiKey: provider === 'fireworks'  ? apiKey : '' },
+        ollama:     { apiKey: '' },
+        custom: {
+          name:    document.getElementById('customName').value.trim() || provider,
+          apiKey:  provider === 'custom' ? apiKey : '',
+          baseUrl: document.getElementById('customUrl').value.trim(),
+          models:  provider === 'custom' ? {
+            default: document.getElementById('defaultModel').value.trim() || 'gpt-4o',
+            opus:    document.getElementById('defaultModel').value.trim() || 'gpt-4o'
+          } : {}
+        }
+      },
+      workspace: { path: './workspace' },
+      imageGen: {
+        enabled:  false,
+        provider: 'fal',
+        apiKey:   '',
+        model:    'fal-ai/flux/schnell',
+        size:     'landscape',
+        quality:  'standard'
+      },
+      voice: {
+        enabled:   voiceEnabled,
+        provider:  'groq',
+        apiKey:    voiceEnabled ? document.getElementById('voiceKey').value.trim() : '',
+        language:  'de',
+        ollamaUrl: 'http://ollama:11434'
+      },
+      dashboard: {
+        enabled:  dashEnabled,
+        port:     dashPort,
+        password: ''
+      }
+    };
+  }
+
+  async function finish() {
+    const btn = document.getElementById('finBtn');
+    btn.disabled = true;
+    btn.textContent = 'Speichere...';
+
+    try {
+      const res = await fetch('/api/finish', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildCfg())
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+
+      const cfg = buildCfg();
+
+      // Alle Dots auf "done"
+      for (let i = 1; i <= 4; i++) {
+        const d = document.getElementById('d' + i);
+        d.className = 'dot done';
+        d.textContent = '✓';
+        const l = document.getElementById('l' + i);
+        if (l) l.className = 'line done';
+      }
+
+      document.getElementById('s4').classList.remove('active');
+      document.getElementById('sDone').classList.add('active');
+
+      if (cfg.dashboard.enabled) {
+        const url = 'http://localhost:' + cfg.dashboard.port;
+        const link = document.getElementById('dashLink');
+        link.href = url;
+        link.textContent = '→ Dashboard öffnen (' + url + ')';
+        link.style.display = 'block';
+      }
+
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '⚡ FluxBot starten';
+      alert('Fehler beim Speichern der Konfiguration:\n' + err.message);
+    }
+  }
+</script>
+</body>
+</html>
