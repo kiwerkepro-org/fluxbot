@@ -126,21 +126,33 @@ func (c *Config) Validate() error {
 		}
 	}
 
-	if c.ImageGen.Enabled {
-		switch c.ImageGen.Provider {
-		case "":
-			ve.add("imageGen.provider", "'fal' (fal.ai Flux, kostenlos) oder 'openai' (DALL-E 3)")
+	// ImageGen: Provider und Key nur prüfen wenn Default explizit gesetzt ist
+	if c.ImageGen.Default != "" && c.ImageGen.Default != "openrouter-shared" {
+		switch c.ImageGen.Default {
+		case "openrouter":
+			if c.ImageGen.OpenRouter.APIKey == "" {
+				ve.add("imageGen.openrouter.apiKey", "OpenRouter API Key von openrouter.ai/keys")
+			}
 		case "fal":
-			if c.ImageGen.APIKey == "" {
-				ve.add("imageGen.apiKey", "fal.ai API Key von fal.ai/dashboard/keys")
+			if c.ImageGen.Fal.APIKey == "" {
+				ve.add("imageGen.fal.apiKey", "fal.ai API Key von fal.ai/dashboard/keys")
 			}
 		case "openai":
-			if c.ImageGen.APIKey == "" {
-				ve.add("imageGen.apiKey", "OpenAI API Key von platform.openai.com")
+			if c.ImageGen.OpenAI.APIKey == "" {
+				ve.add("imageGen.openai.apiKey", "OpenAI API Key von platform.openai.com")
 			}
-		default:
-			ve.add("imageGen.provider",
-				fmt.Sprintf("'%s' unbekannt – erlaubt: fal, openai", c.ImageGen.Provider))
+		case "stability":
+			if c.ImageGen.Stability.APIKey == "" {
+				ve.add("imageGen.stability.apiKey", "Stability AI API Key von platform.stability.ai")
+			}
+		case "together":
+			if c.ImageGen.Together.APIKey == "" {
+				ve.add("imageGen.together.apiKey", "Together AI API Key von api.together.xyz")
+			}
+		case "replicate":
+			if c.ImageGen.Replicate.APIKey == "" {
+				ve.add("imageGen.replicate.apiKey", "Replicate API Key von replicate.com/account")
+			}
 		}
 	}
 

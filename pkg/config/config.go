@@ -13,6 +13,7 @@ type Config struct {
 	Workspace WorkspaceConfig `json:"workspace"`
 	Voice     VoiceConfig     `json:"voice"`
 	ImageGen  ImageGenConfig  `json:"imageGen"`
+	VideoGen  VideoGenConfig  `json:"videoGen"`
 	Dashboard DashboardConfig `json:"dashboard"`
 }
 
@@ -139,16 +140,55 @@ type VoiceConfig struct {
 	OllamaURL string `json:"ollamaUrl"` // Ollama API URL, z.B. http://ollama:11434
 }
 
-// ImageGenConfig konfiguriert optionale kostenpflichtige Bild-Provider (fal.ai, DALL-E).
-// OpenRouter-Modelle (FLUX.2 Pro, Seedream 4.5) sind automatisch aktiv wenn
-// providers.openrouter.apiKey gesetzt ist – kein eigener Eintrag nötig.
+// ImageGenConfig konfiguriert die Bild-Generierung.
+// Default legt den aktiven Provider fest. Jeder Provider hat seinen eigenen API-Key.
+// Wird kein Default gesetzt, wird der erste Provider mit einem Key automatisch gewählt.
 type ImageGenConfig struct {
-	Enabled  bool   `json:"enabled"`  // Nur für fal.ai / DALL-E
-	Provider string `json:"provider"` // "fal" oder "openai"
-	APIKey   string `json:"apiKey"`   // fal.ai oder OpenAI Key
-	Model    string `json:"model"`    // Modell-ID, z.B. "fal-ai/flux-2/pro"
-	Size     string `json:"size"`     // "square", "landscape", "portrait"
-	Quality  string `json:"quality"`  // Nur DALL-E: "standard" oder "hd"
+	Default string `json:"default"` // "openrouter","fal","openai","stability","together","replicate","" = aus
+
+	// ── Provider ──────────────────────────────────────────────────────────────
+	OpenRouter ImageGenProviderConfig `json:"openrouter"` // FLUX.2 Pro, Seedream, 50+ Modelle
+	Fal        ImageGenProviderConfig `json:"fal"`        // Flux Pro Ultra, SDXL, ...
+	OpenAI     ImageGenProviderConfig `json:"openai"`     // DALL-E 3
+	Stability  ImageGenProviderConfig `json:"stability"`  // Stable Diffusion 3.5
+	Together   ImageGenProviderConfig `json:"together"`   // Flux, SDXL über Together AI
+	Replicate  ImageGenProviderConfig `json:"replicate"`  // Tausende Modelle
+
+	// ── Darstellung ───────────────────────────────────────────────────────────
+	Size    string `json:"size"`    // "square", "landscape", "portrait"
+	Quality string `json:"quality"` // DALL-E: "standard" oder "hd"
+}
+
+// ImageGenProviderConfig enthält API-Key und optionales Modell für einen Bild-Provider.
+type ImageGenProviderConfig struct {
+	APIKey string `json:"apiKey"`
+	Model  string `json:"model,omitempty"` // leer = Provider-Default
+}
+
+// VideoGenConfig konfiguriert die Video-Generierung.
+// Default legt den aktiven Provider fest.
+type VideoGenConfig struct {
+	Default string `json:"default"` // "runway","kling","luma","pika","hailuo","sora","veo","" = aus
+
+	// ── Provider ──────────────────────────────────────────────────────────────
+	Runway  VideoGenProviderConfig `json:"runway"`  // Runway Gen-4
+	Kling   VideoGenProviderConfig `json:"kling"`   // Kling AI 2.0
+	Luma    VideoGenProviderConfig `json:"luma"`    // Luma Dream Machine
+	Pika    VideoGenProviderConfig `json:"pika"`    // Pika Labs
+	Hailuo  VideoGenProviderConfig `json:"hailuo"`  // HailuoAI (Minimax)
+	Sora    VideoGenProviderConfig `json:"sora"`    // OpenAI Sora
+	Veo     VideoGenProviderConfig `json:"veo"`     // Google Veo 3
+
+	// ── Parameter ─────────────────────────────────────────────────────────────
+	Duration    int    `json:"duration"`    // Videolänge in Sekunden (default: 5)
+	AspectRatio string `json:"aspectRatio"` // "16:9", "9:16", "1:1"
+	Quality     string `json:"quality"`     // "standard", "hd"
+}
+
+// VideoGenProviderConfig enthält API-Key und optionales Modell für einen Video-Provider.
+type VideoGenProviderConfig struct {
+	APIKey string `json:"apiKey"`
+	Model  string `json:"model,omitempty"` // leer = Provider-Default
 }
 
 // Load lädt die Konfiguration aus einer JSON-Datei
@@ -213,11 +253,23 @@ func Load(path string) (*Config, error) {
 		cfg.Voice.OllamaURL = "http://ollama:11434"
 	}
 
+	// ── ImageGen Defaults ───────────────────────────────────────────────────
 	if cfg.ImageGen.Size == "" {
 		cfg.ImageGen.Size = "landscape"
 	}
 	if cfg.ImageGen.Quality == "" {
 		cfg.ImageGen.Quality = "standard"
+	}
+
+	// ── VideoGen Defaults ───────────────────────────────────────────────────
+	if cfg.VideoGen.Duration == 0 {
+		cfg.VideoGen.Duration = 5
+	}
+	if cfg.VideoGen.AspectRatio == "" {
+		cfg.VideoGen.AspectRatio = "16:9"
+	}
+	if cfg.VideoGen.Quality == "" {
+		cfg.VideoGen.Quality = "standard"
 	}
 
 	if cfg.Channels.WhatsApp.WebhookPort == 0 {

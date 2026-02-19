@@ -186,39 +186,15 @@ func runBot(ctx context.Context, configPath string) {
 
 	// ── Bild-Generatoren ─────────────────────────────────────────────────────
 	var imageGenerators []imagegen.Generator
-
-	// OpenRouter-Modelle (kostenlos, immer aktiv wenn Key vorhanden)
-	if cfg.Providers.OpenRouter.APIKey != "" {
-		fluxPro := imagegen.NewOpenRouterImageGenerator(
-			cfg.Providers.OpenRouter.APIKey,
-			"black-forest-labs/flux.2-pro",
-			"FLUX.2 Pro",
-		)
-		seedream := imagegen.NewOpenRouterImageGenerator(
-			cfg.Providers.OpenRouter.APIKey,
-			"bytedance/seedream-4.5",
-			"Seedream 4.5",
-		)
-		imageGenerators = append(imageGenerators, fluxPro, seedream)
-		log.Printf("[Main] Bild-Generierung: FLUX.2 Pro + Seedream 4.5 (OpenRouter, kostenlos)")
-	}
-
-	// fal.ai (optional, kostenpflichtig)
-	if cfg.ImageGen.Enabled && cfg.ImageGen.APIKey != "" {
-		switch cfg.ImageGen.Provider {
-		case "fal":
-			fal := imagegen.NewFalGenerator(cfg.ImageGen.APIKey, cfg.ImageGen.Model)
-			imageGenerators = append(imageGenerators, fal)
-			log.Printf("[Main] Bild-Generierung: fal.ai %s hinzugefügt", fal.Name())
-		case "openai":
-			dalle := imagegen.NewOpenAIImageGenerator(cfg.ImageGen.APIKey, cfg.ImageGen.Quality)
-			imageGenerators = append(imageGenerators, dalle)
-			log.Printf("[Main] Bild-Generierung: DALL-E hinzugefügt")
-		}
-	}
-
+	imageGenerators = buildImageGenerators(cfg)
 	if len(imageGenerators) == 0 {
-		log.Println("[Main] Bild-Generierung: deaktiviert (kein OpenRouter-Key, kein fal.ai-Key)")
+		log.Println("[Main] Bild-Generierung: deaktiviert (kein Provider konfiguriert)")
+	} else {
+		names := make([]string, len(imageGenerators))
+		for i, g := range imageGenerators {
+			names[i] = g.Name()
+		}
+		log.Printf("[Main] Bild-Generierung: %s", strings.Join(names, ", "))
 	}
 
 	// ── Security ──────────────────────────────────────────────────────────────
@@ -420,6 +396,84 @@ func getProviderModels(cfg *config.Config) map[string]string {
 	}
 
 	return config.DefaultModels()
+}
+
+// buildImageGenerators erstellt die Liste der aktiven Bild-Generatoren.
+// Der aktive Provider wird aus cfg.ImageGen.Default bestimmt.
+// Ist Default leer, wird der erste Provider mit gesetztem API-Key gewählt.
+func buildImageGenerators(cfg *config.Config) []imagegen.Generator {
+	ig := cfg.ImageGen
+
+	// Auto-Detect wenn kein Default gesetzt
+	if ig.Default == "" {
+		switch {
+		case ig.OpenRouter.APIKey != "":
+			ig.Default = "openrouter"
+		case cfg.Providers.OpenRouter.APIKey != "":
+			ig.Default = "openrouter-shared"
+		case ig.Fal.APIKey != "":
+			ig.Default = "fal"
+		case ig.OpenAI.APIKey != "":
+			ig.Default = "openai"
+		case ig.Stability.APIKey != "":
+			ig.Default = "stability"
+		case ig.Together.APIKey != "":
+			ig.Default = "together"
+		case ig.Replicate.APIKey != "":
+			ig.Default = "replicate"
+		default:
+			return nil
+		}
+	}
+
+	switch ig.Default {
+	case "openrouter":
+		key := ig.OpenRouter.APIKey
+		return []imagegen.Generator{
+			imagegen.NewOpenRouterImageGenerator(key, "black-forest-labs/flux.2-pro", "FLUX.2 Pro"),
+			imagegen.NewOpenRouterImageGenerator(key, "bytedance/seedream-4.5", "Seedream 4.5"),
+		}
+	case "openrouter-shared":
+		// Gemeinsamen OpenRouter-Key aus LLM-Provider-Config verwenden
+		key := cfg.Providers.OpenRouter.APIKey
+		return []imagegen.Generator{
+			imagegen.NewOpenRouterImageGenerator(key, "black-forest-labs/flux.2-pro", "FLUX.2 Pro"),
+			imagegen.NewOpenRouterImageGenerator(key, "bytedance/seedream-4.5", "Seedream 4.5"),
+		}
+	case "fal":
+		model := ig.Fal.Model
+		if model == "" {
+			model = "fal-ai/flux-pro/v1.1-ultra"
+		}
+		return []imagegen.Generator{imagegen.NewFalGenerator(ig.Fal.APIKey, model)}
+	case "openai":
+		return []imagegen.Generator{imagegen.NewOpenAIImageGenerator(ig.OpenAI.APIKey, ig.Quality)}
+	case "stability":
+		model := ig.Stability.Model
+		if model == "" {
+			model = "stability-ai/stable-diffusion-3.5-large"
+		}
+		return []imagegen.Generator{
+			imagegen.NewFalGenerator(ig.Stability.APIKey, model),
+		}
+	case "together":
+		model := ig.Together.Model
+		if model == "" {
+			model = "black-forest-labs/FLUX.1-schnell-Free"
+		}
+		return []imagegen.Generator{
+			imagegen.NewOpenRouterImageGenerator(ig.Together.APIKey, model, "Together FLUX"),
+		}
+	case "replicate":
+		model := ig.Replicate.Model
+		if model == "" {
+			model = "black-forest-labs/flux-1.1-pro"
+		}
+		return []imagegen.Generator{
+			imagegen.NewOpenRouterImageGenerator(ig.Replicate.APIKey, model, "Replicate"),
+		}
+	}
+	return nil
 }
 
 // loadSoul lädt SOUL.md und IDENTITY.md aus dem Workspace und kombiniert beide.

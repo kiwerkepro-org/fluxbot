@@ -665,6 +665,72 @@
     </div>
   </div>
 
+  <!-- Bilder -->
+  <div class="toggle-row" style="margin-top:4px">
+    <div>
+      <div class="toggle-lbl">🎨 Bild-Generierung</div>
+      <div class="toggle-desc">KI erstellt Bilder auf Anfrage</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="imgOn" onchange="onImgToggle()">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div id="imgCfg" style="display:none;margin-top:10px">
+    <div class="form-group">
+      <label>Bild-Provider</label>
+      <select id="imgProvider" onchange="onImgProviderChange()">
+        <option value="openrouter-shared">🌐 OpenRouter (gemeinsamer Key – kein Extra-Key nötig)</option>
+        <option value="openrouter">🌐 OpenRouter – eigener Key für Bilder</option>
+        <option value="fal">🔥 fal.ai – FLUX Pro Ultra, Recraft</option>
+        <option value="openai">🎨 OpenAI – DALL-E 3</option>
+        <option value="stability">🌈 Stability AI – Stable Diffusion 3.5</option>
+        <option value="together">🤝 Together AI – FLUX.1 Schnell (kostenlos)</option>
+        <option value="replicate">♻️ Replicate – tausende Modelle</option>
+      </select>
+    </div>
+    <div id="imgKeyRow" style="display:none">
+      <div class="form-group">
+        <label id="imgKeyLabel">API Key</label>
+        <input type="password" id="imgKey" placeholder="" autocomplete="off">
+        <div class="hint" id="imgKeyHint"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Videos -->
+  <div class="toggle-row" style="margin-top:4px">
+    <div>
+      <div class="toggle-lbl">🎬 Video-Generierung</div>
+      <div class="toggle-desc">KI erstellt Videos auf Anfrage (kostenpflichtig)</div>
+    </div>
+    <label class="switch">
+      <input type="checkbox" id="vidOn" onchange="onVidToggle()">
+      <span class="slider"></span>
+    </label>
+  </div>
+
+  <div id="vidCfg" style="display:none;margin-top:10px">
+    <div class="form-group">
+      <label>Video-Provider</label>
+      <select id="vidProvider" onchange="onVidProviderChange()">
+        <option value="runway">🚀 Runway – Gen-4</option>
+        <option value="kling">🎭 Kling AI – 2.0</option>
+        <option value="luma">💡 Luma AI – Dream Machine</option>
+        <option value="pika">✨ Pika Labs – Pika 2.0</option>
+        <option value="hailuo">🌊 HailuoAI – Minimax Video</option>
+        <option value="sora">🤖 OpenAI – Sora</option>
+        <option value="veo">🔵 Google – Veo 3</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label id="vidKeyLabel">API Key</label>
+      <input type="password" id="vidKey" placeholder="..." autocomplete="off">
+      <div class="hint" id="vidKeyHint"></div>
+    </div>
+  </div>
+
   <div class="btn-row" style="margin-top:22px">
     <button class="btn btn-secondary" onclick="go2(3)">← Zurück</button>
     <button class="btn btn-primary" id="finBtn" onclick="finish()">⚡ FluxBot starten</button>
@@ -847,6 +913,56 @@
       document.getElementById('voiceOn').checked ? 'block' : 'none';
   }
 
+  function onImgToggle() {
+    document.getElementById('imgCfg').style.display =
+      document.getElementById('imgOn').checked ? 'block' : 'none';
+    if (document.getElementById('imgOn').checked) onImgProviderChange();
+  }
+
+  const imgProviderMeta = {
+    'openrouter-shared': { ph: '(kein Extra-Key)', label: 'API Key', hint: 'Nutzt den OpenRouter-Key aus Schritt 2.', needsKey: false },
+    'openrouter':        { ph: 'sk-or-v1-...',     label: 'OpenRouter API Key', hint: 'Eigener Key für Bilder → openrouter.ai/keys', needsKey: true },
+    'fal':               { ph: 'fal_...',           label: 'fal.ai API Key', hint: 'FLUX Pro Ultra, Recraft → fal.ai/dashboard/keys', needsKey: true },
+    'openai':            { ph: 'sk-...',            label: 'OpenAI API Key', hint: 'DALL-E 3 → platform.openai.com/api-keys', needsKey: true },
+    'stability':         { ph: 'sk-...',            label: 'Stability AI API Key', hint: 'Stable Diffusion 3.5 → platform.stability.ai', needsKey: true },
+    'together':          { ph: '...',               label: 'Together AI API Key', hint: 'FLUX.1 Schnell kostenlos → api.together.ai', needsKey: true },
+    'replicate':         { ph: 'r8_...',            label: 'Replicate API Token', hint: 'Tausende Modelle → replicate.com/account/api-tokens', needsKey: true },
+  };
+
+  function onImgProviderChange() {
+    const p = document.getElementById('imgProvider').value;
+    const m = imgProviderMeta[p] || imgProviderMeta['fal'];
+    document.getElementById('imgKeyRow').style.display = m.needsKey ? 'block' : 'none';
+    if (m.needsKey) {
+      document.getElementById('imgKey').placeholder = m.ph;
+      document.getElementById('imgKeyLabel').textContent = m.label;
+      document.getElementById('imgKeyHint').textContent = m.hint;
+    }
+  }
+
+  function onVidToggle() {
+    document.getElementById('vidCfg').style.display =
+      document.getElementById('vidOn').checked ? 'block' : 'none';
+    if (document.getElementById('vidOn').checked) onVidProviderChange();
+  }
+
+  const vidProviderMeta = {
+    'runway': { ph: 'key_...', hint: 'Runway Gen-4 → app.runwayml.com' },
+    'kling':  { ph: '...',     hint: 'Kling AI 2.0 → klingai.com' },
+    'luma':   { ph: '...',     hint: 'Luma Dream Machine → lumalabs.ai' },
+    'pika':   { ph: '...',     hint: 'Pika 2.0 → pika.art' },
+    'hailuo': { ph: '...',     hint: 'HailuoAI (Minimax) → hailuoai.com' },
+    'sora':   { ph: 'sk-...',  hint: 'OpenAI Sora → sora.com' },
+    'veo':    { ph: 'AIza...', hint: 'Google Veo 3 → deepmind.google/technologies/veo' },
+  };
+
+  function onVidProviderChange() {
+    const p = document.getElementById('vidProvider').value;
+    const m = vidProviderMeta[p] || vidProviderMeta['runway'];
+    document.getElementById('vidKey').placeholder = m.ph;
+    document.getElementById('vidKeyHint').textContent = m.hint;
+  }
+
   function updateDashUrl() {
     const p = document.getElementById('dashPort').value || '8090';
     document.getElementById('dashUrl').textContent = 'http://localhost:' + p;
@@ -958,14 +1074,18 @@
         }
       },
       workspace: { path: './workspace' },
-      imageGen: {
-        enabled:  false,
-        provider: 'fal',
-        apiKey:   '',
-        model:    'fal-ai/flux/schnell',
-        size:     'landscape',
-        quality:  'standard'
-      },
+      imageGen: (() => {
+        const imgEnabled  = document.getElementById('imgOn').checked;
+        const imgProv     = imgEnabled ? document.getElementById('imgProvider').value : '';
+        const imgKey      = imgEnabled ? (document.getElementById('imgKey').value.trim() || '') : '';
+        const base = { default: imgEnabled ? imgProv : '', size: 'landscape', quality: 'standard',
+          openrouter: {}, fal: {}, openai: {}, stability: {}, together: {}, replicate: {} };
+        if (imgEnabled && imgKey && imgProv !== 'openrouter-shared') {
+          const provField = imgProv === 'openrouter' ? 'openrouter' : imgProv;
+          if (base[provField] !== undefined) base[provField].apiKey = imgKey;
+        }
+        return base;
+      })(),
       voice: {
         enabled:   voiceEnabled,
         provider:  'groq',
@@ -973,6 +1093,17 @@
         language:  'de',
         ollamaUrl: 'http://ollama:11434'
       },
+      videoGen: (() => {
+        const vidEnabled = document.getElementById('vidOn').checked;
+        const vidProv    = vidEnabled ? document.getElementById('vidProvider').value : '';
+        const vidKey     = vidEnabled ? (document.getElementById('vidKey').value.trim() || '') : '';
+        const base = { default: vidEnabled ? vidProv : '', duration: 5, aspectRatio: '16:9', quality: 'standard',
+          runway: {}, kling: {}, luma: {}, pika: {}, hailuo: {}, sora: {}, veo: {} };
+        if (vidEnabled && vidKey && vidProv && base[vidProv] !== undefined) {
+          base[vidProv].apiKey = vidKey;
+        }
+        return base;
+      })(),
       dashboard: {
         enabled:  dashEnabled,
         port:     dashPort,

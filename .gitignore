@@ -27,7 +27,7 @@ fluxbot-go-tmp-umask
 #  Docker-Daten (Produktionsdaten, die lokal auf dem Rechner liegen)
 # ─────────────────────────────────────────────────────────────────────────────
 fluxbot-data/
-FluxBot/
+/FluxBot/
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Build-Artefakte

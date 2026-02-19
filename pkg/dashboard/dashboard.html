@@ -63,7 +63,7 @@
     color: var(--text); padding: 8px 12px; font-size: 14px; outline: none; transition: border-color 0.15s;
   }
   .field input:focus, .field select:focus { border-color: var(--accent); }
-  .field input[type=text]::placeholder { color: var(--muted); }
+  .field input[type=text]::placeholder, .field input[type=password]::placeholder { color: var(--muted); }
   .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .toggle-row:last-child { border-bottom: none; padding-bottom: 0; }
   .toggle-label { font-size: 14px; color: var(--text); }
@@ -76,6 +76,12 @@
   input:checked + .toggle-slider:before { transform: translateX(20px); }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media(max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* ── Eye-Input (Passwort-Masking) ── */
+  .input-wrap { position: relative; display: flex; align-items: center; }
+  .input-wrap input { flex: 1; padding-right: 38px !important; }
+  .eye-btn { position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; padding: 0; transition: color 0.15s; }
+  .eye-btn:hover { color: var(--text); }
 
   /* ── Buttons ── */
   .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 7px; font-size: 14px; font-weight: 500; border: none; cursor: pointer; transition: all 0.15s; }
@@ -109,11 +115,15 @@
   /* ── Config Raw Editor ── */
   .config-editor { width: 100%; min-height: 400px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 16px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; resize: vertical; outline: none; }
   .config-editor:focus { border-color: var(--accent); }
-  .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
-  .tab-btn { padding: 8px 16px; font-size: 13px; cursor: pointer; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .tab-btn { padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
   .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
+
+  /* ── Provider-Info ── */
+  .provider-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
+  .provider-hint a { color: var(--accent); text-decoration: none; }
 </style>
 </head>
 <body>
@@ -124,16 +134,16 @@
     <h1>🤖 FluxBot</h1>
     <span>Dashboard</span>
   </div>
-  <div class="nav-item active" onclick="showSection('status')">
+  <div class="nav-item active" onclick="showSection('status', this)">
     <span class="nav-icon">📊</span> Status
   </div>
-  <div class="nav-item" onclick="showSection('config')">
+  <div class="nav-item" onclick="showSection('config', this)">
     <span class="nav-icon">⚙️</span> Konfiguration
   </div>
-  <div class="nav-item" onclick="showSection('soul')">
+  <div class="nav-item" onclick="showSection('soul', this)">
     <span class="nav-icon">🎭</span> Persönlichkeit
   </div>
-  <div class="nav-item" onclick="showSection('logs')">
+  <div class="nav-item" onclick="showSection('logs', this)">
     <span class="nav-icon">📋</span> Logs
   </div>
   <div class="sidebar-footer">KI-WERKE · FluxBot v1.0</div>
@@ -173,62 +183,92 @@
     <p class="subtitle">API-Keys und Einstellungen verwalten</p>
 
     <div class="tab-bar">
-      <button class="tab-btn active" onclick="showTab('channels')">Kanäle</button>
-      <button class="tab-btn" onclick="showTab('providers')">Provider</button>
-      <button class="tab-btn" onclick="showTab('voice')">Voice</button>
-      <button class="tab-btn" onclick="showTab('raw')">JSON (Experte)</button>
+      <button class="tab-btn active" onclick="showTab('channels', this)">📡 Kanäle</button>
+      <button class="tab-btn" onclick="showTab('providers', this)">🤖 Provider</button>
+      <button class="tab-btn" onclick="showTab('imagegen', this)">🎨 Bilder</button>
+      <button class="tab-btn" onclick="showTab('videogen', this)">🎬 Videos</button>
+      <button class="tab-btn" onclick="showTab('voice', this)">🎙️ Voice</button>
+      <button class="tab-btn" onclick="showTab('raw', this)">📄 JSON</button>
     </div>
 
-    <!-- Kanäle -->
+    <!-- ── Tab: Kanäle ── -->
     <div class="tab-content active" id="tab-channels">
       <div class="panel">
-        <div class="panel-title">📱 Kanäle</div>
+        <div class="panel-title">📱 Kommunikationskanäle</div>
+
+        <!-- Telegram -->
         <div class="toggle-row">
           <div><div class="toggle-label">Telegram</div><div class="toggle-sub">Long-Polling, kein Webhook nötig</div></div>
           <label class="toggle"><input type="checkbox" id="tg-enabled"><span class="toggle-slider"></span></label>
         </div>
-        <div class="field" style="margin-top:12px"><label>Telegram Bot Token</label><input type="text" id="tg-token" placeholder="1234567890:ABCdef..."></div>
-        <div class="field"><label>Erlaubte User-IDs (kommagetrennt)</label><input type="text" id="tg-allowfrom" placeholder="123456789, 987654321"></div>
+        <div style="margin-top:12px">
+          <div class="field"><label>Telegram Bot Token</label>
+            <div class="input-wrap"><input type="password" id="tg-token" placeholder="1234567890:ABCdef..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Erlaubte User-IDs (kommagetrennt)</label>
+            <input type="text" id="tg-allowfrom" placeholder="123456789, 987654321">
+          </div>
+        </div>
 
+        <!-- Discord -->
         <div class="toggle-row" style="margin-top:8px">
           <div><div class="toggle-label">Discord</div><div class="toggle-sub">Gateway WebSocket</div></div>
           <label class="toggle"><input type="checkbox" id="dc-enabled"><span class="toggle-slider"></span></label>
         </div>
-        <div class="field" style="margin-top:12px"><label>Discord Bot Token</label><input type="text" id="dc-token" placeholder="MTxxxxxx..."></div>
+        <div style="margin-top:12px">
+          <div class="field"><label>Discord Bot Token</label>
+            <div class="input-wrap"><input type="password" id="dc-token" placeholder="MTxxxxxx..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+        </div>
 
+        <!-- Slack -->
         <div class="toggle-row" style="margin-top:8px">
           <div><div class="toggle-label">Slack</div><div class="toggle-sub">Events API (Webhook)</div></div>
           <label class="toggle"><input type="checkbox" id="slack-enabled"><span class="toggle-slider"></span></label>
         </div>
         <div class="two-col" style="margin-top:12px">
-          <div class="field"><label>Bot Token</label><input type="text" id="slack-bot-token" placeholder="xoxb-..."></div>
-          <div class="field"><label>Signing Secret</label><input type="text" id="slack-signing" placeholder="abc123..."></div>
+          <div class="field"><label>Bot Token</label>
+            <div class="input-wrap"><input type="password" id="slack-bot-token" placeholder="xoxb-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Signing Secret</label>
+            <div class="input-wrap"><input type="password" id="slack-signing" placeholder="abc123..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
         </div>
 
+        <!-- Matrix -->
         <div class="toggle-row" style="margin-top:8px">
           <div><div class="toggle-label">Matrix</div><div class="toggle-sub">HTTP Long-Polling</div></div>
           <label class="toggle"><input type="checkbox" id="matrix-enabled"><span class="toggle-slider"></span></label>
         </div>
         <div class="two-col" style="margin-top:12px">
-          <div class="field"><label>Homeserver</label><input type="text" id="matrix-homeserver" placeholder="https://matrix.org"></div>
-          <div class="field"><label>Access Token</label><input type="text" id="matrix-token" placeholder="syt_..."></div>
+          <div class="field"><label>Homeserver</label>
+            <input type="text" id="matrix-homeserver" placeholder="https://matrix.org">
+          </div>
+          <div class="field"><label>Access Token</label>
+            <div class="input-wrap"><input type="password" id="matrix-token" placeholder="syt_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
         </div>
 
+        <!-- WhatsApp -->
         <div class="toggle-row" style="margin-top:8px">
           <div><div class="toggle-label">WhatsApp</div><div class="toggle-sub">Meta Business Cloud API</div></div>
           <label class="toggle"><input type="checkbox" id="wa-enabled"><span class="toggle-slider"></span></label>
         </div>
         <div class="two-col" style="margin-top:12px">
-          <div class="field"><label>Phone Number ID</label><input type="text" id="wa-phoneid" placeholder="1234567890"></div>
-          <div class="field"><label>Access Token</label><input type="text" id="wa-token" placeholder="EAA..."></div>
+          <div class="field"><label>Phone Number ID</label>
+            <input type="text" id="wa-phoneid" placeholder="1234567890">
+          </div>
+          <div class="field"><label>Access Token</label>
+            <div class="input-wrap"><input type="password" id="wa-token" placeholder="EAA..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Provider -->
+    <!-- ── Tab: Provider (LLM) ── -->
     <div class="tab-content" id="tab-providers">
       <div class="panel">
-        <div class="panel-title">🤖 KI-Provider</div>
+        <div class="panel-title">🤖 KI-Provider (Sprache / Text)</div>
         <div class="field">
           <label>Aktiver Anbieter</label>
           <select id="ai-provider" onchange="onDashProviderChange()">
@@ -262,15 +302,16 @@
             </optgroup>
           </select>
         </div>
-        <div class="field" id="dash-provider-hint-row">
-          <div style="font-size:12px;color:var(--muted);line-height:1.5" id="dash-provider-hint">
-            Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr – alles mit einem Key. →
-            <a href="https://openrouter.ai/keys" target="_blank" style="color:var(--accent);text-decoration:none">openrouter.ai</a>
-          </div>
+        <div class="provider-hint" id="dash-provider-hint" style="margin-bottom:12px">
+          Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr – alles mit einem Key. →
+          <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai</a>
         </div>
         <div class="field">
           <label id="dash-apikey-label">API Key</label>
-          <input type="password" id="ai-apikey" placeholder="sk-or-v1-..." autocomplete="off">
+          <div class="input-wrap">
+            <input type="password" id="ai-apikey" placeholder="sk-or-v1-..." autocomplete="off">
+            <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+          </div>
         </div>
         <!-- Custom Provider Felder -->
         <div id="dash-custom-url-row" style="display:none">
@@ -279,25 +320,196 @@
           <div class="field"><label>Standard-Modell</label><input type="text" id="ai-custom-model" placeholder="z.B. gpt-4o"></div>
         </div>
       </div>
+    </div>
+
+    <!-- ── Tab: Bilder ── -->
+    <div class="tab-content" id="tab-imagegen">
       <div class="panel">
-        <div class="panel-title">🎨 Bild-Generierung (fal.ai / DALL-E)</div>
-        <div class="toggle-row">
-          <div><div class="toggle-label">fal.ai / DALL-E aktivieren</div><div class="toggle-sub">OpenRouter-Modelle (FLUX.2 Pro, Seedream) sind immer kostenlos aktiv</div></div>
-          <label class="toggle"><input type="checkbox" id="img-enabled"><span class="toggle-slider"></span></label>
+        <div class="panel-title">🎨 Bild-Generierung</div>
+        <div class="field">
+          <label>Aktiver Provider</label>
+          <select id="img-default" onchange="onImgProviderChange()">
+            <option value="">⬜  Deaktiviert</option>
+            <option value="openrouter-shared">🌐  OpenRouter (gemeinsamer Key aus Provider-Tab)</option>
+            <option value="openrouter">🌐  OpenRouter (eigener Key für Bilder)</option>
+            <option value="fal">🔥  fal.ai – FLUX Pro Ultra, Recraft, Ideogram</option>
+            <option value="openai">🎨  OpenAI – DALL-E 3</option>
+            <option value="stability">🌈  Stability AI – Stable Diffusion 3.5</option>
+            <option value="together">🤝  Together AI – FLUX.1 Schnell (kostenlos)</option>
+            <option value="replicate">♻️  Replicate – tausende Modelle</option>
+          </select>
         </div>
-        <div class="two-col" style="margin-top:12px">
-          <div class="field"><label>Provider</label>
-            <select id="img-provider">
-              <option value="fal">fal.ai</option>
-              <option value="openai">DALL-E (OpenAI)</option>
+        <div class="provider-hint" id="img-provider-hint" style="margin-bottom:16px"></div>
+
+        <!-- OpenRouter eigener Key -->
+        <div id="img-openrouter-row" style="display:none">
+          <div class="field"><label>OpenRouter API Key (für Bilder)</label>
+            <div class="input-wrap"><input type="password" id="img-openrouter-key" placeholder="sk-or-v1-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="img-openrouter-model" placeholder="black-forest-labs/flux.2-pro"></div>
+        </div>
+
+        <!-- fal.ai -->
+        <div id="img-fal-row" style="display:none">
+          <div class="field"><label>fal.ai API Key</label>
+            <div class="input-wrap"><input type="password" id="img-fal-key" placeholder="fal_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="img-fal-model" placeholder="fal-ai/flux-pro/v1.1-ultra"></div>
+        </div>
+
+        <!-- OpenAI DALL-E -->
+        <div id="img-openai-row" style="display:none">
+          <div class="field"><label>OpenAI API Key</label>
+            <div class="input-wrap"><input type="password" id="img-openai-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+        </div>
+
+        <!-- Stability AI -->
+        <div id="img-stability-row" style="display:none">
+          <div class="field"><label>Stability AI API Key</label>
+            <div class="input-wrap"><input type="password" id="img-stability-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="img-stability-model" placeholder="stability-ai/stable-diffusion-3.5-large"></div>
+        </div>
+
+        <!-- Together AI -->
+        <div id="img-together-row" style="display:none">
+          <div class="field"><label>Together AI API Key</label>
+            <div class="input-wrap"><input type="password" id="img-together-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="img-together-model" placeholder="black-forest-labs/FLUX.1-schnell-Free"></div>
+        </div>
+
+        <!-- Replicate -->
+        <div id="img-replicate-row" style="display:none">
+          <div class="field"><label>Replicate API Token</label>
+            <div class="input-wrap"><input type="password" id="img-replicate-key" placeholder="r8_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="img-replicate-model" placeholder="black-forest-labs/flux-1.1-pro"></div>
+        </div>
+
+        <!-- Allgemeine Bild-Einstellungen -->
+        <div class="two-col" style="margin-top:8px">
+          <div class="field">
+            <label>Format</label>
+            <select id="img-size">
+              <option value="landscape">Querformat (16:9)</option>
+              <option value="portrait">Hochformat (9:16)</option>
+              <option value="square">Quadrat (1:1)</option>
             </select>
           </div>
-          <div class="field"><label>API Key</label><input type="text" id="img-apikey" placeholder="fal_..."></div>
+          <div class="field">
+            <label>Qualität (DALL-E)</label>
+            <select id="img-quality">
+              <option value="standard">Standard</option>
+              <option value="hd">HD</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Voice -->
+    <!-- ── Tab: Videos ── -->
+    <div class="tab-content" id="tab-videogen">
+      <div class="panel">
+        <div class="panel-title">🎬 Video-Generierung</div>
+        <div class="field">
+          <label>Aktiver Provider</label>
+          <select id="vid-default" onchange="onVidProviderChange()">
+            <option value="">⬜  Deaktiviert</option>
+            <option value="runway">🚀  Runway – Gen-4 (führender Video-KI-Anbieter)</option>
+            <option value="kling">🎭  Kling AI – 2.0 (Kuaishou)</option>
+            <option value="luma">💡  Luma AI – Dream Machine</option>
+            <option value="pika">✨  Pika Labs – Pika 2.0</option>
+            <option value="hailuo">🌊  HailuoAI – Minimax Video</option>
+            <option value="sora">🤖  OpenAI – Sora</option>
+            <option value="veo">🔵  Google – Veo 3</option>
+          </select>
+        </div>
+        <div class="provider-hint" id="vid-provider-hint" style="margin-bottom:16px"></div>
+
+        <!-- Runway -->
+        <div id="vid-runway-row" style="display:none">
+          <div class="field"><label>Runway API Key</label>
+            <div class="input-wrap"><input type="password" id="vid-runway-key" placeholder="key_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-runway-model" placeholder="gen4_turbo"></div>
+        </div>
+
+        <!-- Kling -->
+        <div id="vid-kling-row" style="display:none">
+          <div class="field"><label>Kling AI API Key</label>
+            <div class="input-wrap"><input type="password" id="vid-kling-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-kling-model" placeholder="kling-v2"></div>
+        </div>
+
+        <!-- Luma -->
+        <div id="vid-luma-row" style="display:none">
+          <div class="field"><label>Luma AI API Key</label>
+            <div class="input-wrap"><input type="password" id="vid-luma-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-luma-model" placeholder="dream-machine"></div>
+        </div>
+
+        <!-- Pika -->
+        <div id="vid-pika-row" style="display:none">
+          <div class="field"><label>Pika Labs API Key</label>
+            <div class="input-wrap"><input type="password" id="vid-pika-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-pika-model" placeholder="pika-2.0"></div>
+        </div>
+
+        <!-- Hailuo -->
+        <div id="vid-hailuo-row" style="display:none">
+          <div class="field"><label>HailuoAI API Key</label>
+            <div class="input-wrap"><input type="password" id="vid-hailuo-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-hailuo-model" placeholder="minimax-video-01"></div>
+        </div>
+
+        <!-- Sora -->
+        <div id="vid-sora-row" style="display:none">
+          <div class="field"><label>OpenAI API Key (für Sora)</label>
+            <div class="input-wrap"><input type="password" id="vid-sora-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-sora-model" placeholder="sora-1.0"></div>
+        </div>
+
+        <!-- Veo -->
+        <div id="vid-veo-row" style="display:none">
+          <div class="field"><label>Google API Key (für Veo)</label>
+            <div class="input-wrap"><input type="password" id="vid-veo-key" placeholder="AIza..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-veo-model" placeholder="veo-3"></div>
+        </div>
+
+        <!-- Allgemeine Video-Einstellungen -->
+        <div class="two-col" style="margin-top:8px">
+          <div class="field">
+            <label>Länge (Sekunden)</label>
+            <input type="number" id="vid-duration" min="1" max="60" placeholder="5">
+          </div>
+          <div class="field">
+            <label>Seitenverhältnis</label>
+            <select id="vid-aspect">
+              <option value="16:9">16:9 (Querformat)</option>
+              <option value="9:16">9:16 (Hochformat)</option>
+              <option value="1:1">1:1 (Quadrat)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Qualität</label>
+          <select id="vid-quality">
+            <option value="standard">Standard</option>
+            <option value="hd">HD</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab: Voice ── -->
     <div class="tab-content" id="tab-voice">
       <div class="panel">
         <div class="panel-title">🎙️ Spracherkennung</div>
@@ -321,11 +533,13 @@
             </select>
           </div>
         </div>
-        <div class="field"><label>API Key (Groq oder OpenAI)</label><input type="text" id="voice-apikey" placeholder="gsk_..."></div>
+        <div class="field"><label>API Key (Groq oder OpenAI)</label>
+          <div class="input-wrap"><input type="password" id="voice-apikey" placeholder="gsk_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+        </div>
       </div>
     </div>
 
-    <!-- Raw JSON -->
+    <!-- ── Tab: JSON ── -->
     <div class="tab-content" id="tab-raw">
       <div class="panel">
         <div class="panel-title">📄 config.json (direkter Zugriff)</div>
@@ -379,12 +593,25 @@
 // ── Config-Objekt (wird beim Laden gefüllt) ────────────────────────────────
 let configData = null;
 
+// ── Eye-Toggle (Passwort-Masking) ─────────────────────────────────────────
+function toggleEye(btn) {
+  const inp = btn.previousElementSibling;
+  if (!inp) return;
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    btn.textContent = '🙈';
+  } else {
+    inp.type = 'password';
+    btn.textContent = '👁';
+  }
+}
+
 // ── Navigation ─────────────────────────────────────────────────────────────
-function showSection(name) {
-  document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+function showSection(name, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('section-' + name).classList.add('active');
-  event.currentTarget.classList.add('active');
+  if (el) el.classList.add('active');
 
   if (name === 'status') loadStatus();
   if (name === 'config') loadConfig();
@@ -392,57 +619,62 @@ function showSection(name) {
   if (name === 'logs') loadLogs();
 }
 
-// ── Provider-Hilfsfunktionen ──────────────────────────────────────────────────
+function showTab(name, el) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+
+  if (name === 'raw' && configData) {
+    document.getElementById('raw-config').value = JSON.stringify(configData, null, 2);
+  }
+}
+
+// ── Provider-Hilfsfunktionen (LLM) ───────────────────────────────────────
 const dashProviderMeta = {
-  openrouter: { ph: 'sk-or-v1-...',  label: 'API Key', hint: 'Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr.',      link: 'https://openrouter.ai/keys',                    linkText: 'openrouter.ai' },
-  anthropic:  { ph: 'sk-ant-...',    label: 'API Key', hint: 'Direkter Zugang zu Claude Sonnet und Claude Opus.',           link: 'https://console.anthropic.com/settings/keys',   linkText: 'console.anthropic.com' },
-  openai:     { ph: 'sk-...',        label: 'API Key', hint: 'Direkter Zugang zu GPT-4o, o1, o3.',                          link: 'https://platform.openai.com/api-keys',          linkText: 'platform.openai.com' },
-  google:     { ph: 'AIza...',       label: 'API Key', hint: 'Gemini 2.0 Flash, Gemini 1.5 Pro.',                           link: 'https://aistudio.google.com/app/apikey',        linkText: 'aistudio.google.com' },
-  xai:        { ph: 'xai-...',       label: 'API Key', hint: 'Grok 2 und Grok 3 von xAI.',                                  link: 'https://console.x.ai/',                         linkText: 'console.x.ai' },
-  groq:       { ph: 'gsk_...',       label: 'API Key', hint: 'Kostenloser Tier. Llama 3.3 70B, sehr schnell.',              link: 'https://console.groq.com/keys',                 linkText: 'console.groq.com' },
-  mistral:    { ph: '...',           label: 'API Key', hint: 'Mistral Large, Mistral Small, Codestral.',                    link: 'https://console.mistral.ai/api-keys/',          linkText: 'console.mistral.ai' },
-  together:   { ph: '...',           label: 'API Key', hint: 'Llama, Qwen, Gemma und viele Open-Source-Modelle.',           link: 'https://api.together.ai/settings/api-keys',     linkText: 'api.together.ai' },
-  deepseek:   { ph: 'sk-...',        label: 'API Key', hint: 'DeepSeek V3 und DeepSeek R1.',                                link: 'https://platform.deepseek.com/api_keys',        linkText: 'platform.deepseek.com' },
-  perplexity: { ph: 'pplx-...',      label: 'API Key', hint: 'Sonar Pro mit Echtzeit-Websuche.',                            link: 'https://www.perplexity.ai/settings/api',        linkText: 'perplexity.ai' },
-  cohere:     { ph: '...',           label: 'API Key', hint: 'Command R+ – spezialisiert auf RAG.',                         link: 'https://dashboard.cohere.com/api-keys',         linkText: 'dashboard.cohere.com' },
-  fireworks:  { ph: 'fw_...',        label: 'API Key', hint: 'Schnelle Inference für Open-Source-Modelle.',                 link: 'https://fireworks.ai/account/api-keys',         linkText: 'fireworks.ai' },
-  novita:     { ph: '...',           label: 'API Key', hint: 'Günstiger Zugang zu Open-Source-Modellen.',                   link: 'https://novita.ai/settings?tab=key-management', linkText: 'novita.ai' },
-  deepinfra:  { ph: '...',           label: 'API Key', hint: 'Kosteneffiziente Inference.',                                 link: 'https://deepinfra.com/dash/api_keys',            linkText: 'deepinfra.com' },
-  cerebras:   { ph: '...',           label: 'API Key', hint: 'Extrem schnelle Inference auf Cerebras-Hardware.',            link: 'https://cloud.cerebras.ai/',                    linkText: 'cloud.cerebras.ai' },
-  lepton:     { ph: '...',           label: 'API Key', hint: 'Einfache Inference-API.',                                     link: 'https://dashboard.lepton.ai/',                  linkText: 'dashboard.lepton.ai' },
-  anyscale:   { ph: 'esecret_...',   label: 'API Key', hint: 'Skalierbare Modell-Deployments.',                             link: 'https://app.endpoints.anyscale.com/',           linkText: 'endpoints.anyscale.com' },
-  replicate:  { ph: 'r8_...',        label: 'API Token', hint: 'Tausende Modelle auf Replicate.',                           link: 'https://replicate.com/account/api-tokens',      linkText: 'replicate.com' },
-  ollama:     { ph: '(kein Key)',    label: 'API Key (nicht nötig)', hint: 'Lokale Modelle – kein API-Key und keine Kosten.', link: 'https://ollama.ai',                            linkText: 'ollama.ai' },
-  custom:     { ph: '...',           label: 'API Key', hint: 'Jede OpenAI-kompatible API.',                                 link: '',                                              linkText: '' },
+  openrouter: { ph: 'sk-or-v1-...',  label: 'API Key', hint: 'Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr.', link: 'https://openrouter.ai/keys', linkText: 'openrouter.ai' },
+  anthropic:  { ph: 'sk-ant-...',    label: 'API Key', hint: 'Direkter Zugang zu Claude Sonnet und Claude Opus.', link: 'https://console.anthropic.com/settings/keys', linkText: 'console.anthropic.com' },
+  openai:     { ph: 'sk-...',        label: 'API Key', hint: 'Direkter Zugang zu GPT-4o, o1, o3.', link: 'https://platform.openai.com/api-keys', linkText: 'platform.openai.com' },
+  google:     { ph: 'AIza...',       label: 'API Key', hint: 'Gemini 2.0 Flash, Gemini 1.5 Pro.', link: 'https://aistudio.google.com/app/apikey', linkText: 'aistudio.google.com' },
+  xai:        { ph: 'xai-...',       label: 'API Key', hint: 'Grok 2 und Grok 3 von xAI.', link: 'https://console.x.ai/', linkText: 'console.x.ai' },
+  groq:       { ph: 'gsk_...',       label: 'API Key', hint: 'Kostenloser Tier. Llama 3.3 70B, sehr schnell.', link: 'https://console.groq.com/keys', linkText: 'console.groq.com' },
+  mistral:    { ph: '...',           label: 'API Key', hint: 'Mistral Large, Mistral Small, Codestral.', link: 'https://console.mistral.ai/api-keys/', linkText: 'console.mistral.ai' },
+  together:   { ph: '...',           label: 'API Key', hint: 'Llama, Qwen, Gemma und viele Open-Source-Modelle.', link: 'https://api.together.ai/settings/api-keys', linkText: 'api.together.ai' },
+  deepseek:   { ph: 'sk-...',        label: 'API Key', hint: 'DeepSeek V3 und DeepSeek R1.', link: 'https://platform.deepseek.com/api_keys', linkText: 'platform.deepseek.com' },
+  perplexity: { ph: 'pplx-...',      label: 'API Key', hint: 'Sonar Pro mit Echtzeit-Websuche.', link: 'https://www.perplexity.ai/settings/api', linkText: 'perplexity.ai' },
+  cohere:     { ph: '...',           label: 'API Key', hint: 'Command R+ – spezialisiert auf RAG.', link: 'https://dashboard.cohere.com/api-keys', linkText: 'dashboard.cohere.com' },
+  fireworks:  { ph: 'fw_...',        label: 'API Key', hint: 'Schnelle Inference für Open-Source-Modelle.', link: 'https://fireworks.ai/account/api-keys', linkText: 'fireworks.ai' },
+  novita:     { ph: '...',           label: 'API Key', hint: 'Günstiger Zugang zu Open-Source-Modellen.', link: 'https://novita.ai/settings?tab=key-management', linkText: 'novita.ai' },
+  deepinfra:  { ph: '...',           label: 'API Key', hint: 'Kosteneffiziente Inference.', link: 'https://deepinfra.com/dash/api_keys', linkText: 'deepinfra.com' },
+  cerebras:   { ph: '...',           label: 'API Key', hint: 'Extrem schnelle Inference auf Cerebras-Hardware.', link: 'https://cloud.cerebras.ai/', linkText: 'cloud.cerebras.ai' },
+  lepton:     { ph: '...',           label: 'API Key', hint: 'Einfache Inference-API.', link: 'https://dashboard.lepton.ai/', linkText: 'dashboard.lepton.ai' },
+  anyscale:   { ph: 'esecret_...',   label: 'API Key', hint: 'Skalierbare Modell-Deployments.', link: 'https://app.endpoints.anyscale.com/', linkText: 'endpoints.anyscale.com' },
+  replicate:  { ph: 'r8_...',        label: 'API Token', hint: 'Tausende Modelle auf Replicate.', link: 'https://replicate.com/account/api-tokens', linkText: 'replicate.com' },
+  ollama:     { ph: '(kein Key)',    label: 'API Key (nicht nötig)', hint: 'Lokale Modelle – kein API-Key und keine Kosten.', link: 'https://ollama.ai', linkText: 'ollama.ai' },
+  custom:     { ph: '...',           label: 'API Key', hint: 'Jede OpenAI-kompatible API.', link: '', linkText: '' },
 };
 
 function onDashProviderChange() {
   const p = document.getElementById('ai-provider').value;
   const m = dashProviderMeta[p] || dashProviderMeta.custom;
-  const isCustom = p === 'custom';
-
   document.getElementById('ai-apikey').placeholder = m.ph;
   document.getElementById('dash-apikey-label').textContent = m.label;
   document.getElementById('dash-provider-hint').innerHTML =
-    m.hint + (m.link ? ' → <a href="' + m.link + '" target="_blank" style="color:var(--accent);text-decoration:none">' + m.linkText + '</a>' : '');
-  document.getElementById('dash-custom-url-row').style.display = isCustom ? 'block' : 'none';
+    m.hint + (m.link ? ' → <a href="' + m.link + '" target="_blank">' + m.linkText + '</a>' : '');
+  document.getElementById('dash-custom-url-row').style.display = (p === 'custom') ? 'block' : 'none';
 }
 
-// Liest den API-Key für den angegebenen Provider aus dem providers-Objekt
 function getDashProviderKey(p, name) {
   const keyMap = {
     openrouter: p.openrouter?.apiKey, anthropic: p.anthropic?.apiKey,
-    openai: p.openai?.apiKey,         google: p.google?.apiKey,
-    xai: p.xai?.apiKey,               groq: p.groq?.apiKey,
-    mistral: p.mistral?.apiKey,       together: p.together?.apiKey,
-    deepseek: p.deepseek?.apiKey,     perplexity: p.perplexity?.apiKey,
-    cohere: p.cohere?.apiKey,         fireworks: p.fireworks?.apiKey,
-    ollama: '',                       custom: p.custom?.apiKey,
+    openai: p.openai?.apiKey, google: p.google?.apiKey, xai: p.xai?.apiKey,
+    groq: p.groq?.apiKey, mistral: p.mistral?.apiKey, together: p.together?.apiKey,
+    deepseek: p.deepseek?.apiKey, perplexity: p.perplexity?.apiKey, cohere: p.cohere?.apiKey,
+    fireworks: p.fireworks?.apiKey, ollama: '', custom: p.custom?.apiKey,
   };
   return keyMap[name] || '';
 }
 
-// Setzt den API-Key für den angegebenen Provider im providers-Objekt
 function setDashProviderKey(providers, name, key) {
   const fieldMap = {
     openrouter: 'openrouter', anthropic: 'anthropic', openai: 'openai',
@@ -457,15 +689,50 @@ function setDashProviderKey(providers, name, key) {
   }
 }
 
-function showTab(name) {
-  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
-  event.currentTarget.classList.add('active');
+// ── ImageGen Provider-Hints ────────────────────────────────────────────────
+const imgProviderHints = {
+  '':                 '',
+  'openrouter-shared': 'Nutzt den OpenRouter-Key aus dem Provider-Tab. Kein zusätzlicher Key nötig.',
+  'openrouter':       'Separater OpenRouter-Key für Bildgenerierung. → <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai</a>',
+  'fal':              'FLUX Pro Ultra, Recraft, Ideogram u.v.m. → <a href="https://fal.ai/dashboard/keys" target="_blank">fal.ai/dashboard</a>',
+  'openai':           'DALL-E 3 von OpenAI. → <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>',
+  'stability':        'Stable Diffusion 3.5 Large. → <a href="https://platform.stability.ai/" target="_blank">platform.stability.ai</a>',
+  'together':         'FLUX.1 Schnell kostenlos. → <a href="https://api.together.ai/settings/api-keys" target="_blank">api.together.ai</a>',
+  'replicate':        'Tausende Bild-Modelle. → <a href="https://replicate.com/account/api-tokens" target="_blank">replicate.com</a>',
+};
 
-  if (name === 'raw' && configData) {
-    document.getElementById('raw-config').value = JSON.stringify(configData, null, 2);
-  }
+const imgProviderRows = ['openrouter', 'fal', 'openai', 'stability', 'together', 'replicate'];
+
+function onImgProviderChange() {
+  const sel = document.getElementById('img-default').value;
+  document.getElementById('img-provider-hint').innerHTML = imgProviderHints[sel] || '';
+  imgProviderRows.forEach(p => {
+    document.getElementById('img-' + p + '-row').style.display =
+      (sel === p) ? 'block' : 'none';
+  });
+}
+
+// ── VideoGen Provider-Hints ───────────────────────────────────────────────
+const vidProviderHints = {
+  '':       '',
+  'runway': 'Runway Gen-4 – Marktführer für KI-Videos. → <a href="https://app.runwayml.com/" target="_blank">app.runwayml.com</a>',
+  'kling':  'Kling AI 2.0 von Kuaishou. → <a href="https://klingai.com/" target="_blank">klingai.com</a>',
+  'luma':   'Luma Dream Machine – realistische Videos. → <a href="https://lumalabs.ai/" target="_blank">lumalabs.ai</a>',
+  'pika':   'Pika Labs 2.0 – kreative Videoeffekte. → <a href="https://pika.art/" target="_blank">pika.art</a>',
+  'hailuo': 'HailuoAI (Minimax) – hochauflösende Videos. → <a href="https://hailuoai.com/" target="_blank">hailuoai.com</a>',
+  'sora':   'OpenAI Sora – hochwertige KI-Videos. → <a href="https://sora.com/" target="_blank">sora.com</a>',
+  'veo':    'Google Veo 3 – realistisches Videoverständnis. → <a href="https://deepmind.google/technologies/veo/" target="_blank">deepmind.google</a>',
+};
+
+const vidProviderRows = ['runway', 'kling', 'luma', 'pika', 'hailuo', 'sora', 'veo'];
+
+function onVidProviderChange() {
+  const sel = document.getElementById('vid-default').value;
+  document.getElementById('vid-provider-hint').innerHTML = vidProviderHints[sel] || '';
+  vidProviderRows.forEach(p => {
+    document.getElementById('vid-' + p + '-row').style.display =
+      (sel === p) ? 'block' : 'none';
+  });
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────
@@ -499,50 +766,85 @@ async function loadStatus() {
   }
 }
 
-// ── CONFIG ────────────────────────────────────────────────────────────────
+// ── CONFIG: Laden ─────────────────────────────────────────────────────────
 async function loadConfig() {
   configData = await api('/api/config');
-  const c = configData.channels || {};
-  const p = configData.providers || {};
-  const v = configData.voice || {};
-  const img = configData.imageGen || {};
+  const c   = configData.channels  || {};
+  const p   = configData.providers || {};
+  const v   = configData.voice     || {};
+  const img = configData.imageGen  || {};
+  const vid = configData.videoGen  || {};
 
-  // Telegram
-  setVal('tg-enabled', c.telegram?.enabled, 'toggle');
-  setVal('tg-token', c.telegram?.token || '');
-  setVal('tg-allowfrom', (c.telegram?.allowFrom || []).join(', '));
-  // Discord
-  setVal('dc-enabled', c.discord?.enabled, 'toggle');
-  setVal('dc-token', c.discord?.token || '');
-  // Slack
-  setVal('slack-enabled', c.slack?.enabled, 'toggle');
-  setVal('slack-bot-token', c.slack?.botToken || '');
-  setVal('slack-signing', c.slack?.signingSecret || '');
-  // Matrix
-  setVal('matrix-enabled', c.matrix?.enabled, 'toggle');
-  setVal('matrix-homeserver', c.matrix?.homeServer || '');
-  setVal('matrix-token', c.matrix?.token || '');
-  // WhatsApp
-  setVal('wa-enabled', c.whatsapp?.enabled, 'toggle');
-  setVal('wa-phoneid', c.whatsapp?.phoneNumberId || '');
-  setVal('wa-token', c.whatsapp?.apiKey || '');
-  // Provider – aktiven Provider + Key laden
+  // Kanäle
+  setVal('tg-enabled',       c.telegram?.enabled,    'toggle');
+  setVal('tg-token',         c.telegram?.token       || '');
+  setVal('tg-allowfrom',     (c.telegram?.allowFrom  || []).join(', '));
+  setVal('dc-enabled',       c.discord?.enabled,     'toggle');
+  setVal('dc-token',         c.discord?.token        || '');
+  setVal('slack-enabled',    c.slack?.enabled,       'toggle');
+  setVal('slack-bot-token',  c.slack?.botToken       || '');
+  setVal('slack-signing',    c.slack?.signingSecret  || '');
+  setVal('matrix-enabled',   c.matrix?.enabled,      'toggle');
+  setVal('matrix-homeserver',c.matrix?.homeServer    || '');
+  setVal('matrix-token',     c.matrix?.token         || '');
+  setVal('wa-enabled',       c.whatsapp?.enabled,    'toggle');
+  setVal('wa-phoneid',       c.whatsapp?.phoneNumberId || '');
+  setVal('wa-token',         c.whatsapp?.apiKey      || '');
+
+  // LLM-Provider
   const activeProvider = p.default || 'openrouter';
   setVal('ai-provider', activeProvider, 'select');
   document.getElementById('ai-apikey').value = getDashProviderKey(p, activeProvider);
-  setVal('ai-custom-url',   p.custom?.baseUrl || '');
-  setVal('ai-custom-name',  p.custom?.name    || '');
+  setVal('ai-custom-url',   p.custom?.baseUrl        || '');
+  setVal('ai-custom-name',  p.custom?.name           || '');
   setVal('ai-custom-model', p.custom?.models?.default || '');
   onDashProviderChange();
-  // Image
-  setVal('img-enabled', img.enabled, 'toggle');
-  setVal('img-provider', img.provider || 'fal', 'select');
-  setVal('img-apikey', img.apiKey || '');
+
+  // Bild-Generierung
+  const imgDefault = img.default || '';
+  setVal('img-default', imgDefault, 'select');
+  setVal('img-openrouter-key',   img.openrouter?.apiKey || '');
+  setVal('img-openrouter-model', img.openrouter?.model  || '');
+  setVal('img-fal-key',          img.fal?.apiKey        || '');
+  setVal('img-fal-model',        img.fal?.model         || '');
+  setVal('img-openai-key',       img.openai?.apiKey     || '');
+  setVal('img-stability-key',    img.stability?.apiKey  || '');
+  setVal('img-stability-model',  img.stability?.model   || '');
+  setVal('img-together-key',     img.together?.apiKey   || '');
+  setVal('img-together-model',   img.together?.model    || '');
+  setVal('img-replicate-key',    img.replicate?.apiKey  || '');
+  setVal('img-replicate-model',  img.replicate?.model   || '');
+  setVal('img-size',    img.size    || 'landscape', 'select');
+  setVal('img-quality', img.quality || 'standard',  'select');
+  onImgProviderChange();
+
+  // Video-Generierung
+  const vidDefault = vid.default || '';
+  setVal('vid-default', vidDefault, 'select');
+  setVal('vid-runway-key',   vid.runway?.apiKey  || '');
+  setVal('vid-runway-model', vid.runway?.model   || '');
+  setVal('vid-kling-key',    vid.kling?.apiKey   || '');
+  setVal('vid-kling-model',  vid.kling?.model    || '');
+  setVal('vid-luma-key',     vid.luma?.apiKey    || '');
+  setVal('vid-luma-model',   vid.luma?.model     || '');
+  setVal('vid-pika-key',     vid.pika?.apiKey    || '');
+  setVal('vid-pika-model',   vid.pika?.model     || '');
+  setVal('vid-hailuo-key',   vid.hailuo?.apiKey  || '');
+  setVal('vid-hailuo-model', vid.hailuo?.model   || '');
+  setVal('vid-sora-key',     vid.sora?.apiKey    || '');
+  setVal('vid-sora-model',   vid.sora?.model     || '');
+  setVal('vid-veo-key',      vid.veo?.apiKey     || '');
+  setVal('vid-veo-model',    vid.veo?.model      || '');
+  setVal('vid-duration', vid.duration    || 5);
+  setVal('vid-aspect',   vid.aspectRatio || '16:9', 'select');
+  setVal('vid-quality',  vid.quality     || 'standard', 'select');
+  onVidProviderChange();
+
   // Voice
-  setVal('voice-enabled', v.enabled, 'toggle');
-  setVal('voice-provider', v.provider || 'groq', 'select');
-  setVal('voice-lang', v.language || 'de', 'select');
-  setVal('voice-apikey', v.apiKey || '');
+  setVal('voice-enabled',   v.enabled,           'toggle');
+  setVal('voice-provider',  v.provider || 'groq', 'select');
+  setVal('voice-lang',      v.language || 'de',   'select');
+  setVal('voice-apikey',    v.apiKey   || '');
 }
 
 function setVal(id, val, type = 'text') {
@@ -559,8 +861,8 @@ function getVal(id, type = 'text') {
   return el.value;
 }
 
+// ── CONFIG: Speichern ─────────────────────────────────────────────────────
 async function saveConfig() {
-  // Aktive Tab prüfen
   const rawTab = document.getElementById('tab-raw').classList.contains('active');
 
   let newConfig;
@@ -568,41 +870,36 @@ async function saveConfig() {
     try { newConfig = JSON.parse(document.getElementById('raw-config').value); }
     catch(e) { toast('Ungültiges JSON: ' + e.message, true); return; }
   } else {
-    // Aus Formular zusammenbauen
     newConfig = JSON.parse(JSON.stringify(configData)); // deep clone
-    const c = newConfig.channels = newConfig.channels || {};
-    // Telegram
-    c.telegram = c.telegram || {};
-    c.telegram.enabled = getVal('tg-enabled', 'toggle');
-    c.telegram.token = getVal('tg-token');
-    c.telegram.allowFrom = getVal('tg-allowfrom').split(',').map(s=>s.trim()).filter(Boolean);
-    // Discord
-    c.discord = c.discord || {};
-    c.discord.enabled = getVal('dc-enabled', 'toggle');
-    c.discord.token = getVal('dc-token');
-    // Slack
-    c.slack = c.slack || {};
-    c.slack.enabled = getVal('slack-enabled', 'toggle');
-    c.slack.botToken = getVal('slack-bot-token');
-    c.slack.signingSecret = getVal('slack-signing');
-    // Matrix
-    c.matrix = c.matrix || {};
-    c.matrix.enabled = getVal('matrix-enabled', 'toggle');
-    c.matrix.homeServer = getVal('matrix-homeserver');
-    c.matrix.token = getVal('matrix-token');
-    // WhatsApp
-    c.whatsapp = c.whatsapp || {};
-    c.whatsapp.enabled = getVal('wa-enabled', 'toggle');
-    c.whatsapp.phoneNumberId = getVal('wa-phoneid');
-    c.whatsapp.apiKey = getVal('wa-token');
-    // KI-Provider
+
+    // Kanäle
+    const ch = newConfig.channels = newConfig.channels || {};
+    ch.telegram = ch.telegram || {};
+    ch.telegram.enabled   = getVal('tg-enabled', 'toggle');
+    ch.telegram.token     = getVal('tg-token');
+    ch.telegram.allowFrom = getVal('tg-allowfrom').split(',').map(s=>s.trim()).filter(Boolean);
+    ch.discord = ch.discord || {};
+    ch.discord.enabled = getVal('dc-enabled', 'toggle');
+    ch.discord.token   = getVal('dc-token');
+    ch.slack = ch.slack || {};
+    ch.slack.enabled       = getVal('slack-enabled', 'toggle');
+    ch.slack.botToken      = getVal('slack-bot-token');
+    ch.slack.signingSecret = getVal('slack-signing');
+    ch.matrix = ch.matrix || {};
+    ch.matrix.enabled    = getVal('matrix-enabled', 'toggle');
+    ch.matrix.homeServer = getVal('matrix-homeserver');
+    ch.matrix.token      = getVal('matrix-token');
+    ch.whatsapp = ch.whatsapp || {};
+    ch.whatsapp.enabled       = getVal('wa-enabled', 'toggle');
+    ch.whatsapp.phoneNumberId = getVal('wa-phoneid');
+    ch.whatsapp.apiKey        = getVal('wa-token');
+
+    // LLM-Provider
     const selProvider = getVal('ai-provider', 'select');
     const selKey      = getVal('ai-apikey');
     newConfig.providers = newConfig.providers || {};
     newConfig.providers.default = selProvider;
-    // Nur den aktiven Provider-Key setzen, Rest unverändert lassen
     setDashProviderKey(newConfig.providers, selProvider, selKey);
-    // Custom-Felder
     if (selProvider === 'custom') {
       newConfig.providers.custom = newConfig.providers.custom || {};
       newConfig.providers.custom.baseUrl = getVal('ai-custom-url');
@@ -610,17 +907,50 @@ async function saveConfig() {
       const m = getVal('ai-custom-model');
       if (m) newConfig.providers.custom.models = { default: m, opus: m };
     }
-    // Image
+
+    // Bild-Generierung
     newConfig.imageGen = newConfig.imageGen || {};
-    newConfig.imageGen.enabled = getVal('img-enabled', 'toggle');
-    newConfig.imageGen.provider = getVal('img-provider', 'select');
-    newConfig.imageGen.apiKey = getVal('img-apikey');
+    newConfig.imageGen.default = getVal('img-default', 'select');
+    newConfig.imageGen.openrouter = newConfig.imageGen.openrouter || {};
+    newConfig.imageGen.openrouter.apiKey = getVal('img-openrouter-key');
+    newConfig.imageGen.openrouter.model  = getVal('img-openrouter-model');
+    newConfig.imageGen.fal = newConfig.imageGen.fal || {};
+    newConfig.imageGen.fal.apiKey = getVal('img-fal-key');
+    newConfig.imageGen.fal.model  = getVal('img-fal-model');
+    newConfig.imageGen.openai = newConfig.imageGen.openai || {};
+    newConfig.imageGen.openai.apiKey = getVal('img-openai-key');
+    newConfig.imageGen.stability = newConfig.imageGen.stability || {};
+    newConfig.imageGen.stability.apiKey = getVal('img-stability-key');
+    newConfig.imageGen.stability.model  = getVal('img-stability-model');
+    newConfig.imageGen.together = newConfig.imageGen.together || {};
+    newConfig.imageGen.together.apiKey = getVal('img-together-key');
+    newConfig.imageGen.together.model  = getVal('img-together-model');
+    newConfig.imageGen.replicate = newConfig.imageGen.replicate || {};
+    newConfig.imageGen.replicate.apiKey = getVal('img-replicate-key');
+    newConfig.imageGen.replicate.model  = getVal('img-replicate-model');
+    newConfig.imageGen.size    = getVal('img-size',    'select');
+    newConfig.imageGen.quality = getVal('img-quality', 'select');
+
+    // Video-Generierung
+    newConfig.videoGen = newConfig.videoGen || {};
+    newConfig.videoGen.default = getVal('vid-default', 'select');
+    const vidProviders = ['runway','kling','luma','pika','hailuo','sora','veo'];
+    vidProviders.forEach(p => {
+      newConfig.videoGen[p] = newConfig.videoGen[p] || {};
+      newConfig.videoGen[p].apiKey = getVal('vid-' + p + '-key');
+      newConfig.videoGen[p].model  = getVal('vid-' + p + '-model');
+    });
+    const dur = parseInt(getVal('vid-duration'));
+    newConfig.videoGen.duration    = isNaN(dur) ? 5 : dur;
+    newConfig.videoGen.aspectRatio = getVal('vid-aspect',  'select');
+    newConfig.videoGen.quality     = getVal('vid-quality', 'select');
+
     // Voice
     newConfig.voice = newConfig.voice || {};
-    newConfig.voice.enabled = getVal('voice-enabled', 'toggle');
+    newConfig.voice.enabled  = getVal('voice-enabled', 'toggle');
     newConfig.voice.provider = getVal('voice-provider', 'select');
-    newConfig.voice.language = getVal('voice-lang', 'select');
-    newConfig.voice.apiKey = getVal('voice-apikey');
+    newConfig.voice.language = getVal('voice-lang',     'select');
+    newConfig.voice.apiKey   = getVal('voice-apikey');
   }
 
   const result = await api('/api/config', 'PUT', newConfig);
