@@ -208,7 +208,13 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 	}
 
 	// ── BILD-GENERIERUNG ─────────────────────────────────────────────────────
-	if len(a.imageGenerators) > 0 && a.isImageRequest(text) {
+	if a.isImageRequest(text) {
+		if len(a.imageGenerators) == 0 {
+			return "🎨 Bildgenerierung ist nicht konfiguriert.\n\n" +
+				"Füge im Dashboard unter *Einstellungen* einen **OpenRouter API Key** hinzu – " +
+				"FLUX.2 Pro und Seedream 4.5 sind dort kostenlos verfügbar.\n" +
+				"👉 openrouter.ai/keys"
+		}
 		return a.handleImageRequest(ctx, msg, session, text)
 	}
 
@@ -491,23 +497,42 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 // ── GEDÄCHTNIS-MERKEN ──────────────────────────────────────────────────────
 
 func (a *Agent) isMemoryCommand(text string) bool {
-	lower := strings.ToLower(text)
-	return (strings.Contains(lower, "merk") && strings.Contains(lower, "dir")) ||
-		strings.Contains(lower, "merke dir") ||
-		strings.Contains(lower, "nicht vergessen")
+	lower := strings.ToLower(strings.TrimSpace(text))
+
+	// Fragen explizit ausschließen – "was hast du dir gemerkt?" darf NICHT triggern
+	questionStarters := []string{"was ", "wie ", "wann ", "wo ", "wer ", "hast ", "kannst ", "weißt ", "zeig ", "welche ", "welchen "}
+	for _, q := range questionStarters {
+		if strings.HasPrefix(lower, q) {
+			return false
+		}
+	}
+
+	// Nur klare Imperativ-Formen triggern
+	return strings.Contains(lower, "merke dir") ||
+		strings.Contains(lower, "merk dir") ||
+		strings.Contains(lower, "nicht vergessen:") ||
+		strings.Contains(lower, "bitte merke dir") ||
+		strings.Contains(lower, "bitte merk dir")
 }
 
 func (a *Agent) extractFact(text string) string {
 	lower := strings.ToLower(text)
-	for _, prefix := range []string{"merke dir", "merk dir", "nicht vergessen:"} {
+	prefixes := []string{
+		"bitte merke dir", "bitte merk dir",
+		"merke dir", "merk dir",
+		"nicht vergessen:",
+	}
+	for _, prefix := range prefixes {
 		if idx := strings.Index(lower, prefix); idx >= 0 {
 			fact := strings.TrimSpace(text[idx+len(prefix):])
+			fact = strings.TrimLeft(fact, ":,. ")
 			if fact != "" {
 				return fact
 			}
 		}
 	}
-	return strings.TrimSpace(text)
+	// Kein Fallback auf den kompletten Text – lieber nichts speichern als Unsinn
+	return ""
 }
 
 // ── BILD-GENERIERUNG ───────────────────────────────────────────────────────
