@@ -30,9 +30,12 @@ type ForgetState struct {
 	Options []int // Indizes der zur Wahl stehenden Fakten (0-basiert intern)
 }
 
-// ImageRequestState speichert eine ausstehende Bildanfrage während der Provider-Auswahl
+// ImageRequestState speichert eine ausstehende Bildanfrage (Provider- und Format-Auswahl)
 type ImageRequestState struct {
-	Prompt string // Extrahierter Bild-Prompt, auf den der Nutzer noch einen Provider wählen muss
+	Prompt       string // Extrahierter Bild-Prompt
+	Format       string // "landscape", "portrait", "square" – leer = noch nicht gewählt
+	GeneratorIdx int    // -1 = noch nicht gewählt, >=0 = Index in imageGenerators
+	Step         string // "provider" = warte auf Provider, "format" = warte auf Format
 }
 
 // Session verwaltet den Zustand einer Benutzer-Session

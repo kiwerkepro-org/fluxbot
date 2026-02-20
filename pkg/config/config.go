@@ -266,7 +266,7 @@ func Load(path string) (*Config, error) {
 		cfg.ImageGen.OpenRouter.Models = []string{
 			"black-forest-labs/flux-2-pro",
 			"bytedance-seed/seedream-4.5",
-			"black-forest-labs/flux-schnell:free",
+			"black-forest-labs/flux-1-schnell:free",
 		}
 	}
 	if len(cfg.ImageGen.Fal.Models) == 0 {

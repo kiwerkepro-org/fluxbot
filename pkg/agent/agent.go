@@ -186,9 +186,9 @@ func (a *Agent) handleVoice(ctx context.Context, msg channels.Message, session *
 func (a *Agent) processText(ctx context.Context, msg channels.Message, session *Session) string {
 	text := msg.Text
 
-	// ── BILD-PROVIDER-AUSWAHL (ausstehende Anfrage) ─────────────────────────
+	// ── BILD-FLOW (ausstehende Anfrage – Provider- oder Format-Auswahl) ─────
 	if session.ImageRequest != nil {
-		return a.handleImageProviderResponse(ctx, msg, session, text)
+		return a.handleImageRequestStep(ctx, msg, session, text)
 	}
 
 	// ── GEDÄCHTNIS-LÖSCH-FLOW ──────────────────────────────────────────────
@@ -210,10 +210,11 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 	// ── BILD-GENERIERUNG ─────────────────────────────────────────────────────
 	if a.isImageRequest(text) {
 		if len(a.imageGenerators) == 0 {
-			return "🎨 Bildgenerierung ist nicht konfiguriert.\n\n" +
-				"Füge im Dashboard unter *Einstellungen* einen **OpenRouter API Key** hinzu – " +
-				"FLUX.2 Pro und Seedream 4.5 sind dort kostenlos verfügbar.\n" +
-				"👉 openrouter.ai/keys"
+			return "🎨 Bildgenerierung ist aktuell nicht aktiviert.\n\n" +
+				"Du kannst das im Dashboard unter dem Tab *Bilder* ändern – " +
+				"wähle dort einen Provider aus und trage deinen API-Key ein.\n\n" +
+				"💡 Empfehlung: OpenRouter gibt dir Zugang zu FLUX.2 Pro, Seedream und vielen weiteren Modellen.\n" +
+				"→ openrouter.ai"
 		}
 		return a.handleImageRequest(ctx, msg, session, text)
 	}
@@ -584,77 +585,170 @@ func (a *Agent) extractImagePrompt(text string) string {
 	return text
 }
 
-// handleImageRequest verarbeitet Bild-Generierungs-Anfragen.
-// Bei einem Generator: direkt generieren. Bei mehreren: Auswahl anzeigen.
+// detectImageFormat erkennt ein gewünschtes Format im Prompt.
+// Gibt "landscape", "portrait", "square" oder "" zurück.
+func detectImageFormat(text string) string {
+	lower := strings.ToLower(text)
+	for _, kw := range []string{"hochformat", "portrait", "9:16", "vertikal", "hoch", "9/16"} {
+		if strings.Contains(lower, kw) {
+			return "portrait"
+		}
+	}
+	for _, kw := range []string{"querformat", "landscape", "16:9", "horizontal", "quer", "breit", "16/9"} {
+		if strings.Contains(lower, kw) {
+			return "landscape"
+		}
+	}
+	for _, kw := range []string{"quadrat", "square", "1:1", "quadratisch", "1/1"} {
+		if strings.Contains(lower, kw) {
+			return "square"
+		}
+	}
+	return ""
+}
+
+// handleImageRequest verarbeitet neue Bild-Generierungs-Anfragen.
 func (a *Agent) handleImageRequest(ctx context.Context, msg channels.Message, session *Session, text string) string {
 	prompt := a.extractImagePrompt(text)
+	format := detectImageFormat(text)
 
-	if len(a.imageGenerators) == 1 {
-		return a.generateImage(ctx, msg, a.imageGenerators[0], prompt)
+	state := &ImageRequestState{Prompt: prompt, Format: format, GeneratorIdx: -1}
+
+	// Schritt 1: Provider wählen (wenn mehrere vorhanden)
+	if len(a.imageGenerators) > 1 {
+		state.Step = "provider"
+		session.ImageRequest = state
+		log.Printf("[Agent] Bild-Anfrage | %d Provider zur Auswahl | Format erkannt: %q | Prompt: %.80s", len(a.imageGenerators), format, prompt)
+		return a.askForProvider()
 	}
 
-	// Mehrere Generatoren → Auswahl anzeigen
-	session.ImageRequest = &ImageRequestState{Prompt: prompt}
-	log.Printf("[Agent] Bild-Anfrage | Provider-Auswahl (%d Optionen) | Prompt: %.80s", len(a.imageGenerators), prompt)
-
-	var sb strings.Builder
-	sb.WriteString("🎨 Womit soll ich das Bild generieren?\n\n")
-	emojis := []string{"1️⃣", "2️⃣", "3️⃣", "4️⃣"}
-	for i, gen := range a.imageGenerators {
-		emoji := emojis[i]
-		sb.WriteString(fmt.Sprintf("%s  %s\n", emoji, gen.Name()))
+	// Nur ein Provider → direkt zu Format
+	state.GeneratorIdx = 0
+	if format != "" {
+		session.ImageRequest = nil
+		return a.generateImage(ctx, msg, a.imageGenerators[0], prompt, format)
 	}
-	sb.WriteString("\n(Schreibe die Nummer oder den Namen)")
-	return sb.String()
+	state.Step = "format"
+	session.ImageRequest = state
+	return a.askForFormat()
 }
 
-// generateImage generiert ein Bild mit dem angegebenen Generator und sendet es.
-// Gibt "" zurück wenn das Bild erfolgreich direkt gesendet wurde.
-func (a *Agent) generateImage(ctx context.Context, msg channels.Message, gen imagegen.Generator, prompt string) string {
-	log.Printf("[Agent] Bild-Anfrage | Provider: %s | Prompt: %.80s", gen.Name(), prompt)
-	a.manager.Typing(msg)
-
-	img, err := gen.Generate(ctx, prompt, a.imageSize)
-	if err != nil {
-		log.Printf("[Agent] Bild-Generierung fehlgeschlagen: %v", err)
-		return fmt.Sprintf("❌ Bild konnte nicht generiert werden: %v", err)
-	}
-
-	caption := fmt.Sprintf("🎨 _%s_", prompt)
-	if err := a.manager.ReplyPhoto(msg, img.URL, caption); err != nil {
-		log.Printf("[Agent] Bild-Senden fehlgeschlagen: %v", err)
-		return fmt.Sprintf("🎨 Bild generiert: %s", img.URL)
-	}
-
-	log.Printf("[Agent] Bild erfolgreich gesendet via %s: %s", gen.Name(), img.URL)
-	return "" // Leer: Bild wurde direkt gesendet
-}
-
-// handleImageProviderResponse verarbeitet die Antwort auf die Provider-Auswahl
-func (a *Agent) handleImageProviderResponse(ctx context.Context, msg channels.Message, session *Session, text string) string {
-	state := session.ImageRequest
+// handleImageRequestStep leitet eine Nutzerantwort an den richtigen Handler weiter.
+func (a *Agent) handleImageRequestStep(ctx context.Context, msg channels.Message, session *Session, text string) string {
 	lower := strings.ToLower(strings.TrimSpace(text))
-
-	if lower == "abbruch" || lower == "cancel" || lower == "nein" || lower == "stop" {
+	if lower == "abbruch" || lower == "cancel" || lower == "stop" {
 		session.ImageRequest = nil
 		return "✅ Bildgenerierung abgebrochen."
 	}
+	switch session.ImageRequest.Step {
+	case "provider":
+		return a.handleProviderChoice(ctx, msg, session, text)
+	case "format":
+		return a.handleFormatChoice(ctx, msg, session, text)
+	}
+	return ""
+}
+
+// handleProviderChoice verarbeitet die Antwort auf die Provider-Frage.
+func (a *Agent) handleProviderChoice(ctx context.Context, msg channels.Message, session *Session, text string) string {
+	state := session.ImageRequest
+	lower := strings.ToLower(strings.TrimSpace(text))
 
 	// Auswahl per Nummer
 	num, err := strconv.Atoi(strings.TrimSpace(text))
 	if err == nil && num >= 1 && num <= len(a.imageGenerators) {
-		session.ImageRequest = nil
-		return a.generateImage(ctx, msg, a.imageGenerators[num-1], state.Prompt)
-	}
-
-	// Auswahl per Name (Teilstring-Match)
-	for _, gen := range a.imageGenerators {
-		if strings.Contains(strings.ToLower(gen.Name()), lower) {
-			session.ImageRequest = nil
-			return a.generateImage(ctx, msg, gen, state.Prompt)
+		state.GeneratorIdx = num - 1
+	} else {
+		// Auswahl per Name (Teilstring-Match)
+		for i, gen := range a.imageGenerators {
+			if strings.Contains(strings.ToLower(gen.Name()), lower) {
+				state.GeneratorIdx = i
+				break
+			}
 		}
 	}
 
-	// Keine Übereinstimmung → nochmal fragen
-	return fmt.Sprintf("❓ Bitte wähle eine Zahl zwischen 1 und %d – oder schreibe \"abbruch\".", len(a.imageGenerators))
+	if state.GeneratorIdx < 0 {
+		return fmt.Sprintf("❓ Bitte wähle eine Zahl zwischen 1 und %d – oder schreibe \"abbruch\".", len(a.imageGenerators))
+	}
+
+	// Provider gewählt – Format bekannt?
+	if state.Format != "" {
+		session.ImageRequest = nil
+		return a.generateImage(ctx, msg, a.imageGenerators[state.GeneratorIdx], state.Prompt, state.Format)
+	}
+	state.Step = "format"
+	return a.askForFormat()
+}
+
+// handleFormatChoice verarbeitet die Antwort auf die Format-Frage.
+func (a *Agent) handleFormatChoice(ctx context.Context, msg channels.Message, session *Session, text string) string {
+	state := session.ImageRequest
+	lower := strings.ToLower(strings.TrimSpace(text))
+
+	format := ""
+	switch {
+	case lower == "1" || strings.Contains(lower, "quer") || strings.Contains(lower, "landscape") || strings.Contains(lower, "16:9"):
+		format = "landscape"
+	case lower == "2" || strings.Contains(lower, "hoch") || strings.Contains(lower, "portrait") || strings.Contains(lower, "9:16"):
+		format = "portrait"
+	case lower == "3" || strings.Contains(lower, "quadrat") || strings.Contains(lower, "square") || strings.Contains(lower, "1:1"):
+		format = "square"
+	}
+
+	if format == "" {
+		return "❓ Bitte wähle:\n1️⃣  Querformat (16:9)\n2️⃣  Hochformat (9:16)\n3️⃣  Quadrat (1:1)\n\nOder schreibe \"abbruch\"."
+	}
+
+	session.ImageRequest = nil
+	return a.generateImage(ctx, msg, a.imageGenerators[state.GeneratorIdx], state.Prompt, format)
+}
+
+// askForProvider gibt die Provider-Auswahl-Nachricht zurück.
+func (a *Agent) askForProvider() string {
+	var sb strings.Builder
+	sb.WriteString("🎨 Womit soll ich das Bild generieren?\n\n")
+	emojis := []string{"1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣"}
+	for i, gen := range a.imageGenerators {
+		if i < len(emojis) {
+			sb.WriteString(fmt.Sprintf("%s  %s\n", emojis[i], gen.Name()))
+		}
+	}
+	sb.WriteString("\n(Nummer oder Name – oder \"abbruch\")")
+	return sb.String()
+}
+
+// askForFormat gibt die Format-Auswahl-Nachricht zurück.
+func (a *Agent) askForFormat() string {
+	return "📐 In welchem Format soll das Bild sein?\n\n" +
+		"1️⃣  Querformat (16:9)\n" +
+		"2️⃣  Hochformat (9:16)\n" +
+		"3️⃣  Quadrat (1:1)\n\n" +
+		"(Nummer oder Name – oder \"abbruch\")"
+}
+
+// generateImage generiert ein Bild und sendet es direkt.
+// Gibt "" zurück wenn das Bild erfolgreich direkt gesendet wurde.
+func (a *Agent) generateImage(ctx context.Context, msg channels.Message, gen imagegen.Generator, prompt, format string) string {
+	if format == "" {
+		format = a.imageSize // Fallback auf config-Default
+	}
+	log.Printf("[Agent] 🎨 Bild-Generierung | Provider: %s | Format: %s | Prompt: %.100s", gen.Name(), format, prompt)
+	a.manager.Typing(msg)
+
+	img, err := gen.Generate(ctx, prompt, format)
+	if err != nil {
+		log.Printf("[Agent] ❌ Bild-Generierung fehlgeschlagen | Provider: %s | Fehler: %v", gen.Name(), err)
+		return fmt.Sprintf("❌ Bild konnte nicht generiert werden: %v", err)
+	}
+
+	log.Printf("[Agent] ✅ Bild-URL erhalten | Provider: %s | URL: %s", gen.Name(), img.URL)
+	caption := fmt.Sprintf("🎨 _%s_", prompt)
+	if err := a.manager.ReplyPhoto(msg, img.URL, caption); err != nil {
+		log.Printf("[Agent] ⚠️  Bild-Senden fehlgeschlagen (sende URL stattdessen) | Fehler: %v", err)
+		return fmt.Sprintf("🎨 Bild generiert: %s", img.URL)
+	}
+
+	log.Printf("[Agent] ✅ Bild erfolgreich gesendet | Provider: %s", gen.Name())
+	return ""
 }

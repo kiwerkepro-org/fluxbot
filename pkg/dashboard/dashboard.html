@@ -258,7 +258,7 @@
             <div class="input-wrap"><input type="password" id="tg-token" placeholder="1234567890:ABCdef..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Erlaubte User-IDs (kommagetrennt)</label>
-            <input type="text" id="tg-allowfrom" placeholder="123456789, 987654321">
+            <div class="input-wrap"><input type="password" id="tg-allowfrom" placeholder="123456789, 987654321" autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
         </div>
 
@@ -386,163 +386,207 @@
       </div>
     </div>
 
-    <!-- ── Bilder ── -->
+    <!-- ── Bilder (Tile-Layout) ── -->
     <div class="tab-content" id="tab-imagegen">
-      <div class="panel">
-        <div class="panel-title">🎨 Bild-Generierung</div>
-        <div class="field">
-          <label>Aktiver Provider</label>
-          <select id="img-default" onchange="onImgProviderChange()">
-            <option value="">⬜  Deaktiviert</option>
-            <option value="openrouter-shared">🌐  OpenRouter (gemeinsamer Key aus Provider-Tab)</option>
-            <option value="openrouter">🌐  OpenRouter (eigener Key für Bilder)</option>
-            <option value="fal">🔥  fal.ai – FLUX Pro Ultra, Recraft, Ideogram</option>
-            <option value="openai">🎨  OpenAI – DALL-E 3</option>
-            <option value="stability">🌈  Stability AI – Stable Diffusion 3.5</option>
-            <option value="together">🤝  Together AI – FLUX.1 Schnell (kostenlos)</option>
-            <option value="replicate">♻️  Replicate – tausende Modelle</option>
-          </select>
-        </div>
-        <div class="provider-hint" id="img-provider-hint" style="margin-bottom:16px"></div>
-
-        <div id="img-openrouter-row" style="display:none">
-          <div class="field"><label>OpenRouter API Key (für Bilder)</label>
-            <div class="input-wrap"><input type="password" id="img-openrouter-key" placeholder="sk-or-v1-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="img-openrouter-model" placeholder="black-forest-labs/flux.2-pro"></div>
-        </div>
-        <div id="img-fal-row" style="display:none">
-          <div class="field"><label>fal.ai API Key</label>
-            <div class="input-wrap"><input type="password" id="img-fal-key" placeholder="fal_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="img-fal-model" placeholder="fal-ai/flux-pro/v1.1-ultra"></div>
-        </div>
-        <div id="img-openai-row" style="display:none">
-          <div class="field"><label>OpenAI API Key</label>
-            <div class="input-wrap"><input type="password" id="img-openai-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-        </div>
-        <div id="img-stability-row" style="display:none">
-          <div class="field"><label>Stability AI API Key</label>
-            <div class="input-wrap"><input type="password" id="img-stability-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="img-stability-model" placeholder="stability-ai/stable-diffusion-3.5-large"></div>
-        </div>
-        <div id="img-together-row" style="display:none">
-          <div class="field"><label>Together AI API Key</label>
-            <div class="input-wrap"><input type="password" id="img-together-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="img-together-model" placeholder="black-forest-labs/FLUX.1-schnell-Free"></div>
-        </div>
-        <div id="img-replicate-row" style="display:none">
-          <div class="field"><label>Replicate API Token</label>
-            <div class="input-wrap"><input type="password" id="img-replicate-key" placeholder="r8_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="img-replicate-model" placeholder="black-forest-labs/flux-1.1-pro"></div>
-        </div>
-
-        <div class="two-col" style="margin-top:8px">
+      <div class="tile-layout">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-title">🎨 Bild-Generierung</div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+            Wähle einen Provider und trage deinen API-Key ein. FluxBot fragt beim Nutzer automatisch nach Format und Modell.
+            Wenn kein Provider aktiv ist, teilt FluxBot dem Nutzer mit, dass Bildgenerierung deaktiviert ist.
+          </p>
           <div class="field">
-            <label>Format</label>
-            <select id="img-size">
-              <option value="landscape">Querformat (16:9)</option>
-              <option value="portrait">Hochformat (9:16)</option>
-              <option value="square">Quadrat (1:1)</option>
+            <label>Aktiver Provider</label>
+            <select id="img-default" onchange="onImgProviderChange()">
+              <option value="">⬜  Deaktiviert – keine Bilder</option>
+              <option value="openrouter-shared">🌐  OpenRouter (gemeinsamer Key aus Provider-Tab)</option>
+              <option value="openrouter">🌐  OpenRouter (eigener Key für Bilder)</option>
+              <option value="fal">🔥  fal.ai – FLUX Pro Ultra, Recraft, Ideogram</option>
+              <option value="openai">🎨  OpenAI – DALL-E 3</option>
+              <option value="stability">🌈  Stability AI – Stable Diffusion 3.5</option>
+              <option value="together">🤝  Together AI – FLUX.1 Schnell</option>
+              <option value="replicate">♻️  Replicate – tausende Modelle</option>
             </select>
           </div>
-          <div class="field">
-            <label>Qualität (DALL-E)</label>
-            <select id="img-quality">
-              <option value="standard">Standard</option>
-              <option value="hd">HD</option>
-            </select>
+          <div class="provider-hint" id="img-provider-hint" style="margin-bottom:16px"></div>
+
+          <div id="img-openrouter-row" style="display:none">
+            <div class="field"><label>OpenRouter API Key (für Bilder)</label>
+              <div class="input-wrap"><input type="password" id="img-openrouter-key" placeholder="sk-or-v1-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field">
+              <label>Modelle (kommagetrennte Slugs – leer = Defaults)</label>
+              <input type="text" id="img-openrouter-models" placeholder="black-forest-labs/flux-2-pro, bytedance-seed/seedream-4.5">
+              <div class="provider-hint">FluxBot bietet dem Nutzer alle eingetragenen Modelle zur Auswahl an.</div>
+            </div>
+          </div>
+          <div id="img-fal-row" style="display:none">
+            <div class="field"><label>fal.ai API Key</label>
+              <div class="input-wrap"><input type="password" id="img-fal-key" placeholder="fal_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modelle (kommagetrennte Slugs – leer = Defaults)</label>
+              <input type="text" id="img-fal-models" placeholder="fal-ai/flux-pro/v1.1-ultra">
+            </div>
+          </div>
+          <div id="img-openai-row" style="display:none">
+            <div class="field"><label>OpenAI API Key</label>
+              <div class="input-wrap"><input type="password" id="img-openai-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Qualität</label>
+              <select id="img-quality"><option value="standard">Standard</option><option value="hd">HD</option></select>
+            </div>
+          </div>
+          <div id="img-stability-row" style="display:none">
+            <div class="field"><label>Stability AI API Key</label>
+              <div class="input-wrap"><input type="password" id="img-stability-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modelle (kommagetrennte Slugs – leer = Defaults)</label>
+              <input type="text" id="img-stability-models" placeholder="stability-ai/stable-diffusion-3.5-large">
+            </div>
+          </div>
+          <div id="img-together-row" style="display:none">
+            <div class="field"><label>Together AI API Key</label>
+              <div class="input-wrap"><input type="password" id="img-together-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modelle (kommagetrennte Slugs – leer = Defaults)</label>
+              <input type="text" id="img-together-models" placeholder="black-forest-labs/FLUX.1-schnell-Free">
+            </div>
+          </div>
+          <div id="img-replicate-row" style="display:none">
+            <div class="field"><label>Replicate API Token</label>
+              <div class="input-wrap"><input type="password" id="img-replicate-key" placeholder="r8_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modelle (kommagetrennte Slugs – leer = Defaults)</label>
+              <input type="text" id="img-replicate-models" placeholder="black-forest-labs/flux-1.1-pro">
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="info-card">
+            <h4>⭐ Empfehlung: OpenRouter</h4>
+            <p>Über 50 Bildmodelle mit einem einzigen API-Key – FLUX.2 Pro, Seedream 4.5, Stable Diffusion u.v.m. Kein separater Account pro Modell nötig.</p>
+            <a href="https://openrouter.ai/keys" target="_blank" class="info-link">→ Kostenlos registrieren</a>
+            <hr class="divider">
+            <p style="font-size:12px;color:var(--muted);margin-bottom:8px">
+              💡 <strong>Format & Modell</strong> fragt FluxBot automatisch beim Nutzer ab – du musst hier nichts festlegen.
+            </p>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Andere Optionen</h4>
+            <div class="other-list">
+              <div>🔥 <strong>fal.ai</strong> – schnell, günstig, viele Modelle</div>
+              <div>🎨 <strong>OpenAI</strong> – DALL-E 3, hohe Qualität</div>
+              <div>🌈 <strong>Stability AI</strong> – Stable Diffusion 3.5</div>
+              <div>🤝 <strong>Together AI</strong> – FLUX.1 kostenlos</div>
+              <div>♻️ <strong>Replicate</strong> – tausende Open-Source-Modelle</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ── Videos ── -->
+    <!-- ── Videos (Tile-Layout) ── -->
     <div class="tab-content" id="tab-videogen">
-      <div class="panel">
-        <div class="panel-title">🎬 Video-Generierung</div>
-        <div class="field">
-          <label>Aktiver Provider</label>
-          <select id="vid-default" onchange="onVidProviderChange()">
-            <option value="">⬜  Deaktiviert</option>
-            <option value="runway">🚀  Runway – Gen-4 (führender Video-KI-Anbieter)</option>
-            <option value="kling">🎭  Kling AI – 2.0 (Kuaishou)</option>
-            <option value="luma">💡  Luma AI – Dream Machine</option>
-            <option value="pika">✨  Pika Labs – Pika 2.0</option>
-            <option value="hailuo">🌊  HailuoAI – Minimax Video</option>
-            <option value="sora">🤖  OpenAI – Sora</option>
-            <option value="veo">🔵  Google – Veo 3</option>
-          </select>
-        </div>
-        <div class="provider-hint" id="vid-provider-hint" style="margin-bottom:16px"></div>
-
-        <div id="vid-runway-row" style="display:none">
-          <div class="field"><label>Runway API Key</label>
-            <div class="input-wrap"><input type="password" id="vid-runway-key" placeholder="key_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-runway-model" placeholder="gen4_turbo"></div>
-        </div>
-        <div id="vid-kling-row" style="display:none">
-          <div class="field"><label>Kling AI API Key</label>
-            <div class="input-wrap"><input type="password" id="vid-kling-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-kling-model" placeholder="kling-v2"></div>
-        </div>
-        <div id="vid-luma-row" style="display:none">
-          <div class="field"><label>Luma AI API Key</label>
-            <div class="input-wrap"><input type="password" id="vid-luma-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-luma-model" placeholder="dream-machine"></div>
-        </div>
-        <div id="vid-pika-row" style="display:none">
-          <div class="field"><label>Pika Labs API Key</label>
-            <div class="input-wrap"><input type="password" id="vid-pika-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-pika-model" placeholder="pika-2.0"></div>
-        </div>
-        <div id="vid-hailuo-row" style="display:none">
-          <div class="field"><label>HailuoAI API Key</label>
-            <div class="input-wrap"><input type="password" id="vid-hailuo-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-hailuo-model" placeholder="minimax-video-01"></div>
-        </div>
-        <div id="vid-sora-row" style="display:none">
-          <div class="field"><label>OpenAI API Key (für Sora)</label>
-            <div class="input-wrap"><input type="password" id="vid-sora-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-sora-model" placeholder="sora-1.0"></div>
-        </div>
-        <div id="vid-veo-row" style="display:none">
-          <div class="field"><label>Google API Key (für Veo)</label>
-            <div class="input-wrap"><input type="password" id="vid-veo-key" placeholder="AIza..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Modell (optional)</label><input type="text" id="vid-veo-model" placeholder="veo-3"></div>
-        </div>
-
-        <div class="two-col" style="margin-top:8px">
+      <div class="tile-layout">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-title">🎬 Video-Generierung</div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+            Wähle einen Provider und trage deinen API-Key ein. Wenn kein Provider aktiv ist, teilt FluxBot dem Nutzer mit, dass Video-Generierung deaktiviert ist.
+          </p>
           <div class="field">
-            <label>Länge (Sekunden)</label>
-            <input type="number" id="vid-duration" min="1" max="60" placeholder="5">
+            <label>Aktiver Provider</label>
+            <select id="vid-default" onchange="onVidProviderChange()">
+              <option value="">⬜  Deaktiviert – keine Videos</option>
+              <option value="runway">🚀  Runway – Gen-4 Turbo (führend)</option>
+              <option value="kling">🎭  Kling AI – 2.0 (Kuaishou)</option>
+              <option value="luma">💡  Luma AI – Dream Machine</option>
+              <option value="pika">✨  Pika Labs – Pika 2.0</option>
+              <option value="hailuo">🌊  HailuoAI – Minimax Video</option>
+              <option value="sora">🤖  OpenAI – Sora</option>
+              <option value="veo">🔵  Google – Veo 3</option>
+            </select>
+          </div>
+          <div class="provider-hint" id="vid-provider-hint" style="margin-bottom:16px"></div>
+
+          <div id="vid-runway-row" style="display:none">
+            <div class="field"><label>Runway API Key</label>
+              <div class="input-wrap"><input type="password" id="vid-runway-key" placeholder="key_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-runway-model" placeholder="gen4_turbo"></div>
+          </div>
+          <div id="vid-kling-row" style="display:none">
+            <div class="field"><label>Kling AI API Key</label>
+              <div class="input-wrap"><input type="password" id="vid-kling-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-kling-model" placeholder="kling-v2"></div>
+          </div>
+          <div id="vid-luma-row" style="display:none">
+            <div class="field"><label>Luma AI API Key</label>
+              <div class="input-wrap"><input type="password" id="vid-luma-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-luma-model" placeholder="dream-machine"></div>
+          </div>
+          <div id="vid-pika-row" style="display:none">
+            <div class="field"><label>Pika Labs API Key</label>
+              <div class="input-wrap"><input type="password" id="vid-pika-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-pika-model" placeholder="pika-2.0"></div>
+          </div>
+          <div id="vid-hailuo-row" style="display:none">
+            <div class="field"><label>HailuoAI API Key</label>
+              <div class="input-wrap"><input type="password" id="vid-hailuo-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-hailuo-model" placeholder="minimax-video-01"></div>
+          </div>
+          <div id="vid-sora-row" style="display:none">
+            <div class="field"><label>OpenAI API Key (für Sora)</label>
+              <div class="input-wrap"><input type="password" id="vid-sora-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-sora-model" placeholder="sora-1.0"></div>
+          </div>
+          <div id="vid-veo-row" style="display:none">
+            <div class="field"><label>Google API Key (für Veo)</label>
+              <div class="input-wrap"><input type="password" id="vid-veo-key" placeholder="AIza..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-veo-model" placeholder="veo-3"></div>
+          </div>
+
+          <div class="two-col" style="margin-top:8px">
+            <div class="field">
+              <label>Länge (Sekunden)</label>
+              <input type="number" id="vid-duration" min="1" max="60" placeholder="5">
+            </div>
+            <div class="field">
+              <label>Seitenverhältnis</label>
+              <select id="vid-aspect">
+                <option value="16:9">16:9 (Querformat)</option>
+                <option value="9:16">9:16 (Hochformat)</option>
+                <option value="1:1">1:1 (Quadrat)</option>
+              </select>
+            </div>
           </div>
           <div class="field">
-            <label>Seitenverhältnis</label>
-            <select id="vid-aspect">
-              <option value="16:9">16:9 (Querformat)</option>
-              <option value="9:16">9:16 (Hochformat)</option>
-              <option value="1:1">1:1 (Quadrat)</option>
+            <label>Qualität</label>
+            <select id="vid-quality">
+              <option value="standard">Standard</option>
+              <option value="hd">HD</option>
             </select>
           </div>
         </div>
-        <div class="field">
-          <label>Qualität</label>
-          <select id="vid-quality">
-            <option value="standard">Standard</option>
-            <option value="hd">HD</option>
-          </select>
+        <div>
+          <div class="info-card">
+            <h4>⭐ Empfehlung: Runway Gen-4</h4>
+            <p>Runway ist der führende Anbieter für KI-Videos – realistische Bewegungen, hohe Qualität, einfache API.</p>
+            <a href="https://app.runwayml.com/settings/tokens" target="_blank" class="info-link">→ Runway API Key holen</a>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Andere Optionen</h4>
+            <div class="other-list">
+              <div>🎭 <strong>Kling AI</strong> – günstiger, gute Qualität</div>
+              <div>💡 <strong>Luma Dream Machine</strong> – kreativ, cinematisch</div>
+              <div>🌊 <strong>HailuoAI</strong> – Minimax, sehr schnell</div>
+              <div>🤖 <strong>Sora</strong> – OpenAI, hohe Qualität</div>
+              <div>🔵 <strong>Veo 3</strong> – Google, mit Audio</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -974,20 +1018,19 @@ async function loadConfig() {
   setVal('ai-custom-model', p.custom?.models?.default || '');
   onDashProviderChange();
 
-  setVal('img-default',       img.default   || '',   'select');
-  setVal('img-openrouter-key',img.openrouter?.apiKey || '');
-  setVal('img-openrouter-model',img.openrouter?.model || '');
-  setVal('img-fal-key',       img.fal?.apiKey        || '');
-  setVal('img-fal-model',     img.fal?.model         || '');
-  setVal('img-openai-key',    img.openai?.apiKey     || '');
-  setVal('img-stability-key', img.stability?.apiKey  || '');
-  setVal('img-stability-model',img.stability?.model  || '');
-  setVal('img-together-key',  img.together?.apiKey   || '');
-  setVal('img-together-model',img.together?.model    || '');
-  setVal('img-replicate-key', img.replicate?.apiKey  || '');
-  setVal('img-replicate-model',img.replicate?.model  || '');
-  setVal('img-size',    img.size    || 'landscape', 'select');
-  setVal('img-quality', img.quality || 'standard',  'select');
+  setVal('img-default',          img.default            || '', 'select');
+  setVal('img-openrouter-key',   img.openrouter?.apiKey || '');
+  setVal('img-openrouter-models',(img.openrouter?.models || []).join(', '));
+  setVal('img-fal-key',          img.fal?.apiKey        || '');
+  setVal('img-fal-models',       (img.fal?.models       || []).join(', '));
+  setVal('img-openai-key',       img.openai?.apiKey     || '');
+  setVal('img-quality',          img.quality            || 'standard', 'select');
+  setVal('img-stability-key',    img.stability?.apiKey  || '');
+  setVal('img-stability-models', (img.stability?.models || []).join(', '));
+  setVal('img-together-key',     img.together?.apiKey   || '');
+  setVal('img-together-models',  (img.together?.models  || []).join(', '));
+  setVal('img-replicate-key',    img.replicate?.apiKey  || '');
+  setVal('img-replicate-models', (img.replicate?.models || []).join(', '));
   onImgProviderChange();
 
   setVal('vid-default',      vid.default || '',   'select');
@@ -1075,26 +1118,28 @@ async function saveConfig() {
       if (m) newConfig.providers.custom.models = { default: m, opus: m };
     }
 
+    // Hilfsfunktion: kommagetrennte Eingabe → Array (leere Einträge filtern)
+    const toModels = id => getVal(id).split(',').map(s=>s.trim()).filter(Boolean);
+
     newConfig.imageGen = newConfig.imageGen || {};
     newConfig.imageGen.default = getVal('img-default', 'select');
     newConfig.imageGen.openrouter = newConfig.imageGen.openrouter || {};
-    newConfig.imageGen.openrouter.apiKey = getVal('img-openrouter-key');
-    newConfig.imageGen.openrouter.model  = getVal('img-openrouter-model');
+    newConfig.imageGen.openrouter.apiKey  = getVal('img-openrouter-key');
+    newConfig.imageGen.openrouter.models  = toModels('img-openrouter-models');
     newConfig.imageGen.fal = newConfig.imageGen.fal || {};
-    newConfig.imageGen.fal.apiKey = getVal('img-fal-key');
-    newConfig.imageGen.fal.model  = getVal('img-fal-model');
+    newConfig.imageGen.fal.apiKey  = getVal('img-fal-key');
+    newConfig.imageGen.fal.models  = toModels('img-fal-models');
     newConfig.imageGen.openai = newConfig.imageGen.openai || {};
     newConfig.imageGen.openai.apiKey = getVal('img-openai-key');
     newConfig.imageGen.stability = newConfig.imageGen.stability || {};
-    newConfig.imageGen.stability.apiKey = getVal('img-stability-key');
-    newConfig.imageGen.stability.model  = getVal('img-stability-model');
+    newConfig.imageGen.stability.apiKey  = getVal('img-stability-key');
+    newConfig.imageGen.stability.models  = toModels('img-stability-models');
     newConfig.imageGen.together = newConfig.imageGen.together || {};
-    newConfig.imageGen.together.apiKey = getVal('img-together-key');
-    newConfig.imageGen.together.model  = getVal('img-together-model');
+    newConfig.imageGen.together.apiKey  = getVal('img-together-key');
+    newConfig.imageGen.together.models  = toModels('img-together-models');
     newConfig.imageGen.replicate = newConfig.imageGen.replicate || {};
-    newConfig.imageGen.replicate.apiKey = getVal('img-replicate-key');
-    newConfig.imageGen.replicate.model  = getVal('img-replicate-model');
-    newConfig.imageGen.size    = getVal('img-size',    'select');
+    newConfig.imageGen.replicate.apiKey  = getVal('img-replicate-key');
+    newConfig.imageGen.replicate.models  = toModels('img-replicate-models');
     newConfig.imageGen.quality = getVal('img-quality', 'select');
 
     newConfig.videoGen = newConfig.videoGen || {};
