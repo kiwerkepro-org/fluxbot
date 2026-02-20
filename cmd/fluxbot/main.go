@@ -429,49 +429,45 @@ func buildImageGenerators(cfg *config.Config) []imagegen.Generator {
 	switch ig.Default {
 	case "openrouter":
 		key := ig.OpenRouter.APIKey
-		return []imagegen.Generator{
-			imagegen.NewOpenRouterImageGenerator(key, "black-forest-labs/flux.2-pro", "FLUX.2 Pro"),
-			imagegen.NewOpenRouterImageGenerator(key, "bytedance-seed/seedream-4.5", "Seedream 4.5"),
+		var gens []imagegen.Generator
+		for _, m := range ig.OpenRouter.Models {
+			gens = append(gens, imagegen.NewOpenRouterImageGenerator(key, m, m))
 		}
+		return gens
 	case "openrouter-shared":
 		// Gemeinsamen OpenRouter-Key aus LLM-Provider-Config verwenden
 		key := cfg.Providers.OpenRouter.APIKey
-		return []imagegen.Generator{
-			imagegen.NewOpenRouterImageGenerator(key, "black-forest-labs/flux.2-pro", "FLUX.2 Pro"),
-			imagegen.NewOpenRouterImageGenerator(key, "bytedance-seed/seedream-4.5", "Seedream 4.5"),
+		var gens []imagegen.Generator
+		for _, m := range ig.OpenRouter.Models {
+			gens = append(gens, imagegen.NewOpenRouterImageGenerator(key, m, m))
 		}
+		return gens
 	case "fal":
-		model := ig.Fal.Model
-		if model == "" {
-			model = "fal-ai/flux-pro/v1.1-ultra"
+		var gens []imagegen.Generator
+		for _, m := range ig.Fal.Models {
+			gens = append(gens, imagegen.NewFalGenerator(ig.Fal.APIKey, m))
 		}
-		return []imagegen.Generator{imagegen.NewFalGenerator(ig.Fal.APIKey, model)}
+		return gens
 	case "openai":
 		return []imagegen.Generator{imagegen.NewOpenAIImageGenerator(ig.OpenAI.APIKey, ig.Quality)}
 	case "stability":
-		model := ig.Stability.Model
-		if model == "" {
-			model = "stability-ai/stable-diffusion-3.5-large"
+		var gens []imagegen.Generator
+		for _, m := range ig.Stability.Models {
+			gens = append(gens, imagegen.NewFalGenerator(ig.Stability.APIKey, m))
 		}
-		return []imagegen.Generator{
-			imagegen.NewFalGenerator(ig.Stability.APIKey, model),
-		}
+		return gens
 	case "together":
-		model := ig.Together.Model
-		if model == "" {
-			model = "black-forest-labs/FLUX.1-schnell-Free"
+		var gens []imagegen.Generator
+		for _, m := range ig.Together.Models {
+			gens = append(gens, imagegen.NewOpenRouterImageGenerator(ig.Together.APIKey, m, m))
 		}
-		return []imagegen.Generator{
-			imagegen.NewOpenRouterImageGenerator(ig.Together.APIKey, model, "Together FLUX"),
-		}
+		return gens
 	case "replicate":
-		model := ig.Replicate.Model
-		if model == "" {
-			model = "black-forest-labs/flux-1.1-pro"
+		var gens []imagegen.Generator
+		for _, m := range ig.Replicate.Models {
+			gens = append(gens, imagegen.NewOpenRouterImageGenerator(ig.Replicate.APIKey, m, m))
 		}
-		return []imagegen.Generator{
-			imagegen.NewOpenRouterImageGenerator(ig.Replicate.APIKey, model, "Replicate"),
-		}
+		return gens
 	}
 	return nil
 }

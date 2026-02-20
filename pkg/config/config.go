@@ -159,10 +159,11 @@ type ImageGenConfig struct {
 	Quality string `json:"quality"` // DALL-E: "standard" oder "hd"
 }
 
-// ImageGenProviderConfig enthält API-Key und optionales Modell für einen Bild-Provider.
+// ImageGenProviderConfig enthält API-Key und konfigurierbare Modell-Liste für einen Bild-Provider.
+// Models: Liste der angebotenen Modell-Slugs. Leer = Provider-Defaults werden verwendet.
 type ImageGenProviderConfig struct {
-	APIKey string `json:"apiKey"`
-	Model  string `json:"model,omitempty"` // leer = Provider-Default
+	APIKey string   `json:"apiKey"`
+	Models []string `json:"models,omitempty"` // leer = Provider-Defaults
 }
 
 // VideoGenConfig konfiguriert die Video-Generierung.
@@ -259,6 +260,34 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.ImageGen.Quality == "" {
 		cfg.ImageGen.Quality = "standard"
+	}
+	// Standard-Modelle je Provider (werden nur gesetzt wenn Nutzer keine eigene Liste hat)
+	if len(cfg.ImageGen.OpenRouter.Models) == 0 {
+		cfg.ImageGen.OpenRouter.Models = []string{
+			"black-forest-labs/flux-2-pro",
+			"bytedance-seed/seedream-4.5",
+			"black-forest-labs/flux-schnell:free",
+		}
+	}
+	if len(cfg.ImageGen.Fal.Models) == 0 {
+		cfg.ImageGen.Fal.Models = []string{
+			"fal-ai/flux-pro/v1.1-ultra",
+		}
+	}
+	if len(cfg.ImageGen.Stability.Models) == 0 {
+		cfg.ImageGen.Stability.Models = []string{
+			"stability-ai/stable-diffusion-3.5-large",
+		}
+	}
+	if len(cfg.ImageGen.Together.Models) == 0 {
+		cfg.ImageGen.Together.Models = []string{
+			"black-forest-labs/FLUX.1-schnell-Free",
+		}
+	}
+	if len(cfg.ImageGen.Replicate.Models) == 0 {
+		cfg.ImageGen.Replicate.Models = []string{
+			"black-forest-labs/flux-1.1-pro",
+		}
 	}
 
 	// ── VideoGen Defaults ───────────────────────────────────────────────────
