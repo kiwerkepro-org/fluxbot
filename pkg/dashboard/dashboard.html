@@ -241,6 +241,7 @@
       <button class="tab-btn" onclick="showTab('imagegen', this)">🎨 Bilder</button>
       <button class="tab-btn" onclick="showTab('videogen', this)">🎬 Videos</button>
       <button class="tab-btn" onclick="showTab('voice', this)">🎙️ Voice</button>
+      <button class="tab-btn" onclick="showTab('integrations', this)">🔌 Integrationen</button>
       <button class="tab-btn" onclick="showTab('raw', this)">📄 JSON</button>
     </div>
 
@@ -616,6 +617,40 @@
             <div class="other-list">
               <div>🤖 <strong>OpenAI Whisper</strong> – sehr präzise, kostenpflichtig</div>
               <div>🏠 <strong>Ollama</strong> – lokal, kein API-Key nötig</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Integrationen ── -->
+    <div class="tab-content" id="tab-integrations">
+      <div class="tile-layout">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-title">🔌 Integrationen – externe API-Keys</div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">
+            Trage hier API-Keys für externe Dienste ein. Skills können diese Keys als <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px">{{PLATZHALTER_NAME}}</code> verwenden – kein Key landet im Klartext in der Skill-Datei.
+          </p>
+          <div id="integrations-list"></div>
+          <button class="btn btn-secondary" style="margin-top:12px" onclick="addIntegration()">＋ Weitere Integration hinzufügen</button>
+        </div>
+        <div>
+          <div class="info-card">
+            <h4>💡 So funktioniert es</h4>
+            <p>Trage Name, Beschreibung und Key ein. FluxBot ersetzt beim Ausführen eines Skills automatisch <code style="background:rgba(255,255,255,0.08);padding:2px 5px;border-radius:4px">{{NAME}}</code> durch den echten Wert.</p>
+            <hr class="divider">
+            <p style="font-size:12px;color:var(--muted)"><strong>Beispiel-Skill:</strong></p>
+            <pre style="font-size:11px;color:var(--muted);background:rgba(255,255,255,0.05);padding:10px;border-radius:6px;overflow:auto">Nutze diesen API-Key:
+{{CAL_API_KEY}}
+für Cal.com Buchungen.</pre>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Typische Integrationen</h4>
+            <div class="other-list">
+              <div>📅 <strong>Cal.com</strong> – Terminbuchungen</div>
+              <div>💳 <strong>Stripe</strong> – Zahlungen</div>
+              <div>📝 <strong>Notion</strong> – Datenbank & Notizen</div>
+              <div>📧 <strong>Resend / SendGrid</strong> – E-Mails</div>
+              <div>🔗 <strong>Zapier / Make</strong> – Webhooks</div>
             </div>
           </div>
         </div>
@@ -1035,6 +1070,9 @@ async function loadConfig() {
 
   // JSON-Tab immer mit Blur starten
   reBlur('json');
+
+  // Integrationen laden
+  renderIntegrations(configData.integrations || []);
 }
 
 function setVal(id, val, type = 'text') {
@@ -1141,6 +1179,9 @@ async function saveConfig() {
     newConfig.voice.provider = getVal('voice-provider', 'select');
     newConfig.voice.language = getVal('voice-lang',     'select');
     newConfig.voice.apiKey   = getVal('voice-apikey');
+
+    // Integrationen aus der dynamischen Liste lesen
+    newConfig.integrations = collectIntegrations();
   }
 
   const result = await api('/api/config', 'PUT', newConfig);
@@ -1286,6 +1327,59 @@ function fallbackCopy(text) {
   try { document.execCommand('copy'); toast('📋 Befehl kopiert!'); }
   catch(e) { toast('Kopieren fehlgeschlagen – bitte manuell kopieren', true); }
   document.body.removeChild(ta);
+}
+
+// ── INTEGRATIONEN ──────────────────────────────────────────────────────────
+function renderIntegrations(list) {
+  const container = document.getElementById('integrations-list');
+  container.innerHTML = '';
+  if (!list || list.length === 0) {
+    addIntegration();
+    return;
+  }
+  list.forEach(item => addIntegration(item.name, item.description, item.value));
+}
+
+function addIntegration(name = '', description = '', value = '') {
+  const container = document.getElementById('integrations-list');
+  const row = document.createElement('div');
+  row.className = 'integration-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:14px;background:rgba(255,255,255,0.04);padding:14px;border-radius:8px;border:1px solid rgba(255,255,255,0.07)';
+  row.innerHTML = `
+    <div class="field" style="margin:0">
+      <label style="font-size:11px;margin-bottom:4px">Platzhalter-Name</label>
+      <input type="text" class="int-name" value="${escHtml(name)}" placeholder="CAL_API_KEY" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9_]/g,'')">
+    </div>
+    <div class="field" style="margin:0">
+      <label style="font-size:11px;margin-bottom:4px">Beschreibung</label>
+      <input type="text" class="int-desc" value="${escHtml(description)}" placeholder="z.B. Cal.com API Key">
+    </div>
+    <div class="field" style="margin:0">
+      <label style="font-size:11px;margin-bottom:4px">Key / Token</label>
+      <div class="input-wrap">
+        <input type="password" class="int-value" value="${escHtml(value)}" placeholder="sk-…" autocomplete="off">
+        <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+      </div>
+    </div>
+    <button type="button" onclick="this.closest('.integration-row').remove()" style="background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:16px;align-self:end">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function collectIntegrations() {
+  const rows = document.querySelectorAll('.integration-row');
+  const result = [];
+  rows.forEach(row => {
+    const name  = row.querySelector('.int-name').value.trim();
+    const desc  = row.querySelector('.int-desc').value.trim();
+    const value = row.querySelector('.int-value').value;
+    if (name) result.push({ name, description: desc, value });
+  });
+  return result;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // ── Init ───────────────────────────────────────────────────────────────────

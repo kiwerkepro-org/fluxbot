@@ -275,6 +275,18 @@ func runBot(ctx context.Context, configPath string) {
 
 	// ── Agent starten ─────────────────────────────────────────────────────────
 	skillsLoader := skills.NewLoader(cfg.Workspace.Path)
+
+	// HMAC-Secret + Integrationen an Skills-Loader übergeben
+	skillsLoader.SetSecret(cfg.SkillSecret)
+	if len(cfg.Integrations) > 0 {
+		integMap := make(map[string]string, len(cfg.Integrations))
+		for _, integ := range cfg.Integrations {
+			integMap[integ.Name] = integ.Value
+		}
+		skillsLoader.SetIntegrations(integMap)
+		log.Printf("[Main] Integrationen: %d konfiguriert", len(cfg.Integrations))
+	}
+
 	sessionManager := agent.NewSessionManager(cfg.Workspace.Path)
 	log.Printf("[Main] Workspace: %s", cfg.Workspace.Path)
 

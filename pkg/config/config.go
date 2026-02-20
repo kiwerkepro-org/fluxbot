@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,13 +10,23 @@ import (
 
 // Config ist die Hauptkonfiguration von FluxBot (config.json)
 type Config struct {
-	Channels  ChannelsConfig  `json:"channels"`
-	Providers ProvidersConfig `json:"providers"`
-	Workspace WorkspaceConfig `json:"workspace"`
-	Voice     VoiceConfig     `json:"voice"`
-	ImageGen  ImageGenConfig  `json:"imageGen"`
-	VideoGen  VideoGenConfig  `json:"videoGen"`
-	Dashboard DashboardConfig `json:"dashboard"`
+	Channels     ChannelsConfig  `json:"channels"`
+	Providers    ProvidersConfig `json:"providers"`
+	Workspace    WorkspaceConfig `json:"workspace"`
+	Voice        VoiceConfig     `json:"voice"`
+	ImageGen     ImageGenConfig  `json:"imageGen"`
+	VideoGen     VideoGenConfig  `json:"videoGen"`
+	Dashboard    DashboardConfig `json:"dashboard"`
+	Integrations []Integration   `json:"integrations,omitempty"` // externe API-Keys für Skills
+	SkillSecret  string          `json:"skillSecret,omitempty"`  // HMAC-Key für Skill-Signierung
+}
+
+// Integration speichert einen benannten API-Key für externe Dienste.
+// Skills referenzieren ihn als {{NAME}} Platzhalter.
+type Integration struct {
+	Name        string `json:"name"`        // Platzhalter-Name, z.B. "CAL_API_KEY"
+	Description string `json:"description"` // Lesbare Beschreibung, z.B. "Cal.com API Key"
+	Value       string `json:"value"`       // Der eigentliche Key / Token
 }
 
 // DashboardConfig konfiguriert das Web-Dashboard
@@ -313,7 +325,25 @@ func Load(path string) (*Config, error) {
 		cfg.Dashboard.Port = 9090
 	}
 
+	// ── Skill-Secret auto-generieren wenn noch nicht vorhanden ──────────────
+	if cfg.SkillSecret == "" {
+		cfg.SkillSecret = generateSecret()
+		// Secret direkt in config.json persistieren
+		if updated, err := json.MarshalIndent(cfg, "", "  "); err == nil {
+			_ = os.WriteFile(path, updated, 0600)
+		}
+	}
+
 	return &cfg, nil
+}
+
+// generateSecret erzeugt einen kryptographisch sicheren 32-Byte Hex-String.
+func generateSecret() string {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		panic("crypto/rand nicht verfügbar: " + err.Error())
+	}
+	return hex.EncodeToString(b)
 }
 
 // DefaultModels gibt die Standard-Modellzuordnung zurück

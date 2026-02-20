@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 type Loader struct {
 	workspacePath string
 	skills        map[string]*Skill // name → Skill
+	secret        string            // HMAC-Secret für Signatur-Prüfung (leer = deaktiviert)
+	integrations  map[string]string // Platzhalter-Name → Wert
 }
 
 // NewLoader erstellt einen neuen Skills-Loader und lädt alle Skills sofort.
@@ -18,9 +21,72 @@ func NewLoader(workspacePath string) *Loader {
 	l := &Loader{
 		workspacePath: workspacePath,
 		skills:        make(map[string]*Skill),
+		integrations:  make(map[string]string),
 	}
 	l.loadAll()
 	return l
+}
+
+// SetSecret setzt den HMAC-Secret für Signaturprüfung.
+func (l *Loader) SetSecret(secret string) {
+	l.secret = secret
+}
+
+// SetIntegrations setzt die Integrations-Platzhalter (Name → Wert).
+func (l *Loader) SetIntegrations(integrations map[string]string) {
+	l.integrations = integrations
+}
+
+// SaveAndSign speichert einen Skill als .md-Datei, signiert ihn und lädt ihn sofort.
+func (l *Loader) SaveAndSign(name, content string) error {
+	skillsDir := filepath.Join(l.workspacePath, "skills")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		return fmt.Errorf("skills-verzeichnis erstellen: %w", err)
+	}
+
+	// Dateiname sichern: nur alphanumerisch + Bindestrich
+	safeName := sanitizeSkillName(name)
+	path := filepath.Join(skillsDir, safeName+".md")
+
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return fmt.Errorf("skill schreiben: %w", err)
+	}
+	log.Printf("[Skills] ✅ Skill gespeichert: %s", path)
+
+	// Signieren wenn Secret gesetzt
+	if l.secret != "" {
+		if err := SignFile(path, l.secret); err != nil {
+			log.Printf("[Skills] ⚠️ Signierung fehlgeschlagen: %v", err)
+		} else {
+			log.Printf("[Skills] 🔐 Skill signiert: %s.sig", path)
+		}
+	}
+
+	// Sofort in Speicher laden
+	skill, err := l.parseSkillFile(path)
+	if err != nil {
+		return fmt.Errorf("skill parsen: %w", err)
+	}
+	l.skills[skill.Name] = skill
+	return nil
+}
+
+// sanitizeSkillName bereinigt einen Skill-Namen für den Dateisystem-Einsatz.
+func sanitizeSkillName(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	var result strings.Builder
+	for _, r := range name {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			result.WriteRune(r)
+		} else if r == ' ' {
+			result.WriteRune('-')
+		}
+	}
+	s := result.String()
+	if s == "" {
+		s = "skill"
+	}
+	return s
 }
 
 // loadAll lädt alle .md-Dateien aus dem skills/-Verzeichnis und AGENTS.md.
@@ -37,11 +103,21 @@ func (l *Loader) loadAll() {
 			continue
 		}
 		path := filepath.Join(skillsDir, entry.Name())
+
+		// Signaturprüfung: manipulierte Skills werden übersprungen
+		if !l.verifySkill(path) {
+			continue
+		}
+
 		skill, err := l.parseSkillFile(path)
 		if err != nil {
 			log.Printf("[Skills] Fehler beim Laden von %s: %v", path, err)
 			continue
 		}
+
+		// Integrations-Platzhalter substituieren
+		skill.Content = l.substituteIntegrations(skill.Content)
+
 		l.skills[skill.Name] = skill
 	}
 
@@ -55,6 +131,41 @@ func (l *Loader) loadAll() {
 	}
 
 	log.Printf("[Skills] %d Skills geladen", len(l.skills))
+}
+
+// verifySkill prüft die Signatur einer Skill-Datei wenn ein Secret gesetzt ist.
+// Gibt false zurück wenn die Datei manipuliert wurde (Signatur vorhanden aber falsch).
+func (l *Loader) verifySkill(path string) bool {
+	if l.secret == "" {
+		return true // Signierung deaktiviert → alles erlaubt
+	}
+	ok, err := VerifyFile(path, l.secret)
+	if err != nil {
+		log.Printf("[Skills] ⚠️ Signaturprüfung Fehler für %s: %v", filepath.Base(path), err)
+		return true // Fehler beim Lesen der .sig = unsigniert → erlaubt
+	}
+	if !ok {
+		// Keine .sig-Datei = unsigniert (erlaubt mit Warnung)
+		// Vorhandene aber falsche .sig = manipuliert (abgelehnt)
+		sigPath := path + ".sig"
+		if _, statErr := os.Stat(sigPath); statErr == nil {
+			log.Printf("[Skills] 🚨 Skill %s wurde manipuliert – wird NICHT geladen!", filepath.Base(path))
+			return false
+		}
+		log.Printf("[Skills] ℹ️ Skill %s ist unsigniert", filepath.Base(path))
+	}
+	return true
+}
+
+// substituteIntegrations ersetzt {{PLACEHOLDER}} mit den konfigurierten Integrationswerten.
+func (l *Loader) substituteIntegrations(content string) string {
+	if len(l.integrations) == 0 {
+		return content
+	}
+	for name, value := range l.integrations {
+		content = strings.ReplaceAll(content, "{{"+name+"}}", value)
+	}
+	return content
 }
 
 // parseSkillFile parst eine .md-Datei mit optionalem YAML-Frontmatter.

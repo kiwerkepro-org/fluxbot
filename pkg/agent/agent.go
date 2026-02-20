@@ -497,7 +497,39 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 		return "🎬 Videogenerierung mit *" + a.videoDefault + "* ist konfiguriert, aber noch nicht vollständig implementiert."
 	}
 
+	// KI hat Skill-Erstellung erkannt → speichern + signieren
+	if strings.Contains(response, "__SKILL_NAME:") && strings.Contains(response, "__SKILL_END__") {
+		return a.handleSkillCreation(response)
+	}
+
 	return response
+}
+
+// handleSkillCreation parst den Skill aus der KI-Antwort, speichert und signiert ihn.
+func (a *Agent) handleSkillCreation(response string) string {
+	// Format: __SKILL_NAME:dateiname__\n<inhalt>\n__SKILL_END__
+	nameStart := strings.Index(response, "__SKILL_NAME:") + len("__SKILL_NAME:")
+	nameEnd := strings.Index(response[nameStart:], "__")
+	if nameEnd < 0 {
+		return "❌ Skill-Format fehlerhaft. Bitte nochmal versuchen."
+	}
+	skillName := strings.TrimSpace(response[nameStart : nameStart+nameEnd])
+
+	contentStart := nameStart + nameEnd + len("__\n")
+	contentEnd := strings.Index(response, "__SKILL_END__")
+	if contentStart >= contentEnd {
+		return "❌ Skill-Inhalt leer. Bitte nochmal versuchen."
+	}
+	skillContent := strings.TrimSpace(response[contentStart:contentEnd])
+
+	if err := a.skillsLoader.SaveAndSign(skillName, skillContent); err != nil {
+		log.Printf("[Agent] ❌ Skill-Speicherung fehlgeschlagen: %v", err)
+		return fmt.Sprintf("❌ Skill konnte nicht gespeichert werden: %v", err)
+	}
+
+	log.Printf("[Agent] ✅ Skill '%s' erstellt und signiert", skillName)
+	return fmt.Sprintf("✅ Skill *%s* wurde erstellt, gespeichert und mit HMAC signiert.\n\n"+
+		"FluxBot kennt diesen Skill ab sofort – er wird bei passenden Anfragen automatisch aktiviert.", skillName)
 }
 
 func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
@@ -520,7 +552,15 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 		"- Bei einfachen Bestätigungen oder Statusmeldungen: eine Zeile reicht.\n" +
 		"\nVIDEO-ERKENNUNG – HÖCHSTE PRIORITÄT:\n" +
 		"Wenn der Nutzer in irgendeiner Form ein Video erstellen, generieren, produzieren, drehen, animieren oder rendern lassen möchte – egal wie er es formuliert, in welcher Sprache oder mit welchen Worten – antworte ausschließlich mit dem exakten Text: __VIDEO_REQUEST__\n" +
-		"Kein weiterer Text, keine Erklärung, nur: __VIDEO_REQUEST__\n"
+		"Kein weiterer Text, keine Erklärung, nur: __VIDEO_REQUEST__\n" +
+		"\nSKILL-ERSTELLUNG – HÖCHSTE PRIORITÄT:\n" +
+		"Wenn der Nutzer einen neuen Skill erstellen, speichern oder einrichten möchte, erstelle den kompletten Skill-Inhalt im Markdown-Format und gib EXAKT folgendes aus:\n" +
+		"__SKILL_NAME:dateiname-ohne-leerzeichen__\n" +
+		"<vollständiger skill-inhalt mit frontmatter>\n" +
+		"__SKILL_END__\n" +
+		"Das Frontmatter muss name, tags und mindestens einen Aktivierungs-Hinweis enthalten.\n" +
+		"Für externe API-Keys in Skills verwende {{PLATZHALTER_NAME}} – nie echte Keys im Skill-Inhalt.\n" +
+		"Kein Text vor oder nach den Markern.\n"
 
 	if facts != "" {
 		prompt += fmt.Sprintf("\nGEDÄCHTNIS ÜBER DEN NUTZER: %s\n", facts)
