@@ -825,44 +825,52 @@
   <!-- SYSTEM -->
   <div class="section" id="section-system">
     <h2>System</h2>
-    <p class="subtitle">FluxBot neu starten oder neu bauen</p>
+    <p class="subtitle">FluxBot neu starten oder neu bauen – passende Befehle für dein System</p>
 
-    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Welches Betriebssystem verwendest du?</div>
-    <div class="os-selector">
-      <span class="os-btn active" onclick="selectOS('windows', this)">🪟 Windows</span>
-      <span class="os-btn" onclick="selectOS('mac', this)">🍎 Mac</span>
-      <span class="os-btn" onclick="selectOS('linux', this)">🐧 Linux</span>
-      <span class="os-btn" onclick="selectOS('docker', this)">🐳 Docker</span>
+    <!-- Ebene 1: Haupt-OS -->
+    <div style="font-size:13px;color:var(--muted);margin-bottom:8px">
+      <strong>Schritt 1:</strong> Wie läuft FluxBot bei dir?
     </div>
+    <div class="os-selector" id="os-main-selector">
+      <span class="os-btn active" onclick="selectMainOS('windows', this)">🪟 Windows</span>
+      <span class="os-btn" onclick="selectMainOS('mac', this)">🍎 Mac</span>
+      <span class="os-btn" onclick="selectMainOS('linux', this)">🐧 Linux</span>
+      <span class="os-btn" onclick="selectMainOS('docker', this)">🐳 Docker</span>
+    </div>
+
+    <!-- Ebene 2: Sub-Auswahl (erscheint je nach Haupt-OS) -->
+    <div id="os-sub-panel" style="display:none;margin-bottom:20px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px">
+        <strong>Schritt 2:</strong> <span id="os-sub-label"></span>
+      </div>
+      <div class="os-selector" id="os-sub-selector"></div>
+    </div>
+
+    <!-- Info-Banner: Was ist der Unterschied? -->
+    <div id="os-info-banner" style="background:rgba(91,141,238,0.07);border:1px solid rgba(91,141,238,0.2);border-radius:10px;padding:14px 18px;margin-bottom:24px;font-size:13px;line-height:1.7;color:var(--muted)"></div>
 
     <div class="system-tiles">
       <!-- Restart -->
       <div class="system-tile">
-        <h3>🔄 Neustart <span class="tile-badge restart">Schnell</span></h3>
-        <p class="tile-desc">Stoppt FluxBot und startet ihn sofort neu. <strong>Konfigurationsänderungen</strong> im Dashboard werden damit aktiv. Keine Daten gehen verloren.</p>
-        <div class="cmd-box">
-          <code id="restart-cmd"></code>
-          <button class="copy-btn" onclick="copyCmd('restart-cmd')">📋 Kopieren</button>
-        </div>
+        <h3>🔄 Neustart <span class="tile-badge restart">Schnell · ~5 Sek.</span></h3>
+        <p class="tile-desc">Stoppt FluxBot und startet ihn sofort neu. Nutze das wenn du Einstellungen im Dashboard gespeichert hast und sichergehen willst, dass alles übernommen wurde. <strong>Keine Daten gehen verloren.</strong></p>
+        <div id="restart-steps"></div>
         <div class="howto-box" id="restart-howto"></div>
       </div>
 
       <!-- Rebuild -->
       <div class="system-tile">
-        <h3>🔨 Neu bauen <span class="tile-badge rebuild">Update</span></h3>
-        <p class="tile-desc">Kompiliert FluxBot komplett neu. Notwendig nach <strong>Updates vom Entwickler</strong> oder bei Dashboard-Änderungen, die nicht sichtbar sind.</p>
-        <div class="cmd-box">
-          <code id="rebuild-cmd"></code>
-          <button class="copy-btn" onclick="copyCmd('rebuild-cmd')">📋 Kopieren</button>
-        </div>
+        <h3>🔨 Neu bauen <span class="tile-badge rebuild">Update · ~2 Min.</span></h3>
+        <p class="tile-desc">Lädt den neuesten Code herunter und kompiliert FluxBot komplett neu. Notwendig nach <strong>Updates vom Entwickler</strong> (neue Funktionen, Bugfixes). Dauert etwas länger als ein einfacher Neustart.</p>
+        <div id="rebuild-steps"></div>
         <div class="howto-box" id="rebuild-howto"></div>
       </div>
     </div>
 
     <div class="cache-hint">
       <strong>🌐 Browser-Cache leeren nach Rebuild:</strong>
-      Nach einem Neu-Build zeigt der Browser evtl. noch das alte Dashboard. Drücke
-      <kbd>Strg + Shift + R</kbd> (Windows/Linux) oder <kbd>Cmd + Shift + R</kbd> (Mac) für einen Hard-Reload.
+      Nach einem Neu-Build zeigt der Browser manchmal noch das alte Dashboard.
+      Drücke <kbd>Strg + Shift + R</kbd> (Windows/Linux) oder <kbd>Cmd + Shift + R</kbd> (Mac) – das lädt alles frisch.
     </div>
   </div>
 
@@ -1346,49 +1354,210 @@ function escHtml(str) {
 }
 
 // ── SYSTEM: OS-Befehle ─────────────────────────────────────────────────────
+// restartSteps / rebuildSteps = Array von Strings → jeder Eintrag = ein Befehl (eigene Box + Kopieren-Button)
+// Ein einzelner String = ein Befehl in einer Box
 const osCmds = {
-  windows: {
-    restart: 'Stop-Process -Name "FluxBot" -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; Start-Process -FilePath ".\\FluxBot.exe"',
-    rebuild: 'Stop-Process -Name "FluxBot" -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; go build -o FluxBot.exe .\\cmd\\fluxbot\\; Start-Process -FilePath ".\\FluxBot.exe"',
-    restartHowto: '<strong>So öffnest du PowerShell:</strong><br><span class="step-num">1</span> Windows-Taste drücken → "PowerShell" tippen<br><span class="step-num">2</span> Rechtsklick → <em>Als Administrator ausführen</em><br><span class="step-num">3</span> In den FluxBot-Ordner: <code>cd C:\\Pfad\\zu\\FluxBot</code><br><span class="step-num">4</span> Befehl kopieren → Strg+V → Enter',
-    rebuildHowto: '<strong>Voraussetzung:</strong> Go muss installiert sein → <a href="https://go.dev/dl/" target="_blank">go.dev/dl</a><br><span class="step-num">1</span> PowerShell als Administrator öffnen<br><span class="step-num">2</span> In den Quellcode-Ordner navigieren<br><span class="step-num">3</span> Befehl kopieren → Strg+V → Enter<br><span class="step-num">4</span> Danach: Strg+Shift+R im Browser'
+
+  // ── Windows PowerShell ────────────────────────────────────────────────────
+  // In Windows PowerShell 5.1 (vorinstalliert) funktioniert && NICHT.
+  // Deshalb werden mehrere Befehle als einzelne Schritte angezeigt.
+  win_ps: {
+    info: '⚠️ <strong>Wichtig für PowerShell:</strong> In Windows PowerShell funktioniert <code>&&</code> <em>nicht</em>. Führe deshalb jeden Befehl einzeln nacheinander aus – warte jeweils bis der vorherige fertig ist (kein blinkendes Cursor mehr).',
+    restartSteps: [
+      'Stop-Process -Name "fluxbot" -Force -ErrorAction SilentlyContinue',
+      'Start-Sleep -Seconds 2',
+      'Start-Process -FilePath ".\\fluxbot.exe"'
+    ],
+    rebuildSteps: [
+      'git pull',
+      'go build -o fluxbot.exe .\\cmd\\fluxbot\\',
+      'Stop-Process -Name "fluxbot" -Force -ErrorAction SilentlyContinue',
+      'Start-Sleep -Seconds 2',
+      'Start-Process -FilePath ".\\fluxbot.exe"'
+    ],
+    restartHowto: '📂 <strong>So öffnest du PowerShell im richtigen Ordner:</strong><br><span class="step-num">1</span> Öffne den FluxBot-Ordner im Windows Explorer<br><span class="step-num">2</span> Halte <kbd>Shift</kbd> gedrückt und klicke mit <strong>rechter Maustaste</strong> in einen leeren Bereich<br><span class="step-num">3</span> Wähle <em>"PowerShell-Fenster hier öffnen"</em> (oder "Terminal hier öffnen")<br><span class="step-num">4</span> Befehle einzeln kopieren → <kbd>Strg</kbd>+<kbd>V</kbd> → <kbd>Enter</kbd> → warten → nächsten',
+    rebuildHowto: '📦 <strong>Voraussetzung: Git & Go müssen installiert sein</strong><br>Git: <a href="https://git-scm.com/download/win" target="_blank" style="color:var(--accent)">git-scm.com/download/win</a><br>Go: <a href="https://go.dev/dl/" target="_blank" style="color:var(--accent)">go.dev/dl</a><br><br>Befehle einzeln der Reihe nach ausführen. Nach Schritt 1 (<code>git pull</code>) siehst du welche Dateien aktualisiert wurden.'
   },
+
+  // ── Windows Eingabeaufforderung (CMD) ─────────────────────────────────────
+  win_cmd: {
+    info: '✅ <strong>Eingabeaufforderung (CMD):</strong> Hier funktioniert <code>&</code> als Trennzeichen (ein kaufmännisches Und – nicht zwei). Die Befehle laufen nacheinander ab.',
+    restartSteps: [
+      'taskkill /F /IM fluxbot.exe 2>nul & timeout /t 2 /nobreak > nul & start fluxbot.exe'
+    ],
+    rebuildSteps: [
+      'git pull',
+      'go build -o fluxbot.exe .\\cmd\\fluxbot\\',
+      'taskkill /F /IM fluxbot.exe 2>nul & timeout /t 2 /nobreak > nul & start fluxbot.exe'
+    ],
+    restartHowto: '📂 <strong>So öffnest du CMD im richtigen Ordner:</strong><br><span class="step-num">1</span> Öffne den FluxBot-Ordner im Windows Explorer<br><span class="step-num">2</span> Klicke in die <strong>Adressleiste</strong> oben (wo der Ordnerpfad steht)<br><span class="step-num">3</span> Tippe <code>cmd</code> und drücke <kbd>Enter</kbd><br><span class="step-num">4</span> Befehl kopieren → rechte Maustaste im CMD-Fenster (fügt ein) → <kbd>Enter</kbd>',
+    rebuildHowto: '📦 <strong>Voraussetzung: Git & Go müssen installiert sein</strong><br>Git: <a href="https://git-scm.com/download/win" target="_blank" style="color:var(--accent)">git-scm.com/download/win</a><br>Go: <a href="https://go.dev/dl/" target="_blank" style="color:var(--accent)">go.dev/dl</a><br><br>Tipp: In CMD wird mit <kbd>rechter Maustaste</kbd> eingefügt (nicht Strg+V).'
+  },
+
+  // ── Mac Terminal ──────────────────────────────────────────────────────────
   mac: {
-    restart: 'pkill -f "FluxBot" 2>/dev/null; sleep 1; ./FluxBot &',
-    rebuild: 'pkill -f "FluxBot" 2>/dev/null; sleep 1; go build -o FluxBot ./cmd/fluxbot/ && ./FluxBot &',
-    restartHowto: '<strong>So öffnest du das Terminal:</strong><br><span class="step-num">1</span> Cmd+Leertaste → "Terminal" tippen → Enter<br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd ~/Pfad/zu/FluxBot</code><br><span class="step-num">3</span> Befehl kopieren → Cmd+V → Enter',
-    rebuildHowto: '<strong>Voraussetzung:</strong> Go installiert? → <a href="https://go.dev/dl/" target="_blank">go.dev/dl</a><br><span class="step-num">1</span> Terminal öffnen<br><span class="step-num">2</span> In den Quellcode-Ordner navigieren<br><span class="step-num">3</span> Befehl kopieren → Cmd+V → Enter'
+    info: '✅ <strong>Mac Terminal:</strong> Auf dem Mac funktioniert <code>&&</code> problemlos. Mehrere Befehle können in einer Zeile verkettet werden.',
+    restartSteps: [
+      'pkill -f "fluxbot" 2>/dev/null; sleep 2 && ./fluxbot &'
+    ],
+    rebuildSteps: [
+      'git pull && go build -o fluxbot ./cmd/fluxbot/ && pkill -f "fluxbot" 2>/dev/null; sleep 2 && ./fluxbot &'
+    ],
+    restartHowto: '📂 <strong>Terminal im richtigen Ordner öffnen:</strong><br><span class="step-num">1</span> <kbd>Cmd</kbd> + <kbd>Leertaste</kbd> → "Terminal" tippen → <kbd>Enter</kbd><br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd ~/Pfad/zu/FluxBot</code><br><span class="step-num">3</span> Befehl kopieren → <kbd>Cmd</kbd>+<kbd>V</kbd> → <kbd>Enter</kbd><br><br>💡 Tipp: Ziehe den Ordner aus dem Finder ins Terminal-Fenster – der Pfad wird automatisch eingetippt.',
+    rebuildHowto: '📦 <strong>Voraussetzungen:</strong><br>Git: mit macOS vorinstalliert (Xcode Command Line Tools)<br>Go: <a href="https://go.dev/dl/" target="_blank" style="color:var(--accent)">go.dev/dl</a> → macOS-Paket herunterladen & installieren'
   },
+
+  // ── Linux Terminal ────────────────────────────────────────────────────────
   linux: {
-    restart: 'pkill -f "FluxBot" 2>/dev/null; sleep 1; ./FluxBot &',
-    rebuild: 'pkill -f "FluxBot" 2>/dev/null; sleep 1; go build -o FluxBot ./cmd/fluxbot/ && ./FluxBot &',
-    restartHowto: '<strong>So öffnest du das Terminal:</strong><br><span class="step-num">1</span> Strg+Alt+T (oder Terminal im App-Menü)<br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd ~/Pfad/zu/FluxBot</code><br><span class="step-num">3</span> Befehl kopieren → Strg+Shift+V → Enter',
-    rebuildHowto: '<strong>Voraussetzung:</strong> <code>sudo apt install golang-go</code><br><span class="step-num">1</span> Terminal öffnen (Strg+Alt+T)<br><span class="step-num">2</span> In den Quellcode-Ordner navigieren<br><span class="step-num">3</span> Befehl kopieren → Strg+Shift+V → Enter'
+    info: '✅ <strong>Linux Terminal:</strong> <code>&&</code> funktioniert problemlos. Mehrere Befehle können verkettet werden.',
+    restartSteps: [
+      'pkill -f "fluxbot" 2>/dev/null; sleep 2 && ./fluxbot &'
+    ],
+    rebuildSteps: [
+      'git pull && go build -o fluxbot ./cmd/fluxbot/ && pkill -f "fluxbot" 2>/dev/null; sleep 2 && ./fluxbot &'
+    ],
+    restartHowto: '📂 <strong>Terminal öffnen:</strong><br><span class="step-num">1</span> <kbd>Strg</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> (die meisten Distributionen)<br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd ~/Pfad/zu/FluxBot</code><br><span class="step-num">3</span> Befehl kopieren → <kbd>Strg</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> zum Einfügen → <kbd>Enter</kbd>',
+    rebuildHowto: '📦 <strong>Voraussetzungen installieren:</strong><br>Git: <code>sudo apt install git</code> (Debian/Ubuntu)<br>Go: <code>sudo apt install golang-go</code> oder <a href="https://go.dev/dl/" target="_blank" style="color:var(--accent)">go.dev/dl</a>'
   },
-  docker: {
-    restart: 'docker restart fluxbot_ai',
-    rebuild: 'docker-compose down && docker-compose up --build -d',
-    restartHowto: '<strong>Auf dem Server / Host:</strong><br><span class="step-num">1</span> SSH-Verbindung zum Server herstellen<br><span class="step-num">2</span> In den FluxBot-Ordner navigieren<br><span class="step-num">3</span> Befehl ausführen',
-    rebuildHowto: '<strong>Hinweis:</strong> Rebuild baut ein neues Docker-Image.<br><span class="step-num">1</span> SSH zum Server<br><span class="step-num">2</span> <code>git pull</code> für neuesten Code<br><span class="step-num">3</span> Rebuild-Befehl ausführen'
+
+  // ── Docker auf Linux/Mac (Server oder lokaler Rechner) ────────────────────
+  docker_linux: {
+    info: '🐳 <strong>Docker auf Linux/Mac:</strong> Der häufigste Fall wenn FluxBot auf einem Server oder einem Mac/Linux-Rechner in Docker läuft. <code>&&</code> funktioniert hier problemlos.',
+    restartSteps: [
+      'docker restart fluxbot_ai'
+    ],
+    rebuildSteps: [
+      'git pull',
+      'docker-compose down',
+      'docker-compose up --build -d'
+    ],
+    restartHowto: '🖥️ <strong>Auf dem Server ausführen (SSH):</strong><br><span class="step-num">1</span> SSH-Verbindung öffnen: <code>ssh benutzer@server-ip</code><br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd /pfad/zu/fluxbot</code><br><span class="step-num">3</span> Befehl ausführen<br><br>💡 Lokal auf Mac/Linux: Terminal öffnen, direkt ausführen.',
+    rebuildHowto: '🖥️ <strong>Schritte einzeln ausführen – auf Abschluss warten:</strong><br><span class="step-num">1</span> <code>git pull</code> – lädt neuen Code von GitHub<br><span class="step-num">2</span> <code>docker-compose down</code> – stoppt den Container<br><span class="step-num">3</span> <code>docker-compose up --build -d</code> – baut neu & startet<br><br>Der letzte Befehl kann 1–2 Minuten dauern. Danach <kbd>Strg</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> im Browser.'
+  },
+
+  // ── Docker auf Windows (PowerShell) ──────────────────────────────────────
+  docker_win_ps: {
+    info: '⚠️ <strong>Docker auf Windows (PowerShell):</strong> In PowerShell funktioniert <code>&&</code> nicht. Deshalb jeden Befehl einzeln ausführen – warte bis der vorherige fertig ist.',
+    restartSteps: [
+      'docker restart fluxbot_ai'
+    ],
+    rebuildSteps: [
+      'git pull',
+      'docker-compose down',
+      'docker-compose up --build -d'
+    ],
+    restartHowto: '📂 <strong>PowerShell öffnen:</strong><br><span class="step-num">1</span> Windows-Taste → "PowerShell" tippen<br><span class="step-num">2</span> Rechtsklick → <em>Als Administrator ausführen</em><br><span class="step-num">3</span> In den FluxBot-Ordner: <code>cd C:\\Pfad\\zu\\FluxBot</code><br><span class="step-num">4</span> Befehl kopieren → <kbd>Strg</kbd>+<kbd>V</kbd> → <kbd>Enter</kbd>',
+    rebuildHowto: '⚠️ <strong>Wichtig:</strong> Jeden Befehl einzeln ausführen – NICHT alles auf einmal!<br><span class="step-num">1</span> <code>git pull</code> eingeben → Enter → warten bis fertig<br><span class="step-num">2</span> <code>docker-compose down</code> → Enter → warten bis fertig<br><span class="step-num">3</span> <code>docker-compose up --build -d</code> → Enter → ca. 2 Min. warten<br><br>Danach <kbd>Strg</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> im Browser.'
+  },
+
+  // ── Docker auf Windows (CMD / Eingabeaufforderung) ────────────────────────
+  docker_win_cmd: {
+    info: '✅ <strong>Docker auf Windows (CMD):</strong> In der Eingabeaufforderung (CMD) können Befehle mit <code>&</code> verkettet werden.',
+    restartSteps: [
+      'docker restart fluxbot_ai'
+    ],
+    rebuildSteps: [
+      'git pull & docker-compose down & docker-compose up --build -d'
+    ],
+    restartHowto: '📂 <strong>CMD öffnen:</strong><br><span class="step-num">1</span> Windows-Taste → "cmd" tippen → <kbd>Enter</kbd><br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd C:\\Pfad\\zu\\FluxBot</code><br><span class="step-num">3</span> Befehl kopieren → <strong>rechte Maustaste</strong> im CMD (fügt ein) → <kbd>Enter</kbd>',
+    rebuildHowto: '✅ <strong>In CMD funktioniert <code>&</code> als Trennzeichen.</strong><br>Alle drei Schritte in einem Befehl – einfach kopieren und ausführen.<br>Dauert ca. 2 Minuten. Danach <kbd>Strg</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> im Browser.'
   }
 };
 
-let currentOS = 'windows';
+// Sub-Optionen je Haupt-OS
+const osSubOptions = {
+  windows: {
+    label: 'Welches Programm öffnest du auf Windows?',
+    options: [
+      { key: 'win_ps',  label: '⚡ PowerShell (Standard · blau)' },
+      { key: 'win_cmd', label: '🖤 Eingabeaufforderung (CMD · schwarz)' }
+    ]
+  },
+  docker: {
+    label: 'Wo läuft Docker?',
+    options: [
+      { key: 'docker_linux',   label: '🐧 Linux/Mac Server oder lokal' },
+      { key: 'docker_win_ps',  label: '🪟 Windows – PowerShell' },
+      { key: 'docker_win_cmd', label: '🪟 Windows – CMD (Eingabeaufforderung)' }
+    ]
+  }
+};
 
-function selectOS(os, el) {
-  currentOS = os;
-  document.querySelectorAll('.os-btn').forEach(b => b.classList.remove('active'));
+let currentOSKey = 'win_ps';
+let currentMainOS = 'windows';
+
+function selectMainOS(main, el) {
+  currentMainOS = main;
+  document.querySelectorAll('#os-main-selector .os-btn').forEach(b => b.classList.remove('active'));
   if (el) el.classList.add('active');
-  updateSystemCmds();
+
+  const subPanel = document.getElementById('os-sub-panel');
+  const subSel   = document.getElementById('os-sub-selector');
+  const subLabel = document.getElementById('os-sub-label');
+
+  if (osSubOptions[main]) {
+    const sub = osSubOptions[main];
+    subLabel.textContent = sub.label;
+    subSel.innerHTML = sub.options.map((o, i) =>
+      `<span class="os-btn${i===0?' active':''}" onclick="selectSubOS('${o.key}', this)">${o.label}</span>`
+    ).join('');
+    subPanel.style.display = 'block';
+    currentOSKey = sub.options[0].key;
+  } else {
+    subPanel.style.display = 'none';
+    currentOSKey = main;
+  }
+  renderSystemCmds();
 }
 
-function updateSystemCmds() {
-  const cmds = osCmds[currentOS] || osCmds.windows;
-  document.getElementById('restart-cmd').textContent   = cmds.restart;
-  document.getElementById('rebuild-cmd').textContent   = cmds.rebuild;
-  document.getElementById('restart-howto').innerHTML   = cmds.restartHowto;
-  document.getElementById('rebuild-howto').innerHTML   = cmds.rebuildHowto;
+function selectSubOS(key, el) {
+  currentOSKey = key;
+  document.querySelectorAll('#os-sub-selector .os-btn').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderSystemCmds();
 }
+
+function renderSystemCmds() {
+  const cmds = osCmds[currentOSKey];
+  if (!cmds) return;
+
+  // Info-Banner
+  document.getElementById('os-info-banner').innerHTML = cmds.info || '';
+
+  // Schritte rendern
+  renderSteps('restart-steps', cmds.restartSteps || []);
+  renderSteps('rebuild-steps', cmds.rebuildSteps || []);
+  document.getElementById('restart-howto').innerHTML = cmds.restartHowto || '';
+  document.getElementById('rebuild-howto').innerHTML = cmds.rebuildHowto || '';
+}
+
+function renderSteps(containerId, steps) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (steps.length === 1) {
+    // Einzelner Befehl → klassische cmd-box
+    el.innerHTML = `<div class="cmd-box"><code>${escHtml(steps[0])}</code><button class="copy-btn" onclick="copyText('${escHtml(steps[0]).replace(/'/g,"\\'")}')">📋 Kopieren</button></div>`;
+  } else {
+    // Mehrere Schritte → nummerierte Liste
+    el.innerHTML = '<div style="font-size:12px;color:var(--yellow);margin-bottom:8px">⚠️ Jeden Befehl einzeln ausführen – warten bis der vorherige fertig ist:</div>' +
+      steps.map((s, i) => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="background:rgba(91,141,238,0.2);color:var(--accent);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${i+1}</span>
+          <div class="cmd-box" style="flex:1;margin:0"><code>${escHtml(s)}</code><button class="copy-btn" onclick="copyText('${escHtml(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">📋</button></div>
+        </div>`
+      ).join('');
+  }
+}
+
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast('📋 Befehl kopiert!')).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function updateSystemCmds() { renderSystemCmds(); }
 
 function copyCmd(id) {
   const el = document.getElementById(id);
