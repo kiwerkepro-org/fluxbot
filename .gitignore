@@ -55,3 +55,14 @@ Thumbs.db
 *.bak
 *.tmp
 /tmp/
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Zusätzliches Hardening (Vorschlag)
+# ─────────────────────────────────────────────────────────────────────────────
+*.pem
+*.key
+*.crt
+*.pub
+auth_token.txt
+credentials.json
+/logs/

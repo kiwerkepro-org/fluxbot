@@ -224,7 +224,7 @@ func runBot(ctx context.Context, configPath string) {
 
 	if cfg.Channels.Telegram.Enabled {
 		tg := channels.NewTelegramChannel(channels.TelegramConfig{
-			Token:      cfg.Channels.Telegram.Token,
+			Token:     cfg.Channels.Telegram.Token,
 			AllowFrom: cfg.Channels.Telegram.AllowFrom,
 		})
 		manager.Register(tg)
@@ -232,7 +232,7 @@ func runBot(ctx context.Context, configPath string) {
 
 	if cfg.Channels.Discord.Enabled {
 		dc := channels.NewDiscordChannel(channels.DiscordConfig{
-			Token:      cfg.Channels.Discord.Token,
+			Token:     cfg.Channels.Discord.Token,
 			AllowFrom: cfg.Channels.Discord.AllowFrom,
 		})
 		manager.Register(dc)
@@ -244,7 +244,7 @@ func runBot(ctx context.Context, configPath string) {
 			AppToken:      cfg.Channels.Slack.AppToken,
 			SigningSecret: cfg.Channels.Slack.SigningSecret,
 			WebhookPort:   cfg.Channels.Slack.WebhookPort,
-			AllowFrom:      cfg.Channels.Slack.AllowFrom,
+			AllowFrom:     cfg.Channels.Slack.AllowFrom,
 		})
 		manager.Register(slack)
 	}
@@ -252,7 +252,7 @@ func runBot(ctx context.Context, configPath string) {
 	if cfg.Channels.Matrix.Enabled {
 		matrix := channels.NewMatrixChannel(channels.MatrixConfig{
 			HomeServer: cfg.Channels.Matrix.HomeServer,
-			UserID:      cfg.Channels.Matrix.UserID,
+			UserID:     cfg.Channels.Matrix.UserID,
 			Token:      cfg.Channels.Matrix.Token,
 			AllowFrom:  cfg.Channels.Matrix.AllowFrom,
 		})
@@ -264,10 +264,10 @@ func runBot(ctx context.Context, configPath string) {
 			Provider:      cfg.Channels.WhatsApp.Provider,
 			PhoneNumber:   cfg.Channels.WhatsApp.PhoneNumber,
 			PhoneNumberID: cfg.Channels.WhatsApp.PhoneNumberID,
-			APIKey:         cfg.Channels.WhatsApp.APIKey,
+			APIKey:        cfg.Channels.WhatsApp.APIKey,
 			WebhookSecret: cfg.Channels.WhatsApp.WebhookSecret,
 			WebhookPort:   cfg.Channels.WhatsApp.WebhookPort,
-			AllowFrom:      cfg.Channels.WhatsApp.AllowFrom,
+			AllowFrom:     cfg.Channels.WhatsApp.AllowFrom,
 		})
 		manager.Register(wa)
 	}
@@ -303,19 +303,19 @@ func runBot(ctx context.Context, configPath string) {
 	activeModels := getProviderModels(cfg)
 
 	fluxAgent := agent.New(agent.Config{
-		Provider:         aiProvider,
+		Provider:        aiProvider,
 		Manager:         manager,
-		Sessions:         sessionManager,
-		SkillsLoader:     skillsLoader,
+		Sessions:        sessionManager,
+		SkillsLoader:    skillsLoader,
 		Models:          activeModels,
 		Transcriber:     transcriber,
-		VoiceLang:        cfg.Voice.Language,
-		Guard:            guard,
+		VoiceLang:       cfg.Voice.Language,
+		Guard:           guard,
 		ImageGenerators: imageGenerators,
-		ImageSize:        cfg.ImageGen.Size,
+		ImageSize:       cfg.ImageGen.Size,
 		VideoDefault:    cfg.VideoGen.Default,
 		EmailSender:     emailSender,
-		Soul:             soul,
+		Soul:            soul,
 	})
 
 	// ── Dashboard ─────────────────────────────────────────────────────────────
@@ -427,17 +427,17 @@ func getProviderModels(cfg *config.Config) map[string]string {
 	// Fallback-Defaults je nach Provider
 	defaults := map[string]map[string]string{
 		"anthropic":  {"default": "claude-sonnet-4-5-20250929", "opus": "claude-opus-4-5-20251101"},
-		"openai":      {"default": "gpt-4o", "opus": "gpt-4o"},
-		"google":      {"default": "gemini-2.0-flash", "opus": "gemini-2.0-pro"},
-		"xai":         {"default": "grok-2-latest", "opus": "grok-2-latest"},
-		"groq":        {"default": "llama-3.3-70b-versatile", "opus": "llama-3.3-70b-versatile"},
-		"mistral":     {"default": "mistral-large-latest", "opus": "mistral-large-latest"},
-		"together":    {"default": "meta-llama/Llama-3.3-70B-Instruct-Turbo", "opus": "meta-llama/Llama-3.3-70B-Instruct-Turbo"},
-		"deepseek":    {"default": "deepseek-chat", "opus": "deepseek-reasoner"},
+		"openai":     {"default": "gpt-4o", "opus": "gpt-4o"},
+		"google":     {"default": "gemini-2.0-flash", "opus": "gemini-2.0-pro"},
+		"xai":        {"default": "grok-2-latest", "opus": "grok-2-latest"},
+		"groq":       {"default": "llama-3.3-70b-versatile", "opus": "llama-3.3-70b-versatile"},
+		"mistral":    {"default": "mistral-large-latest", "opus": "mistral-large-latest"},
+		"together":   {"default": "meta-llama/Llama-3.3-70B-Instruct-Turbo", "opus": "meta-llama/Llama-3.3-70B-Instruct-Turbo"},
+		"deepseek":   {"default": "deepseek-chat", "opus": "deepseek-reasoner"},
 		"perplexity": {"default": "sonar-pro", "opus": "sonar-reasoning-pro"},
-		"cohere":      {"default": "command-r-plus", "opus": "command-r-plus"},
+		"cohere":     {"default": "command-r-plus", "opus": "command-r-plus"},
 		"fireworks":  {"default": "accounts/fireworks/models/llama-v3p3-70b-instruct", "opus": "accounts/fireworks/models/llama-v3p3-70b-instruct"},
-		"ollama":      {"default": "llama3.2", "opus": "llama3.2"},
+		"ollama":     {"default": "llama3.2", "opus": "llama3.2"},
 	}
 
 	if d, ok := defaults[p]; ok {
@@ -528,7 +528,7 @@ func buildImageGenerators(cfg *config.Config) []imagegen.Generator {
 
 // buildEmailSender erstellt einen SMTP-Sender aus den Integrationen der Config.
 // Pflicht-Keys: SMTP_HOST, SMTP_USER, SMTP_PASSWORD
-// Optional:      SMTP_PORT (Standard: 587), SMTP_FROM (Standard: SMTP_USER)
+// Optional:     SMTP_PORT (Standard: 587), SMTP_FROM (Standard: SMTP_USER)
 // Gibt nil zurück wenn keine SMTP-Credentials konfiguriert sind.
 func buildEmailSender(cfg *config.Config) *email.Sender {
 	integMap := make(map[string]string, len(cfg.Integrations))
@@ -569,20 +569,4 @@ func loadSoul(workspacePath string) string {
 	}
 
 	return strings.Join(parts, "\n\n---\n\n")
-}
-
-// init wird automatisch vor der main()-Funktion aufgerufen.
-// Wir nutzen dies für ein Sicherheits-Hardening, um Umgebungsvariablen zu prüfen,
-// ohne den produktiven Ablauf in main() oder runBot() zu verändern.
-func init() {
-	// In der kiwerkepro-org auf GitHub wird dies über Repository Secrets injiziert.
-	// Lokal wird es aus der .env Datei (via OS-Environment) geladen.
-	hmacSecret := os.Getenv("FLUXBOT_HMAC_SECRET")
-
-	if hmacSecret == "" {
-		log.Println("[Security] HINWEIS: Die Umgebungsvariable FLUXBOT_HMAC_SECRET ist nicht gesetzt.")
-		log.Println("[Security] HMAC-Validierungen für externe Skills könnten fehlschlagen.")
-	} else {
-		log.Println("[Security] ✅ FLUXBOT_HMAC_SECRET erfolgreich für kryptografische Operationen geladen.")
-	}
 }
