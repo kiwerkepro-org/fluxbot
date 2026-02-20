@@ -126,6 +126,10 @@
   .info-card .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
   .info-card .other-list { font-size: 12px; color: var(--muted); line-height: 2.2; }
   .info-card .other-list strong { color: var(--text); }
+  .info-card .other-list { line-height: 1.5; }
+  .smtp-prov-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+  .smtp-prov-btn:hover { background: rgba(91,141,238,0.12); border-color: rgba(91,141,238,0.4); color: var(--accent); }
+  .smtp-prov-btn.active { background: rgba(91,141,238,0.15); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
   /* ── Blur Overlay (JSON / Soul) ── */
   .blur-wrap { position: relative; border-radius: 8px; overflow: hidden; }
@@ -626,30 +630,110 @@
     <!-- ── Integrationen ── -->
     <div class="tab-content" id="tab-integrations">
       <div class="tile-layout">
-        <div class="panel" style="margin-bottom:0">
-          <div class="panel-title">🔌 Integrationen – externe API-Keys</div>
-          <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">
-            Trage hier API-Keys für externe Dienste ein. Skills können diese Keys als <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px">{{PLATZHALTER_NAME}}</code> verwenden – kein Key landet im Klartext in der Skill-Datei.
-          </p>
-          <div id="integrations-list"></div>
-          <button class="btn btn-secondary" style="margin-top:12px" onclick="addIntegration()">＋ Weitere Integration hinzufügen</button>
+        <div style="display:flex;flex-direction:column;gap:20px">
+
+          <!-- SMTP E-Mail Panel -->
+          <div class="panel" style="margin-bottom:0">
+            <div class="panel-title">📧 E-Mail-Versand (SMTP)</div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+              FluxBot kann E-Mails direkt versenden – aber <strong>nur wenn du es explizit befiehlst</strong>. Wähle deinen Anbieter und trage die Zugangsdaten ein.
+            </p>
+
+            <!-- Provider-Schnellauswahl -->
+            <div style="margin-bottom:16px">
+              <label style="display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Anbieter wählen</label>
+              <div style="display:flex;flex-wrap:wrap;gap:8px" id="smtp-provider-btns">
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('gmail')">Gmail</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('outlook')">Outlook / Hotmail</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('gmx')">GMX</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('webde')">Web.de</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('strato')">Strato</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('ionos')">IONOS</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('custom')">Eigener Server</button>
+              </div>
+            </div>
+
+            <!-- Credential-Link (je nach Provider) -->
+            <div id="smtp-cred-hint" style="display:none;background:rgba(91,141,238,0.08);border:1px solid rgba(91,141,238,0.25);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.6"></div>
+
+            <!-- Felder -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="field" style="margin:0">
+                <label>SMTP-Server (Host)</label>
+                <input id="smtp-host" type="text" placeholder="smtp.gmail.com">
+              </div>
+              <div class="field" style="margin:0">
+                <label>Port</label>
+                <input id="smtp-port" type="text" placeholder="587" value="587" style="max-width:100px">
+              </div>
+              <div class="field" style="margin:0">
+                <label>E-Mail-Adresse (Benutzername)</label>
+                <input id="smtp-user" type="text" placeholder="dein@gmail.com" autocomplete="off">
+              </div>
+              <div class="field" style="margin:0">
+                <label>App-Passwort / Passwort</label>
+                <div class="input-wrap">
+                  <input id="smtp-password" type="password" placeholder="●●●●●●●●●●●●●●●●" autocomplete="new-password">
+                  <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+                </div>
+              </div>
+              <div class="field" style="margin:0;grid-column:1/-1">
+                <label>Absender-Anzeigename (optional) – leer = E-Mail-Adresse</label>
+                <input id="smtp-from" type="text" placeholder='FluxBot <dein@gmail.com>'>
+              </div>
+            </div>
+          </div>
+
+          <!-- Generische API-Keys Panel -->
+          <div class="panel" style="margin-bottom:0">
+            <div class="panel-title">🔌 Weitere Integrationen – API-Keys</div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">
+              Skills können diese Keys als <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px">{{PLATZHALTER_NAME}}</code> verwenden – kein Key landet im Klartext in der Skill-Datei.
+            </p>
+            <div id="integrations-list"></div>
+            <button class="btn btn-secondary" style="margin-top:12px" onclick="addIntegration()">＋ Weitere Integration hinzufügen</button>
+          </div>
+
         </div>
+
+        <!-- Info-Card rechts -->
         <div>
           <div class="info-card">
-            <h4>💡 So funktioniert es</h4>
-            <p>Trage Name, Beschreibung und Key ein. FluxBot ersetzt beim Ausführen eines Skills automatisch <code style="background:rgba(255,255,255,0.08);padding:2px 5px;border-radius:4px">{{NAME}}</code> durch den echten Wert.</p>
+            <h4>📧 App-Passwörter erstellen</h4>
+            <p style="margin-bottom:12px;font-size:13px">Die meisten Anbieter verlangen ein spezielles App-Passwort statt deines normalen Passworts. Klicke auf den Link für deinen Anbieter:</p>
+            <div class="other-list" style="gap:10px">
+              <div>
+                <strong>Gmail</strong><br>
+                <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">→ myaccount.google.com/apppasswords</a><br>
+                <span style="font-size:11px;color:var(--muted)">2-Faktor-Auth muss aktiv sein</span>
+              </div>
+              <div>
+                <strong>Outlook / Hotmail / Live</strong><br>
+                <a href="https://account.microsoft.com/security" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">→ account.microsoft.com/security</a><br>
+                <span style="font-size:11px;color:var(--muted)">Sicherheit → Erweitert → App-Kennwörter</span>
+              </div>
+              <div>
+                <strong>GMX &amp; Web.de</strong><br>
+                <a href="https://hilfe.gmx.net/email/sicherheit/app-passwort.html" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">→ hilfe.gmx.net – App-Passwort</a><br>
+                <span style="font-size:11px;color:var(--muted)">Nur nötig wenn 2FA aktiv</span>
+              </div>
+              <div>
+                <strong>Strato</strong><br>
+                <a href="https://www.strato.de/faq/e-mail/smtp-und-imap-fuer-verschiedene-e-mail-programme/" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">→ Strato SMTP-Daten</a><br>
+                <span style="font-size:11px;color:var(--muted)">Normales E-Mail-Passwort reicht</span>
+              </div>
+              <div>
+                <strong>IONOS</strong><br>
+                <a href="https://www.ionos.de/hilfe/email/allgemeine-themen-zu-e-mail/postausgangsserver-smtp/" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">→ IONOS SMTP-Einstellungen</a><br>
+                <span style="font-size:11px;color:var(--muted)">Normales E-Mail-Passwort reicht</span>
+              </div>
+            </div>
             <hr class="divider">
-            <p style="font-size:12px;color:var(--muted)"><strong>Beispiel-Skill:</strong></p>
-            <pre style="font-size:11px;color:var(--muted);background:rgba(255,255,255,0.05);padding:10px;border-radius:6px;overflow:auto">Nutze diesen API-Key:
-{{CAL_API_KEY}}
-für Cal.com Buchungen.</pre>
-            <hr class="divider">
-            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Typische Integrationen</h4>
+            <h4>🔌 Weitere API-Keys</h4>
             <div class="other-list">
               <div>📅 <strong>Cal.com</strong> – Terminbuchungen</div>
               <div>💳 <strong>Stripe</strong> – Zahlungen</div>
               <div>📝 <strong>Notion</strong> – Datenbank & Notizen</div>
-              <div>📧 <strong>Resend / SendGrid</strong> – E-Mails</div>
               <div>🔗 <strong>Zapier / Make</strong> – Webhooks</div>
             </div>
           </div>
@@ -1330,14 +1414,80 @@ function fallbackCopy(text) {
 }
 
 // ── INTEGRATIONEN ──────────────────────────────────────────────────────────
+const SMTP_KEYS = ['SMTP_HOST','SMTP_PORT','SMTP_USER','SMTP_PASSWORD','SMTP_FROM'];
+
 function renderIntegrations(list) {
+  // SMTP-Felder in die dedizierten Inputs füllen, den Rest in die generische Liste
+  const smtpMap = {};
+  const otherList = [];
+  for (const item of (list || [])) {
+    if (SMTP_KEYS.includes(item.name)) smtpMap[item.name] = item.value;
+    else otherList.push(item);
+  }
+  setVal('smtp-host',     smtpMap['SMTP_HOST']     || '');
+  setVal('smtp-port',     smtpMap['SMTP_PORT']     || '587');
+  setVal('smtp-user',     smtpMap['SMTP_USER']     || '');
+  setVal('smtp-password', smtpMap['SMTP_PASSWORD'] || '');
+  setVal('smtp-from',     smtpMap['SMTP_FROM']     || '');
+
+  // Provider-Button aktivieren wenn Host bekannt
+  detectSmtpProvider(smtpMap['SMTP_HOST'] || '');
+
   const container = document.getElementById('integrations-list');
   container.innerHTML = '';
-  if (!list || list.length === 0) {
-    addIntegration();
-    return;
+  if (otherList.length === 0) { addIntegration(); return; }
+  otherList.forEach(item => addIntegration(item.name, item.description, item.value));
+}
+
+// Setzt Host/Port automatisch und zeigt Hinweis-Link für bekannte Anbieter
+const SMTP_PROVIDERS = {
+  gmail:   { host: 'smtp.gmail.com',       port: '587', label: 'Gmail',
+             hint: '🔑 Gmail benötigt ein <strong>App-Passwort</strong> (nicht dein Google-Passwort).<br><a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:var(--accent)">→ App-Passwort erstellen (myaccount.google.com/apppasswords)</a><br><span style="color:var(--muted);font-size:12px">Voraussetzung: 2-Faktor-Authentifizierung muss aktiv sein.</span>' },
+  outlook: { host: 'smtp.office365.com',   port: '587', label: 'Outlook',
+             hint: '🔑 Outlook benötigt ein <strong>App-Kennwort</strong> wenn 2FA aktiv ist.<br><a href="https://account.microsoft.com/security" target="_blank" style="color:var(--accent)">→ account.microsoft.com/security</a> → Sicherheit → Erweitert → App-Kennwörter' },
+  gmx:     { host: 'mail.gmx.net',         port: '587', label: 'GMX',
+             hint: '🔑 GMX: Normales Passwort reicht. Bei aktiver 2FA:<br><a href="https://hilfe.gmx.net/email/sicherheit/app-passwort.html" target="_blank" style="color:var(--accent)">→ GMX App-Passwort erstellen</a>' },
+  webde:   { host: 'smtp.web.de',          port: '587', label: 'Web.de',
+             hint: '🔑 Web.de: Normales Passwort reicht. Bei aktiver 2FA:<br><a href="https://hilfe.web.de/pop-imap-smtp/imap-serverdaten.html" target="_blank" style="color:var(--accent)">→ Web.de SMTP-Einstellungen</a>' },
+  strato:  { host: 'smtp.strato.de',       port: '587', label: 'Strato',
+             hint: '🔑 Strato: Normales E-Mail-Passwort verwenden.<br><a href="https://www.strato.de/faq/e-mail/smtp-und-imap-fuer-verschiedene-e-mail-programme/" target="_blank" style="color:var(--accent)">→ Strato SMTP-Dokumentation</a>' },
+  ionos:   { host: 'smtp.ionos.de',        port: '587', label: 'IONOS',
+             hint: '🔑 IONOS: Normales E-Mail-Passwort verwenden.<br><a href="https://www.ionos.de/hilfe/email/allgemeine-themen-zu-e-mail/postausgangsserver-smtp/" target="_blank" style="color:var(--accent)">→ IONOS SMTP-Einstellungen</a>' },
+  custom:  { host: '',                     port: '587', label: 'Eigener Server',
+             hint: '⚙️ Trage deinen eigenen SMTP-Server ein. Port <strong>587</strong> (STARTTLS) oder <strong>465</strong> (SSL) sind üblich.' },
+};
+
+function setSmtpProvider(key) {
+  const p = SMTP_PROVIDERS[key];
+  if (!p) return;
+  if (p.host) document.getElementById('smtp-host').value = p.host;
+  document.getElementById('smtp-port').value = p.port;
+  // Provider-Button hervorheben
+  document.querySelectorAll('.smtp-prov-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  // Hinweis anzeigen
+  const hint = document.getElementById('smtp-cred-hint');
+  hint.innerHTML = p.hint;
+  hint.style.display = 'block';
+  document.getElementById('smtp-user').focus();
+}
+
+function detectSmtpProvider(host) {
+  // Passenden Provider-Button aktivieren basierend auf gespeichertem Host
+  const hostMap = {
+    'smtp.gmail.com': 'gmail', 'smtp.office365.com': 'outlook',
+    'mail.gmx.net': 'gmx', 'smtp.web.de': 'webde',
+    'smtp.strato.de': 'strato', 'smtp.ionos.de': 'ionos',
+  };
+  const key = hostMap[host];
+  document.querySelectorAll('.smtp-prov-btn').forEach(b => b.classList.remove('active'));
+  if (key) {
+    const btns = document.querySelectorAll('.smtp-prov-btn');
+    btns.forEach(b => { if (b.textContent.toLowerCase().includes(SMTP_PROVIDERS[key]?.label?.toLowerCase().split('/')[0].trim().toLowerCase())) b.classList.add('active'); });
+    const hint = document.getElementById('smtp-cred-hint');
+    hint.innerHTML = SMTP_PROVIDERS[key].hint;
+    hint.style.display = 'block';
   }
-  list.forEach(item => addIntegration(item.name, item.description, item.value));
 }
 
 function addIntegration(name = '', description = '', value = '') {
@@ -1367,9 +1517,23 @@ function addIntegration(name = '', description = '', value = '') {
 }
 
 function collectIntegrations() {
-  const rows = document.querySelectorAll('.integration-row');
   const result = [];
-  rows.forEach(row => {
+
+  // SMTP-Felder zuerst (nur wenn befüllt)
+  const smtpDefs = [
+    { id: 'smtp-host',     name: 'SMTP_HOST',     desc: 'SMTP-Server' },
+    { id: 'smtp-port',     name: 'SMTP_PORT',     desc: 'SMTP-Port' },
+    { id: 'smtp-user',     name: 'SMTP_USER',     desc: 'E-Mail-Adresse / Benutzername' },
+    { id: 'smtp-password', name: 'SMTP_PASSWORD', desc: 'App-Passwort / Passwort' },
+    { id: 'smtp-from',     name: 'SMTP_FROM',     desc: 'Absender-Adresse' },
+  ];
+  for (const f of smtpDefs) {
+    const val = (document.getElementById(f.id)?.value || '').trim();
+    if (val) result.push({ name: f.name, description: f.desc, value: val });
+  }
+
+  // Generische Integrationen
+  document.querySelectorAll('.integration-row').forEach(row => {
     const name  = row.querySelector('.int-name').value.trim();
     const desc  = row.querySelector('.int-desc').value.trim();
     const value = row.querySelector('.int-value').value;
