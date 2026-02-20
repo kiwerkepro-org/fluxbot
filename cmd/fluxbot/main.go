@@ -431,14 +431,14 @@ func buildImageGenerators(cfg *config.Config) []imagegen.Generator {
 		key := ig.OpenRouter.APIKey
 		return []imagegen.Generator{
 			imagegen.NewOpenRouterImageGenerator(key, "black-forest-labs/flux.2-pro", "FLUX.2 Pro"),
-			imagegen.NewOpenRouterImageGenerator(key, "bytedance/seedream-4.5", "Seedream 4.5"),
+			imagegen.NewOpenRouterImageGenerator(key, "bytedance-seed/seedream-4.5", "Seedream 4.5"),
 		}
 	case "openrouter-shared":
 		// Gemeinsamen OpenRouter-Key aus LLM-Provider-Config verwenden
 		key := cfg.Providers.OpenRouter.APIKey
 		return []imagegen.Generator{
 			imagegen.NewOpenRouterImageGenerator(key, "black-forest-labs/flux.2-pro", "FLUX.2 Pro"),
-			imagegen.NewOpenRouterImageGenerator(key, "bytedance/seedream-4.5", "Seedream 4.5"),
+			imagegen.NewOpenRouterImageGenerator(key, "bytedance-seed/seedream-4.5", "Seedream 4.5"),
 		}
 	case "fal":
 		model := ig.Fal.Model

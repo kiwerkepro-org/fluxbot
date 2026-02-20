@@ -7,18 +7,9 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #0f1117;
-    --sidebar: #161b27;
-    --card: #1e2535;
-    --border: #2a3347;
-    --accent: #5b8dee;
-    --accent2: #7c5cbf;
-    --green: #3ecf8e;
-    --red: #e25d5d;
-    --yellow: #f5a623;
-    --text: #e2e8f0;
-    --muted: #8892a4;
-    --input-bg: #0f1117;
+    --bg: #0f1117; --sidebar: #161b27; --card: #1e2535; --border: #2a3347;
+    --accent: #5b8dee; --accent2: #7c5cbf; --green: #3ecf8e;
+    --red: #e25d5d; --yellow: #f5a623; --text: #e2e8f0; --muted: #8892a4; --input-bg: #0f1117;
   }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
 
@@ -27,7 +18,7 @@
   .logo { padding: 0 20px 24px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
   .logo h1 { font-size: 18px; font-weight: 700; color: var(--text); }
   .logo span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; border-radius: 0; color: var(--muted); font-size: 14px; transition: all 0.15s; border-left: 3px solid transparent; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; color: var(--muted); font-size: 14px; transition: all 0.15s; border-left: 3px solid transparent; }
   .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.04); }
   .nav-item.active { color: var(--accent); background: rgba(91,141,238,0.1); border-left-color: var(--accent); }
   .nav-icon { font-size: 16px; width: 20px; text-align: center; }
@@ -48,8 +39,6 @@
   .card-value.green { color: var(--green); }
   .card-value.blue { color: var(--accent); }
   .card-value.yellow { color: var(--yellow); }
-
-  /* ── Channel Tags ── */
   .channel-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
   .channel-tag { background: rgba(91,141,238,0.15); color: var(--accent); border: 1px solid rgba(91,141,238,0.3); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 500; }
 
@@ -63,7 +52,7 @@
     color: var(--text); padding: 8px 12px; font-size: 14px; outline: none; transition: border-color 0.15s;
   }
   .field input:focus, .field select:focus { border-color: var(--accent); }
-  .field input[type=text]::placeholder, .field input[type=password]::placeholder { color: var(--muted); }
+  .field input::placeholder { color: var(--muted); }
   .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
   .toggle-row:last-child { border-bottom: none; padding-bottom: 0; }
   .toggle-label { font-size: 14px; color: var(--text); }
@@ -91,16 +80,19 @@
   .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
   .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #c94f4f; }
   .actions { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
 
   /* ── Toast ── */
-  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--green); color: #0f1117; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; z-index: 1000; }
+  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--green); color: #0f1117; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; z-index: 2000; }
   #toast.error { background: var(--red); color: #fff; }
   #toast.show { opacity: 1; transform: translateY(0); }
 
-  /* ── SOUL Editor ── */
+  /* ── Editors ── */
   .soul-editor { width: 100%; min-height: 300px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 16px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.6; resize: vertical; outline: none; }
   .soul-editor:focus { border-color: var(--accent); }
+  .config-editor { width: 100%; min-height: 400px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 16px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; resize: vertical; outline: none; }
+  .config-editor:focus { border-color: var(--accent); }
 
   /* ── Logs ── */
   .log-box { background: #080c14; border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.8; max-height: 500px; overflow-y: auto; color: #a0aec0; }
@@ -108,27 +100,85 @@
   .log-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   .log-filename { font-size: 12px; color: var(--muted); }
 
-  /* ── Restart Notice ── */
+  /* ── Notice ── */
   .notice { background: rgba(245,166,35,0.1); border: 1px solid rgba(245,166,35,0.3); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--yellow); margin-top: 16px; display: none; }
   .notice.show { display: block; }
 
-  /* ── Config Raw Editor ── */
-  .config-editor { width: 100%; min-height: 400px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 16px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; resize: vertical; outline: none; }
-  .config-editor:focus { border-color: var(--accent); }
+  /* ── Tabs ── */
   .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
   .tab-btn { padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
   .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
   .tab-content { display: none; }
   .tab-content.active { display: block; }
 
-  /* ── Provider-Info ── */
+  /* ── Provider Hint ── */
   .provider-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
   .provider-hint a { color: var(--accent); text-decoration: none; }
+
+  /* ── Tile Layout (Provider / Voice) ── */
+  .tile-layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+  @media(max-width: 900px) { .tile-layout { grid-template-columns: 1fr; } }
+  .info-card { background: linear-gradient(135deg, rgba(91,141,238,0.07), rgba(124,92,191,0.07)); border: 1px solid rgba(91,141,238,0.22); border-radius: 12px; padding: 20px; position: sticky; top: 0; }
+  .info-card h4 { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
+  .info-card p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+  .info-card .info-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 13px; text-decoration: none; border: 1px solid rgba(91,141,238,0.3); border-radius: 6px; padding: 6px 14px; transition: all 0.15s; }
+  .info-card .info-link:hover { background: rgba(91,141,238,0.12); }
+  .info-card .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  .info-card .other-list { font-size: 12px; color: var(--muted); line-height: 2.2; }
+  .info-card .other-list strong { color: var(--text); }
+
+  /* ── Blur Overlay (JSON / Soul) ── */
+  .blur-wrap { position: relative; border-radius: 8px; overflow: hidden; }
+  .blurred { filter: blur(5px); pointer-events: none; user-select: none; }
+  .blur-overlay { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: rgba(15,17,23,0.35); cursor: pointer; transition: background 0.2s; }
+  .blur-overlay:hover { background: rgba(91,141,238,0.1); }
+  .blur-hint { text-align: center; padding: 28px; }
+  .blur-hint .lock-icon { font-size: 36px; display: block; margin-bottom: 12px; }
+  .blur-hint strong { font-size: 16px; color: var(--text); display: block; margin-bottom: 6px; }
+  .blur-hint p { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+  .blur-hint .click-btn { display: inline-block; background: var(--accent); color: #fff; border-radius: 7px; padding: 8px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+  /* ── Warning Banner ── */
+  .warn-banner { background: rgba(226,93,93,0.08); border: 1px solid rgba(226,93,93,0.28); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: #f08080; margin-bottom: 14px; display: flex; gap: 10px; align-items: flex-start; }
+  .warn-banner .warn-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .warn-banner strong { display: block; color: var(--red); font-size: 13px; margin-bottom: 2px; }
+
+  /* ── Confirmation Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 14px; }
+  .modal p { font-size: 14px; color: var(--muted); line-height: 1.65; margin-bottom: 8px; }
+  .modal-confirm-text { color: var(--text); font-weight: 600; margin-top: 4px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 22px; justify-content: flex-end; }
+
+  /* ── System Section ── */
+  .os-selector { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; }
+  .os-btn { padding: 9px 22px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--muted); transition: all 0.15s; user-select: none; }
+  .os-btn:hover { border-color: var(--accent); color: var(--text); }
+  .os-btn.active { background: rgba(91,141,238,0.14); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .system-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width: 700px) { .system-tiles { grid-template-columns: 1fr; } }
+  .system-tile { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .system-tile h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .tile-badge { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
+  .tile-badge.restart { background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); }
+  .tile-badge.rebuild { background: rgba(91,141,238,0.15); color: var(--accent); border: 1px solid rgba(91,141,238,0.3); }
+  .tile-desc { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 18px; }
+  .cmd-box { background: #080c14; border: 1px solid var(--border); border-radius: 8px; padding: 12px 42px 12px 14px; font-family: 'Courier New', monospace; font-size: 12px; color: #a8c0d6; word-break: break-all; line-height: 1.6; position: relative; margin-bottom: 14px; min-height: 48px; }
+  .copy-btn { position: absolute; top: 8px; right: 8px; background: var(--border); color: var(--muted); border: none; border-radius: 5px; padding: 4px 9px; font-size: 11px; cursor: pointer; transition: all 0.15s; }
+  .copy-btn:hover { background: var(--accent); color: #fff; }
+  .howto-box { background: rgba(91,141,238,0.05); border: 1px solid rgba(91,141,238,0.14); border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--muted); line-height: 1.9; }
+  .howto-box strong { color: var(--text); }
+  .howto-box a { color: var(--accent); text-decoration: none; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; border-radius: 50%; width: 17px; height: 17px; font-size: 10px; font-weight: 700; margin-right: 4px; flex-shrink: 0; }
+  .cache-hint { background: rgba(245,166,35,0.07); border: 1px solid rgba(245,166,35,0.22); border-radius: 8px; padding: 14px 18px; font-size: 13px; color: var(--muted); line-height: 1.7; margin-top: 20px; }
+  .cache-hint strong { color: var(--yellow); }
+  kbd { background: var(--border); padding: 2px 7px; border-radius: 4px; font-size: 12px; color: var(--text); font-family: 'Courier New', monospace; }
 </style>
 </head>
 <body>
 
-<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+<!-- ── Sidebar ── -->
 <div class="sidebar">
   <div class="logo">
     <h1>🤖 FluxBot</h1>
@@ -146,10 +196,13 @@
   <div class="nav-item" onclick="showSection('logs', this)">
     <span class="nav-icon">📋</span> Logs
   </div>
+  <div class="nav-item" onclick="showSection('system', this)">
+    <span class="nav-icon">🔧</span> System
+  </div>
   <div class="sidebar-footer">KI-WERKE · FluxBot v1.0</div>
 </div>
 
-<!-- ── Main ────────────────────────────────────────────────────────────────── -->
+<!-- ── Main ── -->
 <div class="main">
 
   <!-- STATUS -->
@@ -191,12 +244,11 @@
       <button class="tab-btn" onclick="showTab('raw', this)">📄 JSON</button>
     </div>
 
-    <!-- ── Tab: Kanäle ── -->
+    <!-- ── Kanäle ── -->
     <div class="tab-content active" id="tab-channels">
       <div class="panel">
         <div class="panel-title">📱 Kommunikationskanäle</div>
 
-        <!-- Telegram -->
         <div class="toggle-row">
           <div><div class="toggle-label">Telegram</div><div class="toggle-sub">Long-Polling, kein Webhook nötig</div></div>
           <label class="toggle"><input type="checkbox" id="tg-enabled"><span class="toggle-slider"></span></label>
@@ -210,7 +262,6 @@
           </div>
         </div>
 
-        <!-- Discord -->
         <div class="toggle-row" style="margin-top:8px">
           <div><div class="toggle-label">Discord</div><div class="toggle-sub">Gateway WebSocket</div></div>
           <label class="toggle"><input type="checkbox" id="dc-enabled"><span class="toggle-slider"></span></label>
@@ -221,7 +272,6 @@
           </div>
         </div>
 
-        <!-- Slack -->
         <div class="toggle-row" style="margin-top:8px">
           <div><div class="toggle-label">Slack</div><div class="toggle-sub">Events API (Webhook)</div></div>
           <label class="toggle"><input type="checkbox" id="slack-enabled"><span class="toggle-slider"></span></label>
@@ -235,7 +285,6 @@
           </div>
         </div>
 
-        <!-- Matrix -->
         <div class="toggle-row" style="margin-top:8px">
           <div><div class="toggle-label">Matrix</div><div class="toggle-sub">HTTP Long-Polling</div></div>
           <label class="toggle"><input type="checkbox" id="matrix-enabled"><span class="toggle-slider"></span></label>
@@ -249,7 +298,6 @@
           </div>
         </div>
 
-        <!-- WhatsApp -->
         <div class="toggle-row" style="margin-top:8px">
           <div><div class="toggle-label">WhatsApp</div><div class="toggle-sub">Meta Business Cloud API</div></div>
           <label class="toggle"><input type="checkbox" id="wa-enabled"><span class="toggle-slider"></span></label>
@@ -265,64 +313,80 @@
       </div>
     </div>
 
-    <!-- ── Tab: Provider (LLM) ── -->
+    <!-- ── Provider (Tile-Layout) ── -->
     <div class="tab-content" id="tab-providers">
-      <div class="panel">
-        <div class="panel-title">🤖 KI-Provider (Sprache / Text)</div>
-        <div class="field">
-          <label>Aktiver Anbieter</label>
-          <select id="ai-provider" onchange="onDashProviderChange()">
-            <optgroup label="── Empfohlen ──────────────────────────">
-              <option value="openrouter">🌐  OpenRouter – alle Modelle über eine API</option>
-            </optgroup>
-            <optgroup label="── Führende Anbieter ──────────────────">
-              <option value="anthropic">🧠  Anthropic – Claude Sonnet / Opus</option>
-              <option value="openai">🤖  OpenAI – GPT-4o / o1 / o3</option>
-              <option value="google">🔵  Google – Gemini 2.0 / 1.5 Pro</option>
-              <option value="xai">✖️   xAI – Grok 2 / Grok 3</option>
-              <option value="groq">⚡  Groq – Llama 3.3 (kostenloser Tier)</option>
-              <option value="mistral">🌊  Mistral AI – Mistral Large / Codestral</option>
-              <option value="together">🤝  Together AI – Open-Source-Modelle</option>
-              <option value="deepseek">🔍  DeepSeek – V3 / R1</option>
-              <option value="perplexity">🔎  Perplexity – Sonar Pro (mit Websuche)</option>
-              <option value="cohere">🔗  Cohere – Command R+</option>
-            </optgroup>
-            <optgroup label="── Weitere Anbieter ───────────────────">
-              <option value="fireworks">🎆  Fireworks AI</option>
-              <option value="novita">🆕  NovitaAI</option>
-              <option value="deepinfra">🏗️  DeepInfra</option>
-              <option value="cerebras">🧠  Cerebras</option>
-              <option value="lepton">⚛️  Lepton AI</option>
-              <option value="anyscale">📡  Anyscale Endpoints</option>
-              <option value="replicate">♻️  Replicate</option>
-              <option value="ollama">🏠  Ollama – lokale Modelle (kein API-Key)</option>
-            </optgroup>
-            <optgroup label="── Benutzerdefiniert ──────────────────">
-              <option value="custom">⚙️  Eigener Provider (OpenAI-kompatible API)</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="provider-hint" id="dash-provider-hint" style="margin-bottom:12px">
-          Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr – alles mit einem Key. →
-          <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai</a>
-        </div>
-        <div class="field">
-          <label id="dash-apikey-label">API Key</label>
-          <div class="input-wrap">
-            <input type="password" id="ai-apikey" placeholder="sk-or-v1-..." autocomplete="off">
-            <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+      <div class="tile-layout">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-title">🤖 KI-Provider (Sprache / Text)</div>
+          <div class="field">
+            <label>Aktiver Anbieter</label>
+            <select id="ai-provider" onchange="onDashProviderChange()">
+              <optgroup label="── Empfohlen ──────────────────────────">
+                <option value="openrouter">🌐  OpenRouter – alle Modelle über eine API</option>
+              </optgroup>
+              <optgroup label="── Führende Anbieter ──────────────────">
+                <option value="anthropic">🧠  Anthropic – Claude Sonnet / Opus</option>
+                <option value="openai">🤖  OpenAI – GPT-4o / o1 / o3</option>
+                <option value="google">🔵  Google – Gemini 2.0 / 1.5 Pro</option>
+                <option value="xai">✖️   xAI – Grok 2 / Grok 3</option>
+                <option value="groq">⚡  Groq – Llama 3.3 (kostenloser Tier)</option>
+                <option value="mistral">🌊  Mistral AI – Mistral Large / Codestral</option>
+                <option value="together">🤝  Together AI – Open-Source-Modelle</option>
+                <option value="deepseek">🔍  DeepSeek – V3 / R1</option>
+                <option value="perplexity">🔎  Perplexity – Sonar Pro (mit Websuche)</option>
+                <option value="cohere">🔗  Cohere – Command R+</option>
+              </optgroup>
+              <optgroup label="── Weitere Anbieter ───────────────────">
+                <option value="fireworks">🎆  Fireworks AI</option>
+                <option value="novita">🆕  NovitaAI</option>
+                <option value="deepinfra">🏗️  DeepInfra</option>
+                <option value="cerebras">🧠  Cerebras</option>
+                <option value="lepton">⚛️  Lepton AI</option>
+                <option value="anyscale">📡  Anyscale Endpoints</option>
+                <option value="replicate">♻️  Replicate</option>
+                <option value="ollama">🏠  Ollama – lokale Modelle (kein API-Key)</option>
+              </optgroup>
+              <optgroup label="── Benutzerdefiniert ──────────────────">
+                <option value="custom">⚙️  Eigener Provider (OpenAI-kompatible API)</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="provider-hint" id="dash-provider-hint" style="margin-bottom:12px">
+            Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr – alles mit einem Key. →
+            <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai</a>
+          </div>
+          <div class="field">
+            <label id="dash-apikey-label">API Key</label>
+            <div class="input-wrap">
+              <input type="password" id="ai-apikey" placeholder="sk-or-v1-..." autocomplete="off">
+              <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+            </div>
+          </div>
+          <div id="dash-custom-url-row" style="display:none">
+            <div class="field"><label>API Base-URL</label><input type="text" id="ai-custom-url" placeholder="https://mein-anbieter.com/v1/chat/completions"></div>
+            <div class="field"><label>Anbieter-Name</label><input type="text" id="ai-custom-name" placeholder="z.B. MeinLLM"></div>
+            <div class="field"><label>Standard-Modell</label><input type="text" id="ai-custom-model" placeholder="z.B. gpt-4o"></div>
           </div>
         </div>
-        <!-- Custom Provider Felder -->
-        <div id="dash-custom-url-row" style="display:none">
-          <div class="field"><label>API Base-URL</label><input type="text" id="ai-custom-url" placeholder="https://mein-anbieter.com/v1/chat/completions"></div>
-          <div class="field"><label>Anbieter-Name</label><input type="text" id="ai-custom-name" placeholder="z.B. MeinLLM"></div>
-          <div class="field"><label>Standard-Modell</label><input type="text" id="ai-custom-model" placeholder="z.B. gpt-4o"></div>
+        <div>
+          <div class="info-card">
+            <h4>⭐ Empfehlung: OpenRouter</h4>
+            <p>Zugang zu über 200 KI-Modellen – Claude, GPT-4, Gemini, Llama u.v.m. – über eine einzige API und eine Rechnung.</p>
+            <a href="https://openrouter.ai/keys" target="_blank" class="info-link">→ Kostenlos registrieren</a>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Andere Optionen</h4>
+            <div class="other-list">
+              <div>⚡ <strong>Groq</strong> – kostenloser Tier, sehr schnell</div>
+              <div>🧠 <strong>Anthropic</strong> – direkter Claude-Zugang</div>
+              <div>🔍 <strong>DeepSeek</strong> – günstig, leistungsstark</div>
+              <div>🏠 <strong>Ollama</strong> – lokal, kein API-Key nötig</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ── Tab: Bilder ── -->
+    <!-- ── Bilder ── -->
     <div class="tab-content" id="tab-imagegen">
       <div class="panel">
         <div class="panel-title">🎨 Bild-Generierung</div>
@@ -341,46 +405,35 @@
         </div>
         <div class="provider-hint" id="img-provider-hint" style="margin-bottom:16px"></div>
 
-        <!-- OpenRouter eigener Key -->
         <div id="img-openrouter-row" style="display:none">
           <div class="field"><label>OpenRouter API Key (für Bilder)</label>
             <div class="input-wrap"><input type="password" id="img-openrouter-key" placeholder="sk-or-v1-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Modell (optional)</label><input type="text" id="img-openrouter-model" placeholder="black-forest-labs/flux.2-pro"></div>
         </div>
-
-        <!-- fal.ai -->
         <div id="img-fal-row" style="display:none">
           <div class="field"><label>fal.ai API Key</label>
             <div class="input-wrap"><input type="password" id="img-fal-key" placeholder="fal_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Modell (optional)</label><input type="text" id="img-fal-model" placeholder="fal-ai/flux-pro/v1.1-ultra"></div>
         </div>
-
-        <!-- OpenAI DALL-E -->
         <div id="img-openai-row" style="display:none">
           <div class="field"><label>OpenAI API Key</label>
             <div class="input-wrap"><input type="password" id="img-openai-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
         </div>
-
-        <!-- Stability AI -->
         <div id="img-stability-row" style="display:none">
           <div class="field"><label>Stability AI API Key</label>
             <div class="input-wrap"><input type="password" id="img-stability-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Modell (optional)</label><input type="text" id="img-stability-model" placeholder="stability-ai/stable-diffusion-3.5-large"></div>
         </div>
-
-        <!-- Together AI -->
         <div id="img-together-row" style="display:none">
           <div class="field"><label>Together AI API Key</label>
             <div class="input-wrap"><input type="password" id="img-together-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Modell (optional)</label><input type="text" id="img-together-model" placeholder="black-forest-labs/FLUX.1-schnell-Free"></div>
         </div>
-
-        <!-- Replicate -->
         <div id="img-replicate-row" style="display:none">
           <div class="field"><label>Replicate API Token</label>
             <div class="input-wrap"><input type="password" id="img-replicate-key" placeholder="r8_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
@@ -388,7 +441,6 @@
           <div class="field"><label>Modell (optional)</label><input type="text" id="img-replicate-model" placeholder="black-forest-labs/flux-1.1-pro"></div>
         </div>
 
-        <!-- Allgemeine Bild-Einstellungen -->
         <div class="two-col" style="margin-top:8px">
           <div class="field">
             <label>Format</label>
@@ -409,7 +461,7 @@
       </div>
     </div>
 
-    <!-- ── Tab: Videos ── -->
+    <!-- ── Videos ── -->
     <div class="tab-content" id="tab-videogen">
       <div class="panel">
         <div class="panel-title">🎬 Video-Generierung</div>
@@ -428,55 +480,42 @@
         </div>
         <div class="provider-hint" id="vid-provider-hint" style="margin-bottom:16px"></div>
 
-        <!-- Runway -->
         <div id="vid-runway-row" style="display:none">
           <div class="field"><label>Runway API Key</label>
             <div class="input-wrap"><input type="password" id="vid-runway-key" placeholder="key_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Modell (optional)</label><input type="text" id="vid-runway-model" placeholder="gen4_turbo"></div>
         </div>
-
-        <!-- Kling -->
         <div id="vid-kling-row" style="display:none">
           <div class="field"><label>Kling AI API Key</label>
             <div class="input-wrap"><input type="password" id="vid-kling-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Modell (optional)</label><input type="text" id="vid-kling-model" placeholder="kling-v2"></div>
         </div>
-
-        <!-- Luma -->
         <div id="vid-luma-row" style="display:none">
           <div class="field"><label>Luma AI API Key</label>
             <div class="input-wrap"><input type="password" id="vid-luma-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Modell (optional)</label><input type="text" id="vid-luma-model" placeholder="dream-machine"></div>
         </div>
-
-        <!-- Pika -->
         <div id="vid-pika-row" style="display:none">
           <div class="field"><label>Pika Labs API Key</label>
             <div class="input-wrap"><input type="password" id="vid-pika-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Modell (optional)</label><input type="text" id="vid-pika-model" placeholder="pika-2.0"></div>
         </div>
-
-        <!-- Hailuo -->
         <div id="vid-hailuo-row" style="display:none">
           <div class="field"><label>HailuoAI API Key</label>
             <div class="input-wrap"><input type="password" id="vid-hailuo-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Modell (optional)</label><input type="text" id="vid-hailuo-model" placeholder="minimax-video-01"></div>
         </div>
-
-        <!-- Sora -->
         <div id="vid-sora-row" style="display:none">
           <div class="field"><label>OpenAI API Key (für Sora)</label>
             <div class="input-wrap"><input type="password" id="vid-sora-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
           <div class="field"><label>Modell (optional)</label><input type="text" id="vid-sora-model" placeholder="sora-1.0"></div>
         </div>
-
-        <!-- Veo -->
         <div id="vid-veo-row" style="display:none">
           <div class="field"><label>Google API Key (für Veo)</label>
             <div class="input-wrap"><input type="password" id="vid-veo-key" placeholder="AIza..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
@@ -484,7 +523,6 @@
           <div class="field"><label>Modell (optional)</label><input type="text" id="vid-veo-model" placeholder="veo-3"></div>
         </div>
 
-        <!-- Allgemeine Video-Einstellungen -->
         <div class="two-col" style="margin-top:8px">
           <div class="field">
             <label>Länge (Sekunden)</label>
@@ -509,41 +547,73 @@
       </div>
     </div>
 
-    <!-- ── Tab: Voice ── -->
+    <!-- ── Voice (Tile-Layout) ── -->
     <div class="tab-content" id="tab-voice">
-      <div class="panel">
-        <div class="panel-title">🎙️ Spracherkennung</div>
-        <div class="toggle-row">
-          <div><div class="toggle-label">Voice aktivieren</div><div class="toggle-sub">Sprachnachrichten werden transkribiert</div></div>
-          <label class="toggle"><input type="checkbox" id="voice-enabled"><span class="toggle-slider"></span></label>
-        </div>
-        <div class="two-col" style="margin-top:16px">
-          <div class="field"><label>Provider</label>
-            <select id="voice-provider">
-              <option value="groq">Groq Whisper (kostenlos)</option>
-              <option value="openai">OpenAI Whisper</option>
-              <option value="ollama">Ollama (lokal)</option>
-            </select>
+      <div class="tile-layout">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-title">🎙️ Spracherkennung</div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">Voice aktivieren</div><div class="toggle-sub">Sprachnachrichten werden transkribiert</div></div>
+            <label class="toggle"><input type="checkbox" id="voice-enabled"><span class="toggle-slider"></span></label>
           </div>
-          <div class="field"><label>Sprache</label>
-            <select id="voice-lang">
-              <option value="de">Deutsch</option>
-              <option value="en">Englisch</option>
-              <option value="">Automatisch</option>
-            </select>
+          <div class="two-col" style="margin-top:16px">
+            <div class="field"><label>Provider</label>
+              <select id="voice-provider">
+                <option value="groq">Groq Whisper (kostenlos)</option>
+                <option value="openai">OpenAI Whisper</option>
+                <option value="ollama">Ollama (lokal)</option>
+              </select>
+            </div>
+            <div class="field"><label>Sprache</label>
+              <select id="voice-lang">
+                <option value="de">Deutsch</option>
+                <option value="en">Englisch</option>
+                <option value="">Automatisch</option>
+              </select>
+            </div>
+          </div>
+          <div class="field"><label>API Key (Groq oder OpenAI)</label>
+            <div class="input-wrap"><input type="password" id="voice-apikey" placeholder="gsk_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
         </div>
-        <div class="field"><label>API Key (Groq oder OpenAI)</label>
-          <div class="input-wrap"><input type="password" id="voice-apikey" placeholder="gsk_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+        <div>
+          <div class="info-card">
+            <h4>⭐ Empfehlung: Groq Whisper</h4>
+            <p>Kostenloser Tier verfügbar. Extrem schnell, sehr gute Erkennungsrate für Deutsch und Englisch.</p>
+            <a href="https://console.groq.com/keys" target="_blank" class="info-link">→ Kostenlos registrieren</a>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Andere Optionen</h4>
+            <div class="other-list">
+              <div>🤖 <strong>OpenAI Whisper</strong> – sehr präzise, kostenpflichtig</div>
+              <div>🏠 <strong>Ollama</strong> – lokal, kein API-Key nötig</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- ── Tab: JSON ── -->
+    <!-- ── JSON (gesperrt + Blur) ── -->
     <div class="tab-content" id="tab-raw">
+      <div class="warn-banner">
+        <span class="warn-icon">⚠️</span>
+        <div>
+          <strong>Direkter JSON-Zugriff – nur für Experten!</strong>
+          Syntaxfehler können FluxBot unbrauchbar machen. Erstelle vor Änderungen immer eine Sicherungskopie.
+        </div>
+      </div>
       <div class="panel">
         <div class="panel-title">📄 config.json (direkter Zugriff)</div>
-        <textarea class="config-editor" id="raw-config" spellcheck="false"></textarea>
+        <div class="blur-wrap" id="json-wrap">
+          <div class="blur-overlay" id="json-overlay" onclick="requestEdit('json')">
+            <div class="blur-hint">
+              <span class="lock-icon">🔒</span>
+              <strong>Zum Bearbeiten klicken</strong>
+              <p>Direkter Zugriff auf die Konfigurationsdatei</p>
+              <span class="click-btn">Entsperren &amp; Bearbeiten</span>
+            </div>
+          </div>
+          <textarea class="config-editor blurred" id="raw-config" spellcheck="false"></textarea>
+        </div>
       </div>
     </div>
 
@@ -556,13 +626,30 @@
     </div>
   </div>
 
-  <!-- SOUL -->
+  <!-- SOUL (gesperrt + Blur) -->
   <div class="section" id="section-soul">
     <h2>Persönlichkeit</h2>
     <p class="subtitle">Fluxys Charakter und Verhalten bearbeiten (SOUL.md)</p>
+    <div class="warn-banner">
+      <span class="warn-icon">⚠️</span>
+      <div>
+        <strong>Persönlichkeit bearbeiten – mit Bedacht!</strong>
+        Diese Datei definiert, wie FluxBot sich in ALLEN Gesprächen verhält. Änderungen sind sofort nach dem nächsten Neustart aktiv.
+      </div>
+    </div>
     <div class="panel">
-      <div class="panel-title">🎭 SOUL.md</div>
-      <textarea class="soul-editor" id="soul-content" spellcheck="false" placeholder="Du bist Fluxy, der KI-Assistent von KI-WERKE...&#10;&#10;Schreibe hier Fluxys Persönlichkeit in natürlicher Sprache."></textarea>
+      <div class="panel-title">🎭 SOUL.md – Persönlichkeit von FluxBot</div>
+      <div class="blur-wrap" id="soul-wrap">
+        <div class="blur-overlay" id="soul-overlay" onclick="requestEdit('soul')">
+          <div class="blur-hint">
+            <span class="lock-icon">🎭</span>
+            <strong>Zum Bearbeiten klicken</strong>
+            <p>Persönlichkeit von FluxBot – beeinflusst alle Gespräche</p>
+            <span class="click-btn">Entsperren &amp; Bearbeiten</span>
+          </div>
+        </div>
+        <textarea class="soul-editor blurred" id="soul-content" spellcheck="false" placeholder="Du bist Fluxy, der KI-Assistent von KI-WERKE...&#10;&#10;Schreibe hier Fluxys Persönlichkeit in natürlicher Sprache."></textarea>
+      </div>
     </div>
     <div class="notice" id="soul-notice">
       ⚠️ Gespeichert – FluxBot muss neu gestartet werden damit die neue Persönlichkeit aktiv wird.
@@ -584,26 +671,78 @@
     <div class="log-box" id="log-box">Lade Logs...</div>
   </div>
 
+  <!-- SYSTEM -->
+  <div class="section" id="section-system">
+    <h2>System</h2>
+    <p class="subtitle">FluxBot neu starten oder neu bauen</p>
+
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">Welches Betriebssystem verwendest du?</div>
+    <div class="os-selector">
+      <span class="os-btn active" onclick="selectOS('windows', this)">🪟 Windows</span>
+      <span class="os-btn" onclick="selectOS('mac', this)">🍎 Mac</span>
+      <span class="os-btn" onclick="selectOS('linux', this)">🐧 Linux</span>
+      <span class="os-btn" onclick="selectOS('docker', this)">🐳 Docker</span>
+    </div>
+
+    <div class="system-tiles">
+      <!-- Restart -->
+      <div class="system-tile">
+        <h3>🔄 Neustart <span class="tile-badge restart">Schnell</span></h3>
+        <p class="tile-desc">Stoppt FluxBot und startet ihn sofort neu. <strong>Konfigurationsänderungen</strong> im Dashboard werden damit aktiv. Keine Daten gehen verloren.</p>
+        <div class="cmd-box">
+          <code id="restart-cmd"></code>
+          <button class="copy-btn" onclick="copyCmd('restart-cmd')">📋 Kopieren</button>
+        </div>
+        <div class="howto-box" id="restart-howto"></div>
+      </div>
+
+      <!-- Rebuild -->
+      <div class="system-tile">
+        <h3>🔨 Neu bauen <span class="tile-badge rebuild">Update</span></h3>
+        <p class="tile-desc">Kompiliert FluxBot komplett neu. Notwendig nach <strong>Updates vom Entwickler</strong> oder bei Dashboard-Änderungen, die nicht sichtbar sind.</p>
+        <div class="cmd-box">
+          <code id="rebuild-cmd"></code>
+          <button class="copy-btn" onclick="copyCmd('rebuild-cmd')">📋 Kopieren</button>
+        </div>
+        <div class="howto-box" id="rebuild-howto"></div>
+      </div>
+    </div>
+
+    <div class="cache-hint">
+      <strong>🌐 Browser-Cache leeren nach Rebuild:</strong>
+      Nach einem Neu-Build zeigt der Browser evtl. noch das alte Dashboard. Drücke
+      <kbd>Strg + Shift + R</kbd> (Windows/Linux) oder <kbd>Cmd + Shift + R</kbd> (Mac) für einen Hard-Reload.
+    </div>
+  </div>
+
 </div><!-- /main -->
 
-<!-- Toast Notification -->
+<!-- ── Confirmation Modal ── -->
+<div class="modal-overlay" id="edit-modal" style="display:none" onclick="closeModalBg(event)">
+  <div class="modal">
+    <h3 id="modal-title">⚠️ Direkte Bearbeitung</h3>
+    <p id="modal-text1"></p>
+    <p id="modal-text2"></p>
+    <p class="modal-confirm-text">Bist du sicher, dass du fortfahren möchtest?</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-danger" onclick="confirmEditDo()">✏️ Ja, bearbeiten</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
-// ── Config-Objekt (wird beim Laden gefüllt) ────────────────────────────────
 let configData = null;
+let pendingEditTarget = null;
 
-// ── Eye-Toggle (Passwort-Masking) ─────────────────────────────────────────
+// ── Eye-Toggle ─────────────────────────────────────────────────────────────
 function toggleEye(btn) {
   const inp = btn.previousElementSibling;
   if (!inp) return;
-  if (inp.type === 'password') {
-    inp.type = 'text';
-    btn.textContent = '🙈';
-  } else {
-    inp.type = 'password';
-    btn.textContent = '👁';
-  }
+  inp.type = (inp.type === 'password') ? 'text' : 'password';
+  btn.textContent = (inp.type === 'password') ? '👁' : '🙈';
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────────
@@ -612,11 +751,11 @@ function showSection(name, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('section-' + name).classList.add('active');
   if (el) el.classList.add('active');
-
-  if (name === 'status') loadStatus();
-  if (name === 'config') loadConfig();
-  if (name === 'soul') loadSoul();
-  if (name === 'logs') loadLogs();
+  if (name === 'status')  loadStatus();
+  if (name === 'config')  loadConfig();
+  if (name === 'soul')    loadSoul();
+  if (name === 'logs')    loadLogs();
+  if (name === 'system')  updateSystemCmds();
 }
 
 function showTab(name, el) {
@@ -624,33 +763,81 @@ function showTab(name, el) {
   document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   if (el) el.classList.add('active');
-
   if (name === 'raw' && configData) {
     document.getElementById('raw-config').value = JSON.stringify(configData, null, 2);
+    // Immer mit Blur starten wenn Tab geöffnet wird
+    reBlur('json');
   }
 }
 
-// ── Provider-Hilfsfunktionen (LLM) ───────────────────────────────────────
+// ── Blur / Confirm ─────────────────────────────────────────────────────────
+function reBlur(target) {
+  const overlay = document.getElementById(target + '-overlay');
+  const ta = document.getElementById(target === 'json' ? 'raw-config' : 'soul-content');
+  if (overlay) overlay.style.display = 'flex';
+  if (ta) ta.classList.add('blurred');
+}
+
+function requestEdit(target) {
+  pendingEditTarget = target;
+  const cfg = {
+    json: {
+      title: '⚠️ JSON direkt bearbeiten',
+      t1:    'Du bearbeitest die Konfigurationsdatei (config.json) direkt.',
+      t2:    'Syntaxfehler oder falsche Werte können FluxBot unbrauchbar machen. Erstelle vorher eine Sicherungskopie (Inhalt kopieren).'
+    },
+    soul: {
+      title: '⚠️ Persönlichkeit bearbeiten',
+      t1:    'Du bearbeitest SOUL.md – die Persönlichkeit von FluxBot.',
+      t2:    'Änderungen beeinflussen das Verhalten in ALLEN Gesprächen. Nach dem Speichern muss FluxBot neu gestartet werden.'
+    }
+  };
+  const c = cfg[target] || cfg.json;
+  document.getElementById('modal-title').textContent  = c.title;
+  document.getElementById('modal-text1').textContent  = c.t1;
+  document.getElementById('modal-text2').textContent  = c.t2;
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  pendingEditTarget = null;
+}
+
+function closeModalBg(e) {
+  if (e.target.id === 'edit-modal') closeModal();
+}
+
+function confirmEditDo() {
+  if (!pendingEditTarget) return;
+  const overlay = document.getElementById(pendingEditTarget + '-overlay');
+  const ta = document.getElementById(pendingEditTarget === 'json' ? 'raw-config' : 'soul-content');
+  if (overlay) overlay.style.display = 'none';
+  if (ta) { ta.classList.remove('blurred'); ta.focus(); }
+  closeModal();
+}
+
+// ── Provider-Hilfsfunktionen (LLM) ────────────────────────────────────────
 const dashProviderMeta = {
   openrouter: { ph: 'sk-or-v1-...',  label: 'API Key', hint: 'Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr.', link: 'https://openrouter.ai/keys', linkText: 'openrouter.ai' },
-  anthropic:  { ph: 'sk-ant-...',    label: 'API Key', hint: 'Direkter Zugang zu Claude Sonnet und Claude Opus.', link: 'https://console.anthropic.com/settings/keys', linkText: 'console.anthropic.com' },
-  openai:     { ph: 'sk-...',        label: 'API Key', hint: 'Direkter Zugang zu GPT-4o, o1, o3.', link: 'https://platform.openai.com/api-keys', linkText: 'platform.openai.com' },
-  google:     { ph: 'AIza...',       label: 'API Key', hint: 'Gemini 2.0 Flash, Gemini 1.5 Pro.', link: 'https://aistudio.google.com/app/apikey', linkText: 'aistudio.google.com' },
-  xai:        { ph: 'xai-...',       label: 'API Key', hint: 'Grok 2 und Grok 3 von xAI.', link: 'https://console.x.ai/', linkText: 'console.x.ai' },
-  groq:       { ph: 'gsk_...',       label: 'API Key', hint: 'Kostenloser Tier. Llama 3.3 70B, sehr schnell.', link: 'https://console.groq.com/keys', linkText: 'console.groq.com' },
-  mistral:    { ph: '...',           label: 'API Key', hint: 'Mistral Large, Mistral Small, Codestral.', link: 'https://console.mistral.ai/api-keys/', linkText: 'console.mistral.ai' },
-  together:   { ph: '...',           label: 'API Key', hint: 'Llama, Qwen, Gemma und viele Open-Source-Modelle.', link: 'https://api.together.ai/settings/api-keys', linkText: 'api.together.ai' },
-  deepseek:   { ph: 'sk-...',        label: 'API Key', hint: 'DeepSeek V3 und DeepSeek R1.', link: 'https://platform.deepseek.com/api_keys', linkText: 'platform.deepseek.com' },
-  perplexity: { ph: 'pplx-...',      label: 'API Key', hint: 'Sonar Pro mit Echtzeit-Websuche.', link: 'https://www.perplexity.ai/settings/api', linkText: 'perplexity.ai' },
-  cohere:     { ph: '...',           label: 'API Key', hint: 'Command R+ – spezialisiert auf RAG.', link: 'https://dashboard.cohere.com/api-keys', linkText: 'dashboard.cohere.com' },
-  fireworks:  { ph: 'fw_...',        label: 'API Key', hint: 'Schnelle Inference für Open-Source-Modelle.', link: 'https://fireworks.ai/account/api-keys', linkText: 'fireworks.ai' },
-  novita:     { ph: '...',           label: 'API Key', hint: 'Günstiger Zugang zu Open-Source-Modellen.', link: 'https://novita.ai/settings?tab=key-management', linkText: 'novita.ai' },
-  deepinfra:  { ph: '...',           label: 'API Key', hint: 'Kosteneffiziente Inference.', link: 'https://deepinfra.com/dash/api_keys', linkText: 'deepinfra.com' },
-  cerebras:   { ph: '...',           label: 'API Key', hint: 'Extrem schnelle Inference auf Cerebras-Hardware.', link: 'https://cloud.cerebras.ai/', linkText: 'cloud.cerebras.ai' },
-  lepton:     { ph: '...',           label: 'API Key', hint: 'Einfache Inference-API.', link: 'https://dashboard.lepton.ai/', linkText: 'dashboard.lepton.ai' },
-  anyscale:   { ph: 'esecret_...',   label: 'API Key', hint: 'Skalierbare Modell-Deployments.', link: 'https://app.endpoints.anyscale.com/', linkText: 'endpoints.anyscale.com' },
-  replicate:  { ph: 'r8_...',        label: 'API Token', hint: 'Tausende Modelle auf Replicate.', link: 'https://replicate.com/account/api-tokens', linkText: 'replicate.com' },
-  ollama:     { ph: '(kein Key)',    label: 'API Key (nicht nötig)', hint: 'Lokale Modelle – kein API-Key und keine Kosten.', link: 'https://ollama.ai', linkText: 'ollama.ai' },
+  anthropic:  { ph: 'sk-ant-...',    label: 'API Key', hint: 'Direkter Zugang zu Claude Sonnet und Claude Opus.',     link: 'https://console.anthropic.com/settings/keys', linkText: 'console.anthropic.com' },
+  openai:     { ph: 'sk-...',        label: 'API Key', hint: 'Direkter Zugang zu GPT-4o, o1, o3.',                    link: 'https://platform.openai.com/api-keys', linkText: 'platform.openai.com' },
+  google:     { ph: 'AIza...',       label: 'API Key', hint: 'Gemini 2.0 Flash, Gemini 1.5 Pro.',                     link: 'https://aistudio.google.com/app/apikey', linkText: 'aistudio.google.com' },
+  xai:        { ph: 'xai-...',       label: 'API Key', hint: 'Grok 2 und Grok 3 von xAI.',                            link: 'https://console.x.ai/', linkText: 'console.x.ai' },
+  groq:       { ph: 'gsk_...',       label: 'API Key', hint: 'Kostenloser Tier. Llama 3.3 70B, sehr schnell.',        link: 'https://console.groq.com/keys', linkText: 'console.groq.com' },
+  mistral:    { ph: '...',           label: 'API Key', hint: 'Mistral Large, Mistral Small, Codestral.',               link: 'https://console.mistral.ai/api-keys/', linkText: 'console.mistral.ai' },
+  together:   { ph: '...',           label: 'API Key', hint: 'Llama, Qwen, Gemma und viele Open-Source-Modelle.',     link: 'https://api.together.ai/settings/api-keys', linkText: 'api.together.ai' },
+  deepseek:   { ph: 'sk-...',        label: 'API Key', hint: 'DeepSeek V3 und DeepSeek R1.',                          link: 'https://platform.deepseek.com/api_keys', linkText: 'platform.deepseek.com' },
+  perplexity: { ph: 'pplx-...',      label: 'API Key', hint: 'Sonar Pro mit Echtzeit-Websuche.',                      link: 'https://www.perplexity.ai/settings/api', linkText: 'perplexity.ai' },
+  cohere:     { ph: '...',           label: 'API Key', hint: 'Command R+ – spezialisiert auf RAG.',                    link: 'https://dashboard.cohere.com/api-keys', linkText: 'dashboard.cohere.com' },
+  fireworks:  { ph: 'fw_...',        label: 'API Key', hint: 'Schnelle Inference für Open-Source-Modelle.',           link: 'https://fireworks.ai/account/api-keys', linkText: 'fireworks.ai' },
+  novita:     { ph: '...',           label: 'API Key', hint: 'Günstiger Zugang zu Open-Source-Modellen.',             link: 'https://novita.ai/settings?tab=key-management', linkText: 'novita.ai' },
+  deepinfra:  { ph: '...',           label: 'API Key', hint: 'Kosteneffiziente Inference.',                            link: 'https://deepinfra.com/dash/api_keys', linkText: 'deepinfra.com' },
+  cerebras:   { ph: '...',           label: 'API Key', hint: 'Extrem schnelle Inference auf Cerebras-Hardware.',      link: 'https://cloud.cerebras.ai/', linkText: 'cloud.cerebras.ai' },
+  lepton:     { ph: '...',           label: 'API Key', hint: 'Einfache Inference-API.',                               link: 'https://dashboard.lepton.ai/', linkText: 'dashboard.lepton.ai' },
+  anyscale:   { ph: 'esecret_...',   label: 'API Key', hint: 'Skalierbare Modell-Deployments.',                       link: 'https://app.endpoints.anyscale.com/', linkText: 'endpoints.anyscale.com' },
+  replicate:  { ph: 'r8_...',        label: 'API Token', hint: 'Tausende Modelle auf Replicate.',                     link: 'https://replicate.com/account/api-tokens', linkText: 'replicate.com' },
+  ollama:     { ph: '(kein Key)',    label: 'API Key (nicht nötig)', hint: 'Lokale Modelle – kein API-Key, keine Kosten.', link: 'https://ollama.ai', linkText: 'ollama.ai' },
   custom:     { ph: '...',           label: 'API Key', hint: 'Jede OpenAI-kompatible API.', link: '', linkText: '' },
 };
 
@@ -666,53 +853,46 @@ function onDashProviderChange() {
 
 function getDashProviderKey(p, name) {
   const keyMap = {
-    openrouter: p.openrouter?.apiKey, anthropic: p.anthropic?.apiKey,
-    openai: p.openai?.apiKey, google: p.google?.apiKey, xai: p.xai?.apiKey,
-    groq: p.groq?.apiKey, mistral: p.mistral?.apiKey, together: p.together?.apiKey,
-    deepseek: p.deepseek?.apiKey, perplexity: p.perplexity?.apiKey, cohere: p.cohere?.apiKey,
-    fireworks: p.fireworks?.apiKey, ollama: '', custom: p.custom?.apiKey,
+    openrouter: p.openrouter?.apiKey, anthropic: p.anthropic?.apiKey, openai: p.openai?.apiKey,
+    google: p.google?.apiKey, xai: p.xai?.apiKey, groq: p.groq?.apiKey, mistral: p.mistral?.apiKey,
+    together: p.together?.apiKey, deepseek: p.deepseek?.apiKey, perplexity: p.perplexity?.apiKey,
+    cohere: p.cohere?.apiKey, fireworks: p.fireworks?.apiKey, ollama: '', custom: p.custom?.apiKey,
   };
   return keyMap[name] || '';
 }
 
 function setDashProviderKey(providers, name, key) {
   const fieldMap = {
-    openrouter: 'openrouter', anthropic: 'anthropic', openai: 'openai',
-    google: 'google', xai: 'xai', groq: 'groq', mistral: 'mistral',
-    together: 'together', deepseek: 'deepseek', perplexity: 'perplexity',
-    cohere: 'cohere', fireworks: 'fireworks', custom: 'custom',
+    openrouter: 'openrouter', anthropic: 'anthropic', openai: 'openai', google: 'google',
+    xai: 'xai', groq: 'groq', mistral: 'mistral', together: 'together', deepseek: 'deepseek',
+    perplexity: 'perplexity', cohere: 'cohere', fireworks: 'fireworks', custom: 'custom',
   };
   const field = fieldMap[name];
-  if (field) {
-    providers[field] = providers[field] || {};
-    providers[field].apiKey = key;
-  }
+  if (field) { providers[field] = providers[field] || {}; providers[field].apiKey = key; }
 }
 
-// ── ImageGen Provider-Hints ────────────────────────────────────────────────
+// ── ImageGen Provider ─────────────────────────────────────────────────────
 const imgProviderHints = {
-  '':                 '',
+  '':                  '',
   'openrouter-shared': 'Nutzt den OpenRouter-Key aus dem Provider-Tab. Kein zusätzlicher Key nötig.',
-  'openrouter':       'Separater OpenRouter-Key für Bildgenerierung. → <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai</a>',
-  'fal':              'FLUX Pro Ultra, Recraft, Ideogram u.v.m. → <a href="https://fal.ai/dashboard/keys" target="_blank">fal.ai/dashboard</a>',
-  'openai':           'DALL-E 3 von OpenAI. → <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>',
-  'stability':        'Stable Diffusion 3.5 Large. → <a href="https://platform.stability.ai/" target="_blank">platform.stability.ai</a>',
-  'together':         'FLUX.1 Schnell kostenlos. → <a href="https://api.together.ai/settings/api-keys" target="_blank">api.together.ai</a>',
-  'replicate':        'Tausende Bild-Modelle. → <a href="https://replicate.com/account/api-tokens" target="_blank">replicate.com</a>',
+  'openrouter':        'Separater OpenRouter-Key für Bildgenerierung. → <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai</a>',
+  'fal':               'FLUX Pro Ultra, Recraft, Ideogram u.v.m. → <a href="https://fal.ai/dashboard/keys" target="_blank">fal.ai/dashboard</a>',
+  'openai':            'DALL-E 3 von OpenAI. → <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>',
+  'stability':         'Stable Diffusion 3.5 Large. → <a href="https://platform.stability.ai/" target="_blank">platform.stability.ai</a>',
+  'together':          'FLUX.1 Schnell kostenlos. → <a href="https://api.together.ai/settings/api-keys" target="_blank">api.together.ai</a>',
+  'replicate':         'Tausende Bild-Modelle. → <a href="https://replicate.com/account/api-tokens" target="_blank">replicate.com</a>',
 };
-
 const imgProviderRows = ['openrouter', 'fal', 'openai', 'stability', 'together', 'replicate'];
 
 function onImgProviderChange() {
   const sel = document.getElementById('img-default').value;
   document.getElementById('img-provider-hint').innerHTML = imgProviderHints[sel] || '';
   imgProviderRows.forEach(p => {
-    document.getElementById('img-' + p + '-row').style.display =
-      (sel === p) ? 'block' : 'none';
+    document.getElementById('img-' + p + '-row').style.display = (sel === p) ? 'block' : 'none';
   });
 }
 
-// ── VideoGen Provider-Hints ───────────────────────────────────────────────
+// ── VideoGen Provider ─────────────────────────────────────────────────────
 const vidProviderHints = {
   '':       '',
   'runway': 'Runway Gen-4 – Marktführer für KI-Videos. → <a href="https://app.runwayml.com/" target="_blank">app.runwayml.com</a>',
@@ -723,19 +903,17 @@ const vidProviderHints = {
   'sora':   'OpenAI Sora – hochwertige KI-Videos. → <a href="https://sora.com/" target="_blank">sora.com</a>',
   'veo':    'Google Veo 3 – realistisches Videoverständnis. → <a href="https://deepmind.google/technologies/veo/" target="_blank">deepmind.google</a>',
 };
-
 const vidProviderRows = ['runway', 'kling', 'luma', 'pika', 'hailuo', 'sora', 'veo'];
 
 function onVidProviderChange() {
   const sel = document.getElementById('vid-default').value;
   document.getElementById('vid-provider-hint').innerHTML = vidProviderHints[sel] || '';
   vidProviderRows.forEach(p => {
-    document.getElementById('vid-' + p + '-row').style.display =
-      (sel === p) ? 'block' : 'none';
+    document.getElementById('vid-' + p + '-row').style.display = (sel === p) ? 'block' : 'none';
   });
 }
 
-// ── Toast ─────────────────────────────────────────────────────────────────
+// ── Toast ──────────────────────────────────────────────────────────────────
 function toast(msg, isError = false) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -743,7 +921,7 @@ function toast(msg, isError = false) {
   setTimeout(() => { t.className = ''; }, 3500);
 }
 
-// ── API Helpers ───────────────────────────────────────────────────────────
+// ── API Helpers ────────────────────────────────────────────────────────────
 async function api(url, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
@@ -751,7 +929,7 @@ async function api(url, method = 'GET', body = null) {
   return resp.json();
 }
 
-// ── STATUS ────────────────────────────────────────────────────────────────
+// ── STATUS ─────────────────────────────────────────────────────────────────
 async function loadStatus() {
   const data = await api('/api/status');
   document.getElementById('status-text').textContent = data.status === 'running' ? '✅ Online' : '❌ Offline';
@@ -759,14 +937,12 @@ async function loadStatus() {
   const channels = data.channels || [];
   document.getElementById('status-channel-count').textContent = channels.length;
   const list = document.getElementById('status-channels');
-  if (channels.length === 0) {
-    list.innerHTML = '<span style="color:var(--muted)">Keine aktiven Kanäle</span>';
-  } else {
-    list.innerHTML = channels.map(c => `<span class="channel-tag">📡 ${c}</span>`).join('');
-  }
+  list.innerHTML = channels.length === 0
+    ? '<span style="color:var(--muted)">Keine aktiven Kanäle</span>'
+    : channels.map(c => `<span class="channel-tag">📡 ${c}</span>`).join('');
 }
 
-// ── CONFIG: Laden ─────────────────────────────────────────────────────────
+// ── CONFIG: Laden ──────────────────────────────────────────────────────────
 async function loadConfig() {
   configData = await api('/api/config');
   const c   = configData.channels  || {};
@@ -775,7 +951,6 @@ async function loadConfig() {
   const img = configData.imageGen  || {};
   const vid = configData.videoGen  || {};
 
-  // Kanäle
   setVal('tg-enabled',       c.telegram?.enabled,    'toggle');
   setVal('tg-token',         c.telegram?.token       || '');
   setVal('tg-allowfrom',     (c.telegram?.allowFrom  || []).join(', '));
@@ -791,7 +966,6 @@ async function loadConfig() {
   setVal('wa-phoneid',       c.whatsapp?.phoneNumberId || '');
   setVal('wa-token',         c.whatsapp?.apiKey      || '');
 
-  // LLM-Provider
   const activeProvider = p.default || 'openrouter';
   setVal('ai-provider', activeProvider, 'select');
   document.getElementById('ai-apikey').value = getDashProviderKey(p, activeProvider);
@@ -800,51 +974,39 @@ async function loadConfig() {
   setVal('ai-custom-model', p.custom?.models?.default || '');
   onDashProviderChange();
 
-  // Bild-Generierung
-  const imgDefault = img.default || '';
-  setVal('img-default', imgDefault, 'select');
-  setVal('img-openrouter-key',   img.openrouter?.apiKey || '');
-  setVal('img-openrouter-model', img.openrouter?.model  || '');
-  setVal('img-fal-key',          img.fal?.apiKey        || '');
-  setVal('img-fal-model',        img.fal?.model         || '');
-  setVal('img-openai-key',       img.openai?.apiKey     || '');
-  setVal('img-stability-key',    img.stability?.apiKey  || '');
-  setVal('img-stability-model',  img.stability?.model   || '');
-  setVal('img-together-key',     img.together?.apiKey   || '');
-  setVal('img-together-model',   img.together?.model    || '');
-  setVal('img-replicate-key',    img.replicate?.apiKey  || '');
-  setVal('img-replicate-model',  img.replicate?.model   || '');
+  setVal('img-default',       img.default   || '',   'select');
+  setVal('img-openrouter-key',img.openrouter?.apiKey || '');
+  setVal('img-openrouter-model',img.openrouter?.model || '');
+  setVal('img-fal-key',       img.fal?.apiKey        || '');
+  setVal('img-fal-model',     img.fal?.model         || '');
+  setVal('img-openai-key',    img.openai?.apiKey     || '');
+  setVal('img-stability-key', img.stability?.apiKey  || '');
+  setVal('img-stability-model',img.stability?.model  || '');
+  setVal('img-together-key',  img.together?.apiKey   || '');
+  setVal('img-together-model',img.together?.model    || '');
+  setVal('img-replicate-key', img.replicate?.apiKey  || '');
+  setVal('img-replicate-model',img.replicate?.model  || '');
   setVal('img-size',    img.size    || 'landscape', 'select');
   setVal('img-quality', img.quality || 'standard',  'select');
   onImgProviderChange();
 
-  // Video-Generierung
-  const vidDefault = vid.default || '';
-  setVal('vid-default', vidDefault, 'select');
-  setVal('vid-runway-key',   vid.runway?.apiKey  || '');
-  setVal('vid-runway-model', vid.runway?.model   || '');
-  setVal('vid-kling-key',    vid.kling?.apiKey   || '');
-  setVal('vid-kling-model',  vid.kling?.model    || '');
-  setVal('vid-luma-key',     vid.luma?.apiKey    || '');
-  setVal('vid-luma-model',   vid.luma?.model     || '');
-  setVal('vid-pika-key',     vid.pika?.apiKey    || '');
-  setVal('vid-pika-model',   vid.pika?.model     || '');
-  setVal('vid-hailuo-key',   vid.hailuo?.apiKey  || '');
-  setVal('vid-hailuo-model', vid.hailuo?.model   || '');
-  setVal('vid-sora-key',     vid.sora?.apiKey    || '');
-  setVal('vid-sora-model',   vid.sora?.model     || '');
-  setVal('vid-veo-key',      vid.veo?.apiKey     || '');
-  setVal('vid-veo-model',    vid.veo?.model      || '');
+  setVal('vid-default',      vid.default || '',   'select');
+  ['runway','kling','luma','pika','hailuo','sora','veo'].forEach(pv => {
+    setVal('vid-' + pv + '-key',   vid[pv]?.apiKey || '');
+    setVal('vid-' + pv + '-model', vid[pv]?.model  || '');
+  });
   setVal('vid-duration', vid.duration    || 5);
   setVal('vid-aspect',   vid.aspectRatio || '16:9', 'select');
   setVal('vid-quality',  vid.quality     || 'standard', 'select');
   onVidProviderChange();
 
-  // Voice
-  setVal('voice-enabled',   v.enabled,           'toggle');
-  setVal('voice-provider',  v.provider || 'groq', 'select');
-  setVal('voice-lang',      v.language || 'de',   'select');
-  setVal('voice-apikey',    v.apiKey   || '');
+  setVal('voice-enabled',  v.enabled,           'toggle');
+  setVal('voice-provider', v.provider || 'groq', 'select');
+  setVal('voice-lang',     v.language || 'de',   'select');
+  setVal('voice-apikey',   v.apiKey   || '');
+
+  // JSON-Tab immer mit Blur starten
+  reBlur('json');
 }
 
 function setVal(id, val, type = 'text') {
@@ -861,18 +1023,24 @@ function getVal(id, type = 'text') {
   return el.value;
 }
 
-// ── CONFIG: Speichern ─────────────────────────────────────────────────────
+// ── CONFIG: Speichern ──────────────────────────────────────────────────────
 async function saveConfig() {
   const rawTab = document.getElementById('tab-raw').classList.contains('active');
-
   let newConfig;
-  if (rawTab) {
-    try { newConfig = JSON.parse(document.getElementById('raw-config').value); }
-    catch(e) { toast('Ungültiges JSON: ' + e.message, true); return; }
-  } else {
-    newConfig = JSON.parse(JSON.stringify(configData)); // deep clone
 
-    // Kanäle
+  if (rawTab) {
+    const ta = document.getElementById('raw-config');
+    if (ta.classList.contains('blurred')) {
+      toast('JSON-Editor ist noch gesperrt. Bitte erst entsperren.', true);
+      return;
+    }
+    try { newConfig = JSON.parse(ta.value); }
+    catch(e) { toast('Ungültiges JSON: ' + e.message, true); return; }
+    // Nach Speichern wieder sperren
+    setTimeout(() => reBlur('json'), 500);
+  } else {
+    newConfig = JSON.parse(JSON.stringify(configData));
+
     const ch = newConfig.channels = newConfig.channels || {};
     ch.telegram = ch.telegram || {};
     ch.telegram.enabled   = getVal('tg-enabled', 'toggle');
@@ -894,7 +1062,6 @@ async function saveConfig() {
     ch.whatsapp.phoneNumberId = getVal('wa-phoneid');
     ch.whatsapp.apiKey        = getVal('wa-token');
 
-    // LLM-Provider
     const selProvider = getVal('ai-provider', 'select');
     const selKey      = getVal('ai-apikey');
     newConfig.providers = newConfig.providers || {};
@@ -908,7 +1075,6 @@ async function saveConfig() {
       if (m) newConfig.providers.custom.models = { default: m, opus: m };
     }
 
-    // Bild-Generierung
     newConfig.imageGen = newConfig.imageGen || {};
     newConfig.imageGen.default = getVal('img-default', 'select');
     newConfig.imageGen.openrouter = newConfig.imageGen.openrouter || {};
@@ -931,23 +1097,20 @@ async function saveConfig() {
     newConfig.imageGen.size    = getVal('img-size',    'select');
     newConfig.imageGen.quality = getVal('img-quality', 'select');
 
-    // Video-Generierung
     newConfig.videoGen = newConfig.videoGen || {};
     newConfig.videoGen.default = getVal('vid-default', 'select');
-    const vidProviders = ['runway','kling','luma','pika','hailuo','sora','veo'];
-    vidProviders.forEach(p => {
-      newConfig.videoGen[p] = newConfig.videoGen[p] || {};
-      newConfig.videoGen[p].apiKey = getVal('vid-' + p + '-key');
-      newConfig.videoGen[p].model  = getVal('vid-' + p + '-model');
+    ['runway','kling','luma','pika','hailuo','sora','veo'].forEach(pv => {
+      newConfig.videoGen[pv] = newConfig.videoGen[pv] || {};
+      newConfig.videoGen[pv].apiKey = getVal('vid-' + pv + '-key');
+      newConfig.videoGen[pv].model  = getVal('vid-' + pv + '-model');
     });
     const dur = parseInt(getVal('vid-duration'));
     newConfig.videoGen.duration    = isNaN(dur) ? 5 : dur;
     newConfig.videoGen.aspectRatio = getVal('vid-aspect',  'select');
     newConfig.videoGen.quality     = getVal('vid-quality', 'select');
 
-    // Voice
     newConfig.voice = newConfig.voice || {};
-    newConfig.voice.enabled  = getVal('voice-enabled', 'toggle');
+    newConfig.voice.enabled  = getVal('voice-enabled',  'toggle');
     newConfig.voice.provider = getVal('voice-provider', 'select');
     newConfig.voice.language = getVal('voice-lang',     'select');
     newConfig.voice.apiKey   = getVal('voice-apikey');
@@ -955,38 +1118,39 @@ async function saveConfig() {
 
   const result = await api('/api/config', 'PUT', newConfig);
   if (result.error) { toast('Fehler: ' + result.error, true); return; }
-
   configData = newConfig;
   toast('✅ Konfiguration gespeichert');
   document.getElementById('config-notice').classList.add('show');
 }
 
-// ── SOUL ──────────────────────────────────────────────────────────────────
+// ── SOUL ───────────────────────────────────────────────────────────────────
 async function loadSoul() {
   const data = await api('/api/soul');
   document.getElementById('soul-content').value = data.content || '';
+  reBlur('soul');
 }
 
 async function saveSoul() {
-  const content = document.getElementById('soul-content').value;
+  const ta = document.getElementById('soul-content');
+  if (ta.classList.contains('blurred')) {
+    toast('Editor ist gesperrt. Bitte erst entsperren.', true);
+    return;
+  }
+  const content = ta.value;
   const result = await api('/api/soul', 'PUT', { content });
   if (result.error) { toast('Fehler: ' + result.error, true); return; }
   toast('✅ Persönlichkeit gespeichert');
   document.getElementById('soul-notice').classList.add('show');
+  setTimeout(() => reBlur('soul'), 500);
 }
 
-// ── LOGS ──────────────────────────────────────────────────────────────────
+// ── LOGS ───────────────────────────────────────────────────────────────────
 async function loadLogs() {
   const data = await api('/api/logs');
   document.getElementById('log-filename').textContent = data.file || '–';
   const box = document.getElementById('log-box');
-  if (!data.lines || data.lines.length === 0) {
-    box.textContent = 'Keine Logs gefunden.';
-    return;
-  }
-  box.innerHTML = data.lines.map(line =>
-    `<span class="log-line">${escHtml(line)}</span>`
-  ).join('\n');
+  if (!data.lines || data.lines.length === 0) { box.textContent = 'Keine Logs gefunden.'; return; }
+  box.innerHTML = data.lines.map(l => `<span class="log-line">${escHtml(l)}</span>`).join('\n');
   box.scrollTop = box.scrollHeight;
 }
 
@@ -994,8 +1158,77 @@ function escHtml(str) {
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// ── Init ──────────────────────────────────────────────────────────────────
+// ── SYSTEM: OS-Befehle ─────────────────────────────────────────────────────
+const osCmds = {
+  windows: {
+    restart: 'Stop-Process -Name "FluxBot" -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; Start-Process -FilePath ".\\FluxBot.exe"',
+    rebuild: 'Stop-Process -Name "FluxBot" -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 2; go build -o FluxBot.exe .\\cmd\\fluxbot\\; Start-Process -FilePath ".\\FluxBot.exe"',
+    restartHowto: '<strong>So öffnest du PowerShell:</strong><br><span class="step-num">1</span> Windows-Taste drücken → "PowerShell" tippen<br><span class="step-num">2</span> Rechtsklick → <em>Als Administrator ausführen</em><br><span class="step-num">3</span> In den FluxBot-Ordner: <code>cd C:\\Pfad\\zu\\FluxBot</code><br><span class="step-num">4</span> Befehl kopieren → Strg+V → Enter',
+    rebuildHowto: '<strong>Voraussetzung:</strong> Go muss installiert sein → <a href="https://go.dev/dl/" target="_blank">go.dev/dl</a><br><span class="step-num">1</span> PowerShell als Administrator öffnen<br><span class="step-num">2</span> In den Quellcode-Ordner navigieren<br><span class="step-num">3</span> Befehl kopieren → Strg+V → Enter<br><span class="step-num">4</span> Danach: Strg+Shift+R im Browser'
+  },
+  mac: {
+    restart: 'pkill -f "FluxBot" 2>/dev/null; sleep 1; ./FluxBot &',
+    rebuild: 'pkill -f "FluxBot" 2>/dev/null; sleep 1; go build -o FluxBot ./cmd/fluxbot/ && ./FluxBot &',
+    restartHowto: '<strong>So öffnest du das Terminal:</strong><br><span class="step-num">1</span> Cmd+Leertaste → "Terminal" tippen → Enter<br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd ~/Pfad/zu/FluxBot</code><br><span class="step-num">3</span> Befehl kopieren → Cmd+V → Enter',
+    rebuildHowto: '<strong>Voraussetzung:</strong> Go installiert? → <a href="https://go.dev/dl/" target="_blank">go.dev/dl</a><br><span class="step-num">1</span> Terminal öffnen<br><span class="step-num">2</span> In den Quellcode-Ordner navigieren<br><span class="step-num">3</span> Befehl kopieren → Cmd+V → Enter'
+  },
+  linux: {
+    restart: 'pkill -f "FluxBot" 2>/dev/null; sleep 1; ./FluxBot &',
+    rebuild: 'pkill -f "FluxBot" 2>/dev/null; sleep 1; go build -o FluxBot ./cmd/fluxbot/ && ./FluxBot &',
+    restartHowto: '<strong>So öffnest du das Terminal:</strong><br><span class="step-num">1</span> Strg+Alt+T (oder Terminal im App-Menü)<br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd ~/Pfad/zu/FluxBot</code><br><span class="step-num">3</span> Befehl kopieren → Strg+Shift+V → Enter',
+    rebuildHowto: '<strong>Voraussetzung:</strong> <code>sudo apt install golang-go</code><br><span class="step-num">1</span> Terminal öffnen (Strg+Alt+T)<br><span class="step-num">2</span> In den Quellcode-Ordner navigieren<br><span class="step-num">3</span> Befehl kopieren → Strg+Shift+V → Enter'
+  },
+  docker: {
+    restart: 'docker restart fluxbot_ai',
+    rebuild: 'docker-compose down && docker-compose up --build -d',
+    restartHowto: '<strong>Auf dem Server / Host:</strong><br><span class="step-num">1</span> SSH-Verbindung zum Server herstellen<br><span class="step-num">2</span> In den FluxBot-Ordner navigieren<br><span class="step-num">3</span> Befehl ausführen',
+    rebuildHowto: '<strong>Hinweis:</strong> Rebuild baut ein neues Docker-Image.<br><span class="step-num">1</span> SSH zum Server<br><span class="step-num">2</span> <code>git pull</code> für neuesten Code<br><span class="step-num">3</span> Rebuild-Befehl ausführen'
+  }
+};
+
+let currentOS = 'windows';
+
+function selectOS(os, el) {
+  currentOS = os;
+  document.querySelectorAll('.os-btn').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  updateSystemCmds();
+}
+
+function updateSystemCmds() {
+  const cmds = osCmds[currentOS] || osCmds.windows;
+  document.getElementById('restart-cmd').textContent   = cmds.restart;
+  document.getElementById('rebuild-cmd').textContent   = cmds.rebuild;
+  document.getElementById('restart-howto').innerHTML   = cmds.restartHowto;
+  document.getElementById('rebuild-howto').innerHTML   = cmds.rebuildHowto;
+}
+
+function copyCmd(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = el.textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast('📋 Befehl kopiert!')).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); toast('📋 Befehl kopiert!'); }
+  catch(e) { toast('Kopieren fehlgeschlagen – bitte manuell kopieren', true); }
+  document.body.removeChild(ta);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
 loadStatus();
+updateSystemCmds();
 </script>
 </body>
 </html>

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -14,12 +15,12 @@ import (
 // OpenRouter liefert Bilder über die Chat-Completions-API.
 //
 // Unterstützte Bild-Modelle (Stand 2026):
-//   - black-forest-labs/flux-1.1-pro          (kostenpflichtig)
-//   - black-forest-labs/flux-schnell:free      (kostenlos)
-//   - google/gemini-2.0-flash-exp:free         (kostenlos, multimodal)
+//   - black-forest-labs/flux.2-pro          (kostenpflichtig)
+//   - bytedance-seed/seedream-4.5            (kostenpflichtig)
+//   - black-forest-labs/flux-schnell:free   (kostenlos)
 //
-// OpenRouter hat KEINEN /images/generations Endpunkt.
-// Stattdessen: /chat/completions – manche Modelle geben Bild-URLs zurück.
+// OpenRouter gibt bei Bildmodellen die Bild-URL im content-Feld zurück,
+// entweder als direkter String, als Markdown-Bild oder als URL-Array.
 
 const openRouterChatBase = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -44,14 +45,14 @@ func (g *OpenRouterImageGenerator) Name() string { return g.displayName }
 func (g *OpenRouterImageGenerator) Generate(ctx context.Context, prompt, size string) (*Image, error) {
 	w, h := mapOpenRouterSize(size)
 
-	// OpenRouter Bildmodelle werden über Chat-Completions angesteuert.
-	// Der Prompt enthält die Bildanforderung, die Antwort enthält eine Bild-URL.
+	// OpenRouter Bildmodelle: Anfrage über Chat-Completions.
+	// Die Bild-URL kommt im content-Feld der Antwort zurück.
 	payload := map[string]interface{}{
 		"model": g.model,
 		"messages": []map[string]interface{}{
 			{
 				"role":    "user",
-				"content": fmt.Sprintf("Generate an image: %s\nSize: %dx%d", prompt, w, h),
+				"content": fmt.Sprintf("Generate an image: %s\nSize: %dx%d pixels", prompt, w, h),
 			},
 		},
 	}
@@ -66,7 +67,7 @@ func (g *OpenRouterImageGenerator) Generate(ctx context.Context, prompt, size st
 	req.Header.Set("HTTP-Referer", "https://github.com/ki-werke/fluxbot")
 	req.Header.Set("X-Title", "FluxBot")
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := &http.Client{Timeout: 180 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("openrouter-img: API nicht erreichbar: %w", err)
@@ -76,12 +77,12 @@ func (g *OpenRouterImageGenerator) Generate(ctx context.Context, prompt, size st
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode >= 400 {
-		// Kurze Fehlermeldung – kein HTML-Dump
 		msg := string(respBody)
+		// HTML-Dump verhindern
 		if strings.HasPrefix(strings.TrimSpace(msg), "<") {
-			msg = fmt.Sprintf("HTTP %d (kein JSON – falscher Endpunkt oder Modell nicht verfügbar)", resp.StatusCode)
-		} else if len(msg) > 300 {
-			msg = msg[:300] + "…"
+			msg = fmt.Sprintf("HTTP %d – ungültiger Endpunkt oder Modell nicht verfügbar", resp.StatusCode)
+		} else if len(msg) > 400 {
+			msg = msg[:400] + "…"
 		}
 		return nil, fmt.Errorf("openrouter-img: API Fehler %d: %s", resp.StatusCode, msg)
 	}
@@ -93,24 +94,42 @@ func (g *OpenRouterImageGenerator) Generate(ctx context.Context, prompt, size st
 				Content interface{} `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
+		Error *struct {
+			Message string `json:"message"`
+			Code    int    `json:"code"`
+		} `json:"error"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
+		log.Printf("[OpenRouter-IMG] JSON-Parse-Fehler. Raw response (500 chars): %.500s", string(respBody))
 		return nil, fmt.Errorf("openrouter-img: JSON-Parse-Fehler: %w", err)
 	}
+
+	// API-Fehler im Body prüfen (HTTP 200 aber Fehlerinhalt)
+	if result.Error != nil {
+		return nil, fmt.Errorf("openrouter-img: API-Fehler: %s", result.Error.Message)
+	}
+
 	if len(result.Choices) == 0 {
-		return nil, fmt.Errorf("openrouter-img: keine Antwort vom Modell")
+		log.Printf("[OpenRouter-IMG] Keine Choices in Antwort. Raw: %.500s", string(respBody))
+		return nil, fmt.Errorf("openrouter-img: keine Antwort vom Modell erhalten")
 	}
 
 	// Bild-URL aus dem Content extrahieren
 	content := result.Choices[0].Message.Content
+	log.Printf("[OpenRouter-IMG] Modell %s – Content-Typ: %T – Wert: %v", g.model, content, content)
+
 	imageURL := extractImageURL(content)
 	if imageURL == "" {
+		// Rohe Antwort für Debugging loggen
+		log.Printf("[OpenRouter-IMG] Keine URL gefunden. Roher Content: %v", content)
 		return nil, fmt.Errorf(
-			"openrouter-img: Modell '%s' lieferte keine Bild-URL.\n"+
-				"Tipp: Nutze einen dedizierten Bild-Provider (fal.ai, Together AI) im Dashboard.",
+			"openrouter-img: Modell '%s' hat geantwortet, aber keine Bild-URL geliefert.\n"+
+				"Tipp: Nutze fal.ai oder Together AI als Bild-Provider im Dashboard.",
 			g.model,
 		)
 	}
+
+	log.Printf("[OpenRouter-IMG] Bild-URL gefunden: %s", imageURL)
 
 	return &Image{
 		URL:    imageURL,
@@ -121,31 +140,82 @@ func (g *OpenRouterImageGenerator) Generate(ctx context.Context, prompt, size st
 }
 
 // extractImageURL sucht eine Bild-URL in einer Chat-Completions-Antwort.
-// OpenRouter gibt bei Bildmodellen entweder eine URL als String oder
-// ein content-Array mit image_url-Objekten zurück.
+// Unterstützt: direkte URL, Markdown-Bild ![](url), URL im Text, content-Array.
 func extractImageURL(content interface{}) string {
 	switch v := content.(type) {
 	case string:
-		// Direkte URL
-		if strings.HasPrefix(v, "http") {
-			return strings.TrimSpace(v)
+		v = strings.TrimSpace(v)
+		if v == "" {
+			return ""
 		}
-		// URL irgendwo im Text
-		for _, word := range strings.Fields(v) {
-			if strings.HasPrefix(word, "https://") {
-				clean := strings.Trim(word, ".,)")
-				if isImageURL(clean) {
-					return clean
+
+		// 1. Direkter URL-String (nur URL, kein Leerzeichen)
+		if strings.HasPrefix(v, "http") && !strings.ContainsAny(v, " \n\t") {
+			return strings.TrimRight(v, ".,)")
+		}
+
+		// 2. Markdown-Bild: ![alt](url)
+		if idx := strings.Index(v, "!["); idx >= 0 {
+			rest := v[idx+2:]
+			if closeBracket := strings.Index(rest, "]("); closeBracket >= 0 {
+				urlPart := rest[closeBracket+2:]
+				if closeParen := strings.Index(urlPart, ")"); closeParen >= 0 {
+					u := strings.TrimSpace(urlPart[:closeParen])
+					if strings.HasPrefix(u, "http") {
+						return u
+					}
 				}
 			}
 		}
+
+		// 3. Erste https-URL im Text suchen (wortweise)
+		for _, word := range strings.Fields(v) {
+			word = strings.Trim(word, ".,()\"'<>\n\r")
+			if strings.HasPrefix(word, "https://") || strings.HasPrefix(word, "http://") {
+				return word
+			}
+		}
+
+		// 4. Letzte Chance: irgendwo "http" im String?
+		if idx := strings.Index(v, "https://"); idx >= 0 {
+			sub := v[idx:]
+			// Bis zum nächsten Leerzeichen oder Anführungszeichen
+			end := strings.IndexAny(sub, " \n\t\"'<>)")
+			if end < 0 {
+				return strings.TrimRight(sub, ".,)")
+			}
+			return strings.TrimRight(sub[:end], ".,)")
+		}
+		if idx := strings.Index(v, "http://"); idx >= 0 {
+			sub := v[idx:]
+			end := strings.IndexAny(sub, " \n\t\"'<>)")
+			if end < 0 {
+				return strings.TrimRight(sub, ".,)")
+			}
+			return strings.TrimRight(sub[:end], ".,)")
+		}
+
 	case []interface{}:
 		// Content-Array (multimodal)
 		for _, part := range v {
 			if m, ok := part.(map[string]interface{}); ok {
-				if m["type"] == "image_url" {
+				switch m["type"] {
+				case "image_url":
 					if iu, ok := m["image_url"].(map[string]interface{}); ok {
-						if url, ok := iu["url"].(string); ok {
+						if url, ok := iu["url"].(string); ok && url != "" {
+							return url
+						}
+					}
+				case "image":
+					// Einige Provider geben base64 oder URL direkt
+					if src, ok := m["source"].(map[string]interface{}); ok {
+						if url, ok := src["url"].(string); ok && url != "" {
+							return url
+						}
+					}
+				case "text":
+					if text, ok := m["text"].(string); ok {
+						if url := extractImageURL(text); url != "" {
 							return url
 						}
 					}
@@ -154,17 +224,6 @@ func extractImageURL(content interface{}) string {
 		}
 	}
 	return ""
-}
-
-func isImageURL(u string) bool {
-	lower := strings.ToLower(u)
-	return strings.Contains(lower, ".png") ||
-		strings.Contains(lower, ".jpg") ||
-		strings.Contains(lower, ".jpeg") ||
-		strings.Contains(lower, ".webp") ||
-		strings.Contains(lower, "image") ||
-		strings.Contains(lower, "cdn") ||
-		strings.Contains(lower, "storage")
 }
 
 // mapOpenRouterSize mappt Größenangaben auf Pixel-Dimensionen
