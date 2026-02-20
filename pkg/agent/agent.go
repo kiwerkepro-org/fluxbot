@@ -590,19 +590,21 @@ func (a *Agent) isImageRequest(text string) bool {
 	return hasTrigger || (hasBild && (strings.Contains(lower, "von ") || strings.Contains(lower, "zeig")))
 }
 
-// isVideoRequest erkennt Videogenerierungs-Anfragen
+// isVideoRequest erkennt Videogenerierungs-Anfragen.
+// Prüft ob "video"/"film" + ein Aktionsverb vorhanden ist.
 func (a *Agent) isVideoRequest(text string) bool {
 	lower := strings.ToLower(text)
-	return strings.Contains(lower, "erstelle ein video") ||
-		strings.Contains(lower, "generiere ein video") ||
-		strings.Contains(lower, "mach ein video") ||
-		strings.Contains(lower, "mach mir ein video") ||
-		strings.Contains(lower, "ein video von") ||
-		strings.Contains(lower, "video erstellen") ||
-		strings.Contains(lower, "video generieren") ||
-		strings.Contains(lower, "create a video") ||
-		strings.Contains(lower, "generate a video") ||
-		strings.Contains(lower, "generate video")
+	hasVideo := strings.Contains(lower, "video") || strings.Contains(lower, "film")
+	if !hasVideo {
+		return false
+	}
+	return strings.Contains(lower, "erstell") ||
+		strings.Contains(lower, "generier") ||
+		strings.Contains(lower, "mach") ||
+		strings.Contains(lower, "produzier") ||
+		strings.Contains(lower, "create") ||
+		strings.Contains(lower, "generate") ||
+		strings.Contains(lower, "render")
 }
 
 // extractImagePrompt extrahiert den Bildprompt aus dem Text

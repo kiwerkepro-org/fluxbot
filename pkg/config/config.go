@@ -211,6 +211,10 @@ func Load(path string) (*Config, error) {
 	if len(cfg.Providers.OpenRouter.Models) == 0 {
 		cfg.Providers.OpenRouter.Models = DefaultModels()
 	}
+	// "image"-Key immer sicherstellen – auch wenn config.json die Map nur teilweise definiert
+	if cfg.Providers.OpenRouter.Models["image"] == "" {
+		cfg.Providers.OpenRouter.Models["image"] = "google/gemini-2.0-flash-001"
+	}
 
 	if len(cfg.Providers.OpenAI.Models) == 0 {
 		cfg.Providers.OpenAI.Models = map[string]string{
