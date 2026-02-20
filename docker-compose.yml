@@ -9,7 +9,7 @@ services:
     build: .
     container_name: fluxbot_ai
     ports:
-      - "8090:8090"
+      - "9090:9090"
     volumes:
       # Workspace enthält config.json, Gedächtnis, Skills
       - ./workspace:/app/workspace
