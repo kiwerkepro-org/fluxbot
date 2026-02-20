@@ -237,17 +237,6 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 		return a.handleImageRequest(ctx, msg, session, text)
 	}
 
-	// ── VIDEO-GENERIERUNG ─────────────────────────────────────────────────────
-	if a.isVideoRequest(text) {
-		if a.videoDefault == "" || a.videoDefault == "disabled" {
-			return "🎬 Videogenerierung ist aktuell nicht aktiviert.\n\n" +
-				"Du kannst das im Dashboard unter dem Tab *Videos* ändern – " +
-				"wähle dort einen Provider aus und trage deinen API-Key ein.\n\n" +
-				"💡 Empfehlung: Runway Gen-4 Turbo für professionelle KI-Videos.\n" +
-				"→ app.runwayml.com"
-		}
-		return "🎬 Videogenerierung mit *" + a.videoDefault + "* ist konfiguriert, aber noch nicht vollständig implementiert. Bitte warte auf das nächste Update."
-	}
 
 	// ── MERKEN-LOGIK ───────────────────────────────────────────────────────
 	if a.isMemoryCommand(text) {
@@ -494,6 +483,20 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 		log.Printf("[Agent] Provider-Fehler: %v", err)
 		return fmt.Sprintf("❌ Fehler bei der KI-Anfrage: %v", err)
 	}
+
+	// KI hat Video-Anfrage erkannt → passende Meldung zurückgeben
+	if strings.Contains(response, "__VIDEO_REQUEST__") {
+		log.Printf("[Agent] 🎬 Video-Anfrage erkannt (KI-Klassifizierung)")
+		if a.videoDefault == "" || a.videoDefault == "disabled" {
+			return "🎬 Videogenerierung ist aktuell nicht aktiviert.\n\n" +
+				"Du kannst das im Dashboard unter dem Tab *Videos* ändern – " +
+				"wähle dort einen Provider aus und trage deinen API-Key ein.\n\n" +
+				"💡 Empfehlung: Runway Gen-4 Turbo für professionelle KI-Videos.\n" +
+				"→ app.runwayml.com"
+		}
+		return "🎬 Videogenerierung mit *" + a.videoDefault + "* ist konfiguriert, aber noch nicht vollständig implementiert."
+	}
+
 	return response
 }
 
@@ -514,7 +517,10 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 		"- Maximal 2-3 Sätze, außer der Nutzer fragt EXPLIZIT nach einer ausführlichen Antwort.\n" +
 		"- KEINE ungebetenen Zusatzinfos, Tipps, Links, Vorschläge oder Erklärungen.\n" +
 		"- KEINE Einleitungsphrasen wie \"Natürlich!\", \"Gerne!\", \"Sicher!\", \"Selbstverständlich!\".\n" +
-		"- Bei einfachen Bestätigungen oder Statusmeldungen: eine Zeile reicht.\n"
+		"- Bei einfachen Bestätigungen oder Statusmeldungen: eine Zeile reicht.\n" +
+		"\nVIDEO-ERKENNUNG – HÖCHSTE PRIORITÄT:\n" +
+		"Wenn der Nutzer in irgendeiner Form ein Video erstellen, generieren, produzieren, drehen, animieren oder rendern lassen möchte – egal wie er es formuliert, in welcher Sprache oder mit welchen Worten – antworte ausschließlich mit dem exakten Text: __VIDEO_REQUEST__\n" +
+		"Kein weiterer Text, keine Erklärung, nur: __VIDEO_REQUEST__\n"
 
 	if facts != "" {
 		prompt += fmt.Sprintf("\nGEDÄCHTNIS ÜBER DEN NUTZER: %s\n", facts)
@@ -588,23 +594,6 @@ func (a *Agent) isImageRequest(text string) bool {
 		strings.Contains(lower, "illustration") ||
 		strings.Contains(lower, "artwork")
 	return hasTrigger || (hasBild && (strings.Contains(lower, "von ") || strings.Contains(lower, "zeig")))
-}
-
-// isVideoRequest erkennt Videogenerierungs-Anfragen.
-// Prüft ob "video"/"film" + ein Aktionsverb vorhanden ist.
-func (a *Agent) isVideoRequest(text string) bool {
-	lower := strings.ToLower(text)
-	hasVideo := strings.Contains(lower, "video") || strings.Contains(lower, "film")
-	if !hasVideo {
-		return false
-	}
-	return strings.Contains(lower, "erstell") ||
-		strings.Contains(lower, "generier") ||
-		strings.Contains(lower, "mach") ||
-		strings.Contains(lower, "produzier") ||
-		strings.Contains(lower, "create") ||
-		strings.Contains(lower, "generate") ||
-		strings.Contains(lower, "render")
 }
 
 // extractImagePrompt extrahiert den Bildprompt aus dem Text
