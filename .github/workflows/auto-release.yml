@@ -74,13 +74,12 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Commits sammeln
-          COMMITS=$(git log "${LAST_TAG}..HEAD" --oneline --no-merges)
+          # Wir sammeln die Commits in einer Variable
+          LOGS=$(git log "${LAST_TAG}..HEAD" --oneline --no-merges)
           
-          # Tag mit formatierter Nachricht erstellen
-          git tag -a "${NEW_TAG}" -m "Release ${NEW_TAG}
+          # Wir bauen die Nachricht sauber zusammen
+          MSG="Release ${NEW_TAG} - Änderungen seit ${LAST_TAG}: ${LOGS}"
           
-          Aenderungen seit ${LAST_TAG}:
-          ${COMMITS}"
-          
+          # Tag erstellen und pushen
+          git tag -a "${NEW_TAG}" -m "$MSG"
           git push origin "${NEW_TAG}"
