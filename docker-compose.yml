@@ -8,6 +8,9 @@ services:
   fluxbot:
     build: .
     container_name: fluxbot_ai
+    # Injektion der Umgebungsvariablen aus der lokalen .env Datei
+    env_file:
+      - .env
     ports:
       - "9090:9090"
     volumes:
