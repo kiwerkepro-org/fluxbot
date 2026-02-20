@@ -319,5 +319,6 @@ func DefaultModels() map[string]string {
 		"opus":    "anthropic/claude-opus-4-5-20251101",
 		"search":  "perplexity/sonar-reasoning-pro",
 		"ocr":     "mistralai/pixtral-12b",
+		"image":   "google/gemini-2.0-flash-001",
 	}
 }

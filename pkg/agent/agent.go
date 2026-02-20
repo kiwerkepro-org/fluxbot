@@ -28,6 +28,7 @@ type Agent struct {
 	guard           *security.Guard
 	imageGenerators []imagegen.Generator // Alle verfügbaren Bildgeneratoren (in Auswahl-Reihenfolge)
 	imageSize       string
+	videoDefault    string // "disabled" oder Provider-Name – steuert Video-Meldung
 	soul            string // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
 	systemPromptFn  func(session *Session, rules string) string
 }
@@ -44,6 +45,7 @@ type Config struct {
 	Guard           *security.Guard      // Optional – nil = kein Security-Check
 	ImageGenerators []imagegen.Generator // Optional – leer = keine Bildgenerierung
 	ImageSize       string
+	VideoDefault    string // "disabled" oder Provider-Name – steuert Video-Meldung
 	Soul            string // Inhalt von SOUL.md + IDENTITY.md (leer = nur Basis-Prompt)
 }
 
@@ -64,6 +66,7 @@ func New(cfg Config) *Agent {
 		guard:           cfg.Guard,
 		imageGenerators: cfg.ImageGenerators,
 		imageSize:       cfg.ImageSize,
+		videoDefault:    cfg.VideoDefault,
 		soul:            cfg.Soul,
 	}
 	a.systemPromptFn = a.buildSystemPrompt
@@ -232,6 +235,18 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 				"→ openrouter.ai"
 		}
 		return a.handleImageRequest(ctx, msg, session, text)
+	}
+
+	// ── VIDEO-GENERIERUNG ─────────────────────────────────────────────────────
+	if a.isVideoRequest(text) {
+		if a.videoDefault == "" || a.videoDefault == "disabled" {
+			return "🎬 Videogenerierung ist aktuell nicht aktiviert.\n\n" +
+				"Du kannst das im Dashboard unter dem Tab *Videos* ändern – " +
+				"wähle dort einen Provider aus und trage deinen API-Key ein.\n\n" +
+				"💡 Empfehlung: Runway Gen-4 Turbo für professionelle KI-Videos.\n" +
+				"→ app.runwayml.com"
+		}
+		return "🎬 Videogenerierung mit *" + a.videoDefault + "* ist konfiguriert, aber noch nicht vollständig implementiert. Bitte warte auf das nächste Update."
 	}
 
 	// ── MERKEN-LOGIK ───────────────────────────────────────────────────────
@@ -573,6 +588,21 @@ func (a *Agent) isImageRequest(text string) bool {
 		strings.Contains(lower, "illustration") ||
 		strings.Contains(lower, "artwork")
 	return hasTrigger || (hasBild && (strings.Contains(lower, "von ") || strings.Contains(lower, "zeig")))
+}
+
+// isVideoRequest erkennt Videogenerierungs-Anfragen
+func (a *Agent) isVideoRequest(text string) bool {
+	lower := strings.ToLower(text)
+	return strings.Contains(lower, "erstelle ein video") ||
+		strings.Contains(lower, "generiere ein video") ||
+		strings.Contains(lower, "mach ein video") ||
+		strings.Contains(lower, "mach mir ein video") ||
+		strings.Contains(lower, "ein video von") ||
+		strings.Contains(lower, "video erstellen") ||
+		strings.Contains(lower, "video generieren") ||
+		strings.Contains(lower, "create a video") ||
+		strings.Contains(lower, "generate a video") ||
+		strings.Contains(lower, "generate video")
 }
 
 // extractImagePrompt extrahiert den Bildprompt aus dem Text

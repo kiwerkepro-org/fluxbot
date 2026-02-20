@@ -292,6 +292,7 @@ func runBot(ctx context.Context, configPath string) {
 		Guard:           guard,
 		ImageGenerators: imageGenerators,
 		ImageSize:       cfg.ImageGen.Size,
+		VideoDefault:    cfg.VideoGen.Default,
 		Soul:            soul,
 	})
 
