@@ -9,10 +9,11 @@ import (
 	"strings"
 
 	"github.com/ki-werke/fluxbot/pkg/channels"
+	"github.com/ki-werke/fluxbot/pkg/email"
+	"github.com/ki-werke/fluxbot/pkg/imagegen"
 	"github.com/ki-werke/fluxbot/pkg/provider"
 	"github.com/ki-werke/fluxbot/pkg/security"
 	"github.com/ki-werke/fluxbot/pkg/skills"
-	"github.com/ki-werke/fluxbot/pkg/imagegen"
 	"github.com/ki-werke/fluxbot/pkg/voice"
 )
 
@@ -28,8 +29,9 @@ type Agent struct {
 	guard           *security.Guard
 	imageGenerators []imagegen.Generator // Alle verfügbaren Bildgeneratoren (in Auswahl-Reihenfolge)
 	imageSize       string
-	videoDefault    string // "disabled" oder Provider-Name – steuert Video-Meldung
-	soul            string // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
+	videoDefault    string       // "disabled" oder Provider-Name – steuert Video-Meldung
+	emailSender     *email.Sender // nil = E-Mail deaktiviert
+	soul            string       // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
 	systemPromptFn  func(session *Session, rules string) string
 }
 
@@ -45,8 +47,9 @@ type Config struct {
 	Guard           *security.Guard      // Optional – nil = kein Security-Check
 	ImageGenerators []imagegen.Generator // Optional – leer = keine Bildgenerierung
 	ImageSize       string
-	VideoDefault    string // "disabled" oder Provider-Name – steuert Video-Meldung
-	Soul            string // Inhalt von SOUL.md + IDENTITY.md (leer = nur Basis-Prompt)
+	VideoDefault    string        // "disabled" oder Provider-Name – steuert Video-Meldung
+	EmailSender     *email.Sender // Optional – nil = E-Mail deaktiviert
+	Soul            string        // Inhalt von SOUL.md + IDENTITY.md (leer = nur Basis-Prompt)
 }
 
 // New erstellt einen neuen Agent
@@ -67,6 +70,7 @@ func New(cfg Config) *Agent {
 		imageGenerators: cfg.ImageGenerators,
 		imageSize:       cfg.ImageSize,
 		videoDefault:    cfg.VideoDefault,
+		emailSender:     cfg.EmailSender,
 		soul:            cfg.Soul,
 	}
 	a.systemPromptFn = a.buildSystemPrompt
@@ -85,6 +89,17 @@ func (a *Agent) UpdateImageGenerators(gens []imagegen.Generator) {
 			names[i] = g.Name()
 		}
 		log.Printf("[Agent] 🔄 Bildgeneratoren neu geladen: %v", names)
+	}
+}
+
+// UpdateEmailSender ersetzt den SMTP-Sender zur Laufzeit.
+// Wird aufgerufen wenn die Config im Dashboard geändert wird.
+func (a *Agent) UpdateEmailSender(sender *email.Sender) {
+	a.emailSender = sender
+	if sender == nil || !sender.IsConfigured() {
+		log.Println("[Agent] 🔄 E-Mail-Versand deaktiviert (keine SMTP-Credentials).")
+	} else {
+		log.Printf("[Agent] 🔄 E-Mail-Sender aktiv (Von: %s)", sender.From())
 	}
 }
 
@@ -207,6 +222,11 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 	// ── BILD-FLOW (ausstehende Anfrage – Provider- oder Format-Auswahl) ─────
 	if session.ImageRequest != nil {
 		return a.handleImageRequestStep(ctx, msg, session, text)
+	}
+
+	// ── E-MAIL-BESTÄTIGUNGS-FLOW ───────────────────────────────────────────
+	if session.EmailState != nil {
+		return a.handleEmailConfirmation(ctx, msg, session, text)
 	}
 
 	// ── GEDÄCHTNIS-LÖSCH-FLOW ──────────────────────────────────────────────
@@ -502,6 +522,11 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 		return a.handleSkillCreation(response)
 	}
 
+	// KI hat E-Mail-Anfrage erkannt → Vorschau erstellen + Bestätigung einholen
+	if strings.Contains(response, "__SEND_EMAIL__") && strings.Contains(response, "__EMAIL_END__") {
+		return a.handleEmailRequest(session, response)
+	}
+
 	return response
 }
 
@@ -532,6 +557,113 @@ func (a *Agent) handleSkillCreation(response string) string {
 		"FluxBot kennt diesen Skill ab sofort – er wird bei passenden Anfragen automatisch aktiviert.", skillName)
 }
 
+// ── E-MAIL-VERSAND ──────────────────────────────────────────────────────────
+
+// handleEmailRequest parst die KI-Antwort mit __SEND_EMAIL__-Marker und zeigt eine Vorschau.
+// Die E-Mail wird NICHT direkt gesendet – der Nutzer muss explizit "ja" bestätigen.
+func (a *Agent) handleEmailRequest(session *Session, response string) string {
+	// Format:
+	//   __SEND_EMAIL__
+	//   TO:<empfänger>
+	//   SUBJECT:<betreff>
+	//   BODY:<text>
+	//   __EMAIL_END__
+	start := strings.Index(response, "__SEND_EMAIL__")
+	end := strings.Index(response, "__EMAIL_END__")
+	if start < 0 || end < 0 || end <= start {
+		return "❌ E-Mail-Format fehlerhaft. Bitte nochmal versuchen."
+	}
+
+	block := strings.TrimSpace(response[start+len("__SEND_EMAIL__") : end])
+
+	var to, subject, body string
+	var bodyLines []string
+	inBody := false
+
+	for _, line := range strings.Split(block, "\n") {
+		upper := strings.ToUpper(strings.TrimSpace(line))
+		switch {
+		case strings.HasPrefix(upper, "TO:"):
+			to = strings.TrimSpace(line[strings.Index(line, ":")+1:])
+		case strings.HasPrefix(upper, "SUBJECT:"):
+			subject = strings.TrimSpace(line[strings.Index(line, ":")+1:])
+			inBody = false
+		case strings.HasPrefix(upper, "BODY:"):
+			rest := strings.TrimSpace(line[strings.Index(line, ":")+1:])
+			bodyLines = []string{rest}
+			inBody = true
+		case inBody:
+			bodyLines = append(bodyLines, line)
+		}
+	}
+	body = strings.TrimSpace(strings.Join(bodyLines, "\n"))
+
+	if to == "" || subject == "" || body == "" {
+		return "❌ E-Mail unvollständig (Empfänger, Betreff oder Text fehlt). Bitte nochmal versuchen."
+	}
+
+	// Vorschau speichern – wartet auf Bestätigung
+	session.EmailState = &EmailState{To: to, Subject: subject, Body: body}
+
+	log.Printf("[Agent] 📧 E-Mail vorbereitet → An: %s | Betreff: %s", to, subject)
+
+	return fmt.Sprintf(
+		"📧 *E-Mail-Vorschau*\n\n"+
+			"*An:* %s\n"+
+			"*Betreff:* %s\n\n"+
+			"%s\n\n"+
+			"──────────────────\n"+
+			"Soll ich diese E-Mail jetzt senden?\n"+
+			"✅ *ja* – senden   ❌ *nein* – abbrechen",
+		to, subject, body,
+	)
+}
+
+// handleEmailConfirmation verarbeitet die Bestätigung oder Ablehnung durch den Nutzer.
+func (a *Agent) handleEmailConfirmation(ctx context.Context, msg channels.Message, session *Session, text string) string {
+	state := session.EmailState
+	lower := strings.ToLower(strings.TrimSpace(text))
+
+	// Abbrechen
+	if lower == "nein" || lower == "no" || lower == "abbruch" || lower == "cancel" || lower == "stop" || lower == "abbrechen" {
+		session.EmailState = nil
+		log.Printf("[Agent] 📧 E-Mail abgebrochen (Nutzer: %s)", msg.SenderID)
+		return "✅ E-Mail wurde abgebrochen."
+	}
+
+	// Bestätigen
+	if lower == "ja" || lower == "yes" || lower == "senden" || lower == "send" || lower == "ok" || lower == "jetzt senden" {
+		session.EmailState = nil
+
+		if a.emailSender == nil || !a.emailSender.IsConfigured() {
+			log.Printf("[Agent] 📧 E-Mail-Versand fehlgeschlagen: kein SMTP-Sender konfiguriert")
+			return "❌ E-Mail-Versand ist nicht eingerichtet.\n\n" +
+				"Trage folgende Werte im Dashboard unter *Integrationen* ein:\n" +
+				"• *SMTP_HOST* – z.B. smtp.gmail.com\n" +
+				"• *SMTP_PORT* – z.B. 587\n" +
+				"• *SMTP_USER* – deine E-Mail-Adresse\n" +
+				"• *SMTP_PASSWORD* – dein App-Passwort\n" +
+				"• *SMTP_FROM* – Absender (optional, Standard = SMTP_USER)"
+		}
+
+		log.Printf("[Agent] 📧 Sende E-Mail → An: %s | Betreff: %s", state.To, state.Subject)
+		if err := a.emailSender.Send(email.Message{
+			To:      state.To,
+			Subject: state.Subject,
+			Body:    state.Body,
+		}); err != nil {
+			log.Printf("[Agent] ❌ E-Mail-Versand fehlgeschlagen: %v", err)
+			return fmt.Sprintf("❌ E-Mail konnte nicht gesendet werden:\n_%v_", err)
+		}
+
+		log.Printf("[Agent] ✅ E-Mail erfolgreich gesendet an %s", state.To)
+		return fmt.Sprintf("✅ E-Mail an *%s* wurde erfolgreich gesendet.", state.To)
+	}
+
+	// Unklare Antwort
+	return "❓ Bitte antworte mit *ja* (senden) oder *nein* (abbrechen)."
+}
+
 func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 	facts := session.FactsSummary()
 
@@ -544,12 +676,26 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 		prompt = "Du bist Fluxy, ein KI-Assistent von KI-WERKE.\n\n"
 	}
 
+	emailInstruction := ""
+	if a.emailSender != nil && a.emailSender.IsConfigured() {
+		emailInstruction = "\nE-MAIL-VERSAND – HÖCHSTE PRIORITÄT:\n" +
+			"Wenn der Nutzer eine E-Mail schreiben, senden oder versenden möchte – egal wie er es formuliert – " +
+			"antworte EXAKT mit folgendem Format (kein weiterer Text):\n" +
+			"__SEND_EMAIL__\n" +
+			"TO:<empfänger@email.de>\n" +
+			"SUBJECT:<Betreff>\n" +
+			"BODY:<E-Mail-Text>\n" +
+			"__EMAIL_END__\n" +
+			"Wichtig: Der E-Mail-Text im BODY darf mehrere Zeilen haben. Kein Text vor oder nach den Markern.\n"
+	}
+
 	prompt += "ANTWORTREGELN – STRIKTE PFLICHT:\n" +
 		"- Beantworte NUR was gefragt wurde. Nichts mehr.\n" +
 		"- Maximal 2-3 Sätze, außer der Nutzer fragt EXPLIZIT nach einer ausführlichen Antwort.\n" +
 		"- KEINE ungebetenen Zusatzinfos, Tipps, Links, Vorschläge oder Erklärungen.\n" +
 		"- KEINE Einleitungsphrasen wie \"Natürlich!\", \"Gerne!\", \"Sicher!\", \"Selbstverständlich!\".\n" +
 		"- Bei einfachen Bestätigungen oder Statusmeldungen: eine Zeile reicht.\n" +
+		emailInstruction +
 		"\nVIDEO-ERKENNUNG – HÖCHSTE PRIORITÄT:\n" +
 		"Wenn der Nutzer in irgendeiner Form ein Video erstellen, generieren, produzieren, drehen, animieren oder rendern lassen möchte – egal wie er es formuliert, in welcher Sprache oder mit welchen Worten – antworte ausschließlich mit dem exakten Text: __VIDEO_REQUEST__\n" +
 		"Kein weiterer Text, keine Erklärung, nur: __VIDEO_REQUEST__\n" +

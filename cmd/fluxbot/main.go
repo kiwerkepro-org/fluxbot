@@ -15,6 +15,7 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/channels"
 	"github.com/ki-werke/fluxbot/pkg/config"
 	"github.com/ki-werke/fluxbot/pkg/dashboard"
+	"github.com/ki-werke/fluxbot/pkg/email"
 	"github.com/ki-werke/fluxbot/pkg/imagegen"
 	"github.com/ki-werke/fluxbot/pkg/provider"
 	"github.com/ki-werke/fluxbot/pkg/security"
@@ -273,6 +274,14 @@ func runBot(ctx context.Context, configPath string) {
 
 	log.Printf("[Main] Aktive Kanäle: %s", strings.Join(manager.ActiveChannels(), ", "))
 
+	// ── E-Mail-Sender ─────────────────────────────────────────────────────────
+	emailSender := buildEmailSender(cfg)
+	if emailSender != nil && emailSender.IsConfigured() {
+		log.Printf("[Main] E-Mail-Versand: aktiv (Von: %s)", emailSender.From())
+	} else {
+		log.Println("[Main] E-Mail-Versand: deaktiviert (keine SMTP-Credentials in Integrationen)")
+	}
+
 	// ── Agent starten ─────────────────────────────────────────────────────────
 	skillsLoader := skills.NewLoader(cfg.Workspace.Path)
 
@@ -305,13 +314,14 @@ func runBot(ctx context.Context, configPath string) {
 		ImageGenerators: imageGenerators,
 		ImageSize:       cfg.ImageGen.Size,
 		VideoDefault:    cfg.VideoGen.Default,
+		EmailSender:     emailSender,
 		Soul:            soul,
 	})
 
 	// ── Dashboard ─────────────────────────────────────────────────────────────
 	if cfg.Dashboard.Enabled {
 		logPath := filepath.Join(cfg.Workspace.Path, "logs", "fluxbot.log")
-		// Reload-Callback: Config neu lesen + Image-Generators aktualisieren
+		// Reload-Callback: Config neu lesen + Image-Generators + E-Mail-Sender aktualisieren
 		onReload := func() {
 			newCfg, err := config.Load(configPath)
 			if err != nil {
@@ -319,7 +329,8 @@ func runBot(ctx context.Context, configPath string) {
 				return
 			}
 			fluxAgent.UpdateImageGenerators(buildImageGenerators(newCfg))
-			log.Printf("[Main] ✅ Config neu geladen – Bildgeneratoren aktualisiert.")
+			fluxAgent.UpdateEmailSender(buildEmailSender(newCfg))
+			log.Printf("[Main] ✅ Config neu geladen – Bildgeneratoren + E-Mail-Sender aktualisiert.")
 		}
 		dash := dashboard.New(
 			configPath,
@@ -513,6 +524,29 @@ func buildImageGenerators(cfg *config.Config) []imagegen.Generator {
 		return gens
 	}
 	return nil
+}
+
+// buildEmailSender erstellt einen SMTP-Sender aus den Integrationen der Config.
+// Pflicht-Keys: SMTP_HOST, SMTP_USER, SMTP_PASSWORD
+// Optional:     SMTP_PORT (Standard: 587), SMTP_FROM (Standard: SMTP_USER)
+// Gibt nil zurück wenn keine SMTP-Credentials konfiguriert sind.
+func buildEmailSender(cfg *config.Config) *email.Sender {
+	integMap := make(map[string]string, len(cfg.Integrations))
+	for _, integ := range cfg.Integrations {
+		integMap[integ.Name] = integ.Value
+	}
+
+	host := integMap["SMTP_HOST"]
+	user := integMap["SMTP_USER"]
+	pass := integMap["SMTP_PASSWORD"]
+
+	if host == "" || user == "" || pass == "" {
+		return nil
+	}
+
+	port := integMap["SMTP_PORT"]
+	from := integMap["SMTP_FROM"]
+	return email.NewSender(host, port, user, pass, from)
 }
 
 // loadSoul lädt SOUL.md und IDENTITY.md aus dem Workspace und kombiniert beide.

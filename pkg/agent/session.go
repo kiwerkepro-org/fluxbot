@@ -38,6 +38,13 @@ type ImageRequestState struct {
 	Step         string // "provider" = warte auf Provider, "format" = warte auf Format
 }
 
+// EmailState speichert eine ausstehende E-Mail (wartet auf explizite Bestätigung durch den Nutzer).
+type EmailState struct {
+	To      string // Empfänger-Adresse
+	Subject string // Betreff
+	Body    string // Nachrichtentext
+}
+
 // Session verwaltet den Zustand einer Benutzer-Session
 type Session struct {
 	UserID    string
@@ -52,6 +59,9 @@ type Session struct {
 
 	// Ausstehende Bildanfrage (nil wenn keine aktive Provider-Auswahl)
 	ImageRequest *ImageRequestState
+
+	// Ausstehende E-Mail (nil wenn keine Bestätigung ausstehend)
+	EmailState *EmailState
 
 	memPath string
 }
