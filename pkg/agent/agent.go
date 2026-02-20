@@ -70,6 +70,21 @@ func New(cfg Config) *Agent {
 	return a
 }
 
+// UpdateImageGenerators ersetzt die aktiven Bild-Generatoren zur Laufzeit.
+// Wird aufgerufen wenn die Config im Dashboard geändert wird.
+func (a *Agent) UpdateImageGenerators(gens []imagegen.Generator) {
+	a.imageGenerators = gens
+	if len(gens) == 0 {
+		log.Println("[Agent] 🔄 Bildgenerierung deaktiviert (0 Generatoren).")
+	} else {
+		names := make([]string, len(gens))
+		for i, g := range gens {
+			names[i] = g.Name()
+		}
+		log.Printf("[Agent] 🔄 Bildgeneratoren neu geladen: %v", names)
+	}
+}
+
 // Run startet den Agent-Loop
 func (a *Agent) Run(ctx context.Context) {
 	voiceStatus := "deaktiviert"

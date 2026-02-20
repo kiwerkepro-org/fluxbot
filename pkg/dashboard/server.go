@@ -22,11 +22,14 @@ type Server struct {
 	port          int
 	startTime     time.Time
 	getChannels   func() []string // Callback: liefert aktive Kanäle zur Laufzeit
+	logPath       string          // Pfad zur Terminal-Log-Datei (fluxbot.log)
+	onReload      func()          // Callback: wird nach Config-Änderung aufgerufen
 }
 
 // New erstellt einen neuen Dashboard-Server.
-// getChannels ist ein Callback der die aktuell aktiven Channel-Namen zurückgibt.
-func New(configPath, workspacePath, password string, port int, getChannels func() []string) *Server {
+// logPath: Pfad zur fluxbot.log – wenn leer, wird kein Terminal-Log angezeigt.
+// onReload: wird nach jeder Config-Änderung über das Dashboard aufgerufen.
+func New(configPath, workspacePath, password string, port int, getChannels func() []string, logPath string, onReload func()) *Server {
 	return &Server{
 		configPath:    configPath,
 		workspacePath: workspacePath,
@@ -34,6 +37,8 @@ func New(configPath, workspacePath, password string, port int, getChannels func(
 		port:          port,
 		startTime:     time.Now(),
 		getChannels:   getChannels,
+		logPath:       logPath,
+		onReload:      onReload,
 	}
 }
 
@@ -50,6 +55,7 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/config", s.auth(s.handleConfig))
 	mux.HandleFunc("/api/soul", s.auth(s.handleSoul))
 	mux.HandleFunc("/api/logs", s.auth(s.handleLogs))
+	mux.HandleFunc("/api/logs/terminal", s.auth(s.handleTerminalLogs))
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),

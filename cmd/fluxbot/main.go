@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"flag"
+	"io"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -113,6 +115,16 @@ func runBot(ctx context.Context, configPath string) {
 
 	if err := os.MkdirAll(cfg.Workspace.Path, 0755); err != nil {
 		log.Fatalf("[Main] Workspace-Verzeichnis konnte nicht erstellt werden: %v", err)
+	}
+
+	// ── Terminal-Log in Datei schreiben (stdout + fluxbot.log) ───────────────
+	logsDir := filepath.Join(cfg.Workspace.Path, "logs")
+	if err := os.MkdirAll(logsDir, 0755); err == nil {
+		logPath := filepath.Join(logsDir, "fluxbot.log")
+		if logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644); err == nil {
+			log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+			log.Printf("[Main] Terminal-Log: %s", logPath)
+		}
 	}
 
 	// SOUL.md + IDENTITY.md laden (Persönlichkeit von Fluxy)
@@ -261,18 +273,6 @@ func runBot(ctx context.Context, configPath string) {
 
 	log.Printf("[Main] Aktive Kanäle: %s", strings.Join(manager.ActiveChannels(), ", "))
 
-	// ── Dashboard ─────────────────────────────────────────────────────────────
-	if cfg.Dashboard.Enabled {
-		dash := dashboard.New(
-			configPath,
-			cfg.Workspace.Path,
-			cfg.Dashboard.Password,
-			cfg.Dashboard.Port,
-			manager.ActiveChannels,
-		)
-		go dash.Start(ctx)
-	}
-
 	// ── Agent starten ─────────────────────────────────────────────────────────
 	skillsLoader := skills.NewLoader(cfg.Workspace.Path)
 	sessionManager := agent.NewSessionManager(cfg.Workspace.Path)
@@ -294,6 +294,31 @@ func runBot(ctx context.Context, configPath string) {
 		ImageSize:       cfg.ImageGen.Size,
 		Soul:            soul,
 	})
+
+	// ── Dashboard ─────────────────────────────────────────────────────────────
+	if cfg.Dashboard.Enabled {
+		logPath := filepath.Join(cfg.Workspace.Path, "logs", "fluxbot.log")
+		// Reload-Callback: Config neu lesen + Image-Generators aktualisieren
+		onReload := func() {
+			newCfg, err := config.Load(configPath)
+			if err != nil {
+				log.Printf("[Main] Reload: Config-Fehler: %v", err)
+				return
+			}
+			fluxAgent.UpdateImageGenerators(buildImageGenerators(newCfg))
+			log.Printf("[Main] ✅ Config neu geladen – Bildgeneratoren aktualisiert.")
+		}
+		dash := dashboard.New(
+			configPath,
+			cfg.Workspace.Path,
+			cfg.Dashboard.Password,
+			cfg.Dashboard.Port,
+			manager.ActiveChannels,
+			logPath,
+			onReload,
+		)
+		go dash.Start(ctx)
+	}
 
 	defer manager.Stop()
 

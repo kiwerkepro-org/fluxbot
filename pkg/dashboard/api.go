@@ -87,7 +87,11 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			httpError(w, "config.json konnte nicht gespeichert werden: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		writeJSON(w, map[string]string{"status": "ok", "message": "config.json gespeichert. Neustart erforderlich."})
+		// Reload-Callback aufrufen (z.B. Image-Generators neu laden)
+		if s.onReload != nil {
+			go s.onReload()
+		}
+		writeJSON(w, map[string]string{"status": "ok", "message": "config.json gespeichert."})
 
 	default:
 		http.Error(w, "Methode nicht erlaubt", http.StatusMethodNotAllowed)
@@ -187,6 +191,22 @@ func tailFile(path string, n int) ([]string, error) {
 		lines = lines[len(lines)-n:]
 	}
 	return lines, scanner.Err()
+}
+
+// ── /api/logs/terminal ────────────────────────────────────────────────────────
+
+// handleTerminalLogs liefert die letzten Zeilen der FluxBot-Terminal-Ausgabe (fluxbot.log).
+func (s *Server) handleTerminalLogs(w http.ResponseWriter, r *http.Request) {
+	if s.logPath == "" {
+		writeJSON(w, logsResponse{Lines: []string{"Kein Terminal-Log konfiguriert."}, File: ""})
+		return
+	}
+	lines, err := tailFile(s.logPath, 200)
+	if err != nil {
+		writeJSON(w, logsResponse{Lines: []string{"Terminal-Log noch nicht vorhanden – FluxBot wurde noch nicht gestartet."}, File: ""})
+		return
+	}
+	writeJSON(w, logsResponse{Lines: lines, File: "fluxbot.log"})
 }
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
