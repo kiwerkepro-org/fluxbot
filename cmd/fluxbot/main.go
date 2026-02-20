@@ -429,7 +429,12 @@ func getProviderModels(cfg *config.Config) map[string]string {
 func buildImageGenerators(cfg *config.Config) []imagegen.Generator {
 	ig := cfg.ImageGen
 
-	// Auto-Detect wenn kein Default gesetzt
+	// Explizit deaktiviert → sofort nil zurückgeben, kein Auto-Detect
+	if ig.Default == "disabled" {
+		return nil
+	}
+
+	// Auto-Detect wenn kein Default gesetzt (Erststart ohne Config)
 	if ig.Default == "" {
 		switch {
 		case ig.OpenRouter.APIKey != "":

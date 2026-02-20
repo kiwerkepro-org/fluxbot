@@ -398,7 +398,7 @@
           <div class="field">
             <label>Aktiver Provider</label>
             <select id="img-default" onchange="onImgProviderChange()">
-              <option value="">⬜  Deaktiviert – keine Bilder</option>
+              <option value="disabled">⬜  Deaktiviert – keine Bilder</option>
               <option value="openrouter-shared">🌐  OpenRouter (gemeinsamer Key aus Provider-Tab)</option>
               <option value="openrouter">🌐  OpenRouter (eigener Key für Bilder)</option>
               <option value="fal">🔥  fal.ai – FLUX Pro Ultra, Recraft, Ideogram</option>
@@ -647,8 +647,8 @@
       </div>
     </div>
 
-    <div class="notice" id="config-notice">
-      ⚠️ Änderungen gespeichert – FluxBot muss neu gestartet werden damit sie aktiv werden.
+    <div id="config-notice" style="display:none;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:10px;background:rgba(62,207,142,0.12);border:1px solid rgba(62,207,142,0.35);color:var(--green)">
+      ✅ Konfiguration gespeichert – Hot-Reload aktiv, keine weiteren Schritte nötig.
     </div>
     <div class="actions">
       <button class="btn btn-primary" onclick="saveConfig()">💾 Speichern</button>
@@ -1006,7 +1006,7 @@ async function loadConfig() {
   setVal('ai-custom-model', p.custom?.models?.default || '');
   onDashProviderChange();
 
-  setVal('img-default',          img.default            || '', 'select');
+  setVal('img-default',          img.default            || 'disabled', 'select');
   setVal('img-openrouter-key',   img.openrouter?.apiKey || '');
   setVal('img-openrouter-models',(img.openrouter?.models || []).join(', '));
   setVal('img-fal-key',          img.fal?.apiKey        || '');
@@ -1146,8 +1146,9 @@ async function saveConfig() {
   const result = await api('/api/config', 'PUT', newConfig);
   if (result.error) { toast('Fehler: ' + result.error, true); return; }
   configData = newConfig;
-  toast('✅ Konfiguration gespeichert');
-  document.getElementById('config-notice').classList.add('show');
+  const n = document.getElementById('config-notice');
+  n.style.display = 'block';
+  setTimeout(() => { n.style.display = 'none'; }, 4000);
 }
 
 // ── SOUL ───────────────────────────────────────────────────────────────────
