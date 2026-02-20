@@ -20,7 +20,7 @@ type Config struct {
 // DashboardConfig konfiguriert das Web-Dashboard
 type DashboardConfig struct {
 	Enabled  bool   `json:"enabled"`
-	Port     int    `json:"port"`     // default: 8080
+	Port     int    `json:"port"`     // default: 9090
 	Password string `json:"password"` // leer = kein Passwortschutz
 }
 
@@ -277,7 +277,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	if cfg.Dashboard.Port == 0 {
-		cfg.Dashboard.Port = 8080
+		cfg.Dashboard.Port = 9090
 	}
 
 	return &cfg, nil
