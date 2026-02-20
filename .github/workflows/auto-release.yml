@@ -1,0 +1,110 @@
+# ─────────────────────────────────────────────────────────────────────────────
+#  FluxBot Auto-Release
+#
+#  Wird bei jedem Push auf "main" ausgelöst.
+#  Liest den letzten vX.Y.Z Tag, erhöht automatisch die Patch-Version
+#  (z.B. v1.0.4 → v1.0.5) und pusht den neuen Tag.
+#  Dadurch löst der bestehende "Release"-Workflow aus, der Binaries baut
+#  und einen GitHub Release mit allen Artefakten erstellt.
+#
+#  Versionssteuerung:
+#    Patch  +1  →  automatisch bei jedem Push auf main  (z.B. v1.0.4 → v1.0.5)
+#    Minor  +1  →  manuell: git tag v1.1.0 && git push origin v1.1.0
+#    Major  +1  →  manuell: git tag v2.0.0 && git push origin v2.0.0
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: Auto Release
+
+on:
+  push:
+    branches:
+      - main
+    # Keine neuen Releases wenn nur Docs/CI-Dateien geändert wurden
+    paths-ignore:
+      - "**.md"
+      - ".github/workflows/auto-release.yml"
+
+permissions:
+  contents: write  # Nötig um Tags zu erstellen und zu pushen
+
+jobs:
+  bump-version:
+    name: Version erhöhen & Tag setzen
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Code auschecken (mit voller Tag-Historie)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # Alle Tags laden – nötig für die Versionsberechnung
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Letzten vX.Y.Z Tag ermitteln
+        id: last_tag
+        run: |
+          # Neuesten vX.Y.Z Tag finden (nach Semver sortiert)
+          LAST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -z "$LAST" ]; then
+            LAST="v1.0.0"
+          fi
+          echo "LAST_TAG=${LAST}" >> "$GITHUB_OUTPUT"
+          echo "Letzter Tag: ${LAST}"
+
+      - name: Neue Patch-Version berechnen
+        id: new_version
+        run: |
+          LAST="${{ steps.last_tag.outputs.LAST_TAG }}"
+          # vX.Y.Z → X Y Z
+          MAJOR=$(echo "$LAST" | cut -d. -f1 | tr -d 'v')
+          MINOR=$(echo "$LAST" | cut -d. -f2)
+          PATCH=$(echo "$LAST" | cut -d. -f3)
+          NEW_PATCH=$((PATCH + 1))
+          NEW_TAG="v${MAJOR}.${MINOR}.${NEW_TAG_PATCH}"
+          NEW_TAG="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+          echo "NEW_TAG=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Neue Version: ${NEW_TAG}"
+
+      - name: Prüfen ob Tag schon existiert
+        id: check_tag
+        run: |
+          NEW_TAG="${{ steps.new_version.outputs.NEW_TAG }}"
+          if git ls-remote --tags origin "${NEW_TAG}" | grep -q "${NEW_TAG}"; then
+            echo "EXISTS=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${NEW_TAG} existiert bereits – kein neuer Release."
+          else
+            echo "EXISTS=false" >> "$GITHUB_OUTPUT"
+            echo "Tag ${NEW_TAG} ist neu."
+          fi
+
+      - name: Commit-Zusammenfassung für Release-Notes ermitteln
+        id: commits
+        if: steps.check_tag.outputs.EXISTS == 'false'
+        run: |
+          LAST="${{ steps.last_tag.outputs.LAST_TAG }}"
+          NEW_TAG="${{ steps.new_version.outputs.NEW_TAG }}"
+          # Alle Commits seit dem letzten Tag als einzeilige Liste
+          COMMITS=$(git log "${LAST}..HEAD" --oneline --no-merges)
+          # Für GitHub Actions Output: Zeilenumbrüche escapen
+          COMMITS="${COMMITS//'%'/'%25'}"
+          COMMITS="${COMMITS//$'\n'/'%0A'}"
+          COMMITS="${COMMITS//$'\r'/'%0D'}"
+          echo "COMMITS=${COMMITS}" >> "$GITHUB_OUTPUT"
+
+      - name: Neuen Tag erstellen und pushen
+        if: steps.check_tag.outputs.EXISTS == 'false'
+        env:
+          NEW_TAG: ${{ steps.new_version.outputs.NEW_TAG }}
+          COMMITS: ${{ steps.commits.outputs.COMMITS }}
+        run: |
+          # Git-Identität konfigurieren (nötig für git tag -a)
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Annotated Tag mit Commit-Liste als Nachricht
+          git tag -a "${NEW_TAG}" -m "Release ${NEW_TAG}
+
+Änderungen seit ${{ steps.last_tag.outputs.LAST_TAG }}:
+${COMMITS}"
+
+          git push origin "${NEW_TAG}"
+          echo "✅ Tag ${NEW_TAG} erstellt und gepusht → Release-Workflow ausgelöst."
