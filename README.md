@@ -1,13 +1,13 @@
 🤖 FluxBot
 
 <div align="center">
-<img src="fluxion_logo.jpg" alt="Fluxion Logo" width="200">
+<img src="fluxion_logo.png" alt="Fluxion Logo" width="200">
 
 
 
 
 
-<strong>powered by <a href="https://ki-werke.de">KI-WERKE</a></strong>
+<strong>powered by <a href="https://www.google.com/search?q=https://ki-werke.de">KI-WERKE</a></strong>
 
 
 
@@ -60,58 +60,21 @@ Füge eigene Fähigkeiten als einfache Textdateien hinzu
 
 Einstellungen bequem im Browser verwalten
 
-📱 Unterstützte Messenger
-
-Messenger
-
-Status
-
-Telegram
-
-✅ Fertig & produktiv
-
-WhatsApp
-
-✅ Implementiert
-
-Slack
-
-✅ Implementiert
-
-Matrix
-
-✅ Implementiert
-
-Discord
-
-🔧 In Entwicklung
-
-🤖 Unterstützte KI-Anbieter
-
-FluxBot funktioniert mit allen großen KI-Anbietern. Du wirst beim ersten Start geführt, welchen du verwenden möchtest.
-
-Empfohlen: OpenRouter, Anthropic (Claude), OpenAI (GPT), Google (Gemini), xAI (Grok), Groq, Mistral, Together, DeepSeek, Perplexity, Cohere und viele mehr.
-
 ⚡ Installation
+
+Hinweis: Die Installationspfade werden derzeit aktualisiert. Bitte nutze vorerst die Releases-Seite.
 
 🖱️ Weg 1 – Direktinstallation (empfohlen für Desktop-Nutzer)
 
 Lade die passende Datei von der Releases-Seite herunter.
 
-Datei starten (Doppelklick unter Windows; unter Linux/macOS ggf. chmod +x ausführen).
-
-Der Einrichtungsassistent öffnet sich automatisch im Browser.
+Datei starten (Doppelklick unter Windows).
 
 🐳 Weg 2 – Docker (empfohlen für Server)
 
 Windows (PowerShell):
 
-irm [https://fluxbot.ki-werke.de/install.ps1](https://fluxbot.ki-werke.de/install.ps1) | iex
-
-
-Linux / macOS (Terminal):
-
-curl -fsSL [https://fluxbot.ki-werke.de/install.sh](https://fluxbot.ki-werke.de/install.sh) | bash
+# Installer wird aktualisiert
 
 
 💬 Chat-Befehle
@@ -120,18 +83,14 @@ Schreib einfach auf Deutsch mit FluxBot. Diese Sätze haben besondere Funktionen
 
 Gedächtnis
 
-Merke dir, ich wohne in Wien
+Merke dir, ich wohne in Wien → FluxBot speichert das dauerhaft.
 
-Vergiss alles
-
-Gespräch zurücksetzen
-
-Neues Gespräch oder Reset
+Vergiss alles → Löscht das komplette Gedächtnis.
 
 🎭 Persönlichkeit anpassen (SOUL.md)
 
 <div align="right">
-<img src="fluxion.jpg" alt="Fluxion Character" width="150">
+<img src="fluxion.png" alt="Fluxion Character" width="150">
 </div>
 
 Du kannst FluxBot eine eigene Persönlichkeit geben – einfach die Datei workspace/SOUL.md bearbeiten:
@@ -146,16 +105,14 @@ VirusTotal Scans – Alle Releases werden automatisiert auf Malware geprüft.
 
 Injection-Schutz – Erkennt und blockiert Manipulationsversuche.
 
-Rate-Limiting – Schutz vor Spamming.
-
-Audit-Log – DSGVO-konforme Protokollierung.
-
-🎥 Fluxion im Video
-
-[Hier Platz für das Video-Link oder Einbettung]
-
 <div align="center">
-<strong>Gebaut mit ❤️ von <a href="https://ki-werke.de">KI-WERKE</a></strong>
+<img src="kiwerke-logo.png" alt="KI-WERKE Logo" width="50">
+
+
+
+
+
+<strong>Gebaut mit ❤️ von <a href="https://www.google.com/search?q=https://ki-werke.de">KI-WERKE</a></strong>
 
 
 
