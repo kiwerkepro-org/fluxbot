@@ -4,6 +4,7 @@
 <strong>powered by <a href="https://ki-werke.de">KI-WERKE</a></strong>
 </div>
 
+
 Dein persönlicher KI-Assistent für Telegram, WhatsApp, Slack und mehr.
 
 FluxBot ist ein selbst gehosteter KI-Bot – er läuft auf deinem eigenen Server oder Computer, nicht irgendwo in der Cloud. Du behältst die volle Kontrolle über deine Daten und kannst jeden KI-Anbieter verwenden, den du möchtest.
@@ -16,7 +17,7 @@ Funktion
 
 Beschreibung
 
-💬 Schreiben & Fragen
+💬 Schreiben & Fragen			
 
 Beantwortet Fragen, schreibt Texte, übersetzt, erklärt – alles per Chat
 
