@@ -1,9 +1,8 @@
 <div align="center">
-<img src="fluxion_logo.png" alt="Fluxion Logo" width="200">
+<img src="fluxion_logo.png" alt="Fluxion Logo" width="200" />
 <h1>🤖 FluxBot</h1>
 <strong>powered by <a href="https://ki-werke.de">KI-WERKE</a></strong>
 </div>
-
 
 Dein persönlicher KI-Assistent für Telegram, WhatsApp, Slack und mehr.
 
@@ -17,7 +16,7 @@ Funktion
 
 Beschreibung
 
-💬 Schreiben & Fragen			
+💬 Schreiben & Fragen
 
 Beantwortet Fragen, schreibt Texte, übersetzt, erklärt – alles per Chat
 
@@ -326,10 +325,9 @@ docker compose logs -f fluxbot
 
 [x] Docker One-Liner-Installer
 
-[x] Discord
+[ ] Discord
 
 [ ] Skills-Marketplace
-
 
 📄 Lizenz
 
@@ -339,6 +337,7 @@ Du darfst FluxBot frei verwenden, verändern und weitergeben – auch kommerziel
 
 <div align="center">
 <img src="kiwerke-logo.png" alt="KI-WERKE Logo" width="50">
+
 
 
 
