@@ -57,6 +57,15 @@ Thumbs.db
 /tmp/
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Vault – AES-256-GCM Secret Storage (NIEMALS committen!)
+# ─────────────────────────────────────────────────────────────────────────────
+# workspace/* deckt diese bereits ab, aber explizit für Klarheit:
+.secrets.vault
+.vaultkey
+**/.secrets.vault
+**/.vaultkey
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Zusätzliches Hardening (Vorschlag)
 # ─────────────────────────────────────────────────────────────────────────────
 *.pem

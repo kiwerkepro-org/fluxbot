@@ -8,8 +8,13 @@ services:
   fluxbot:
     build: .
     container_name: fluxbot_ai
-    # Injektion der Umgebungsvariablen aus der lokalen .env Datei
-    
+    # ── Vault-Schlüssel (AES-256-GCM) ─────────────────────────────────────────
+    # Für VPS / Hetzner / Docker: FLUXBOT_VAULT_KEY setzen (32-Byte hex-String).
+    # Den Wert erhältst du beim ersten lokalen Start aus der Ausgabe:
+    #   [Vault] FLUXBOT_VAULT_KEY=<dein-key>
+    # Lokal (ohne Docker): .vaultkey-Datei wird automatisch generiert.
+    environment:
+      - FLUXBOT_VAULT_KEY=${FLUXBOT_VAULT_KEY:-}
     ports:
       - "9090:9090"
     volumes:

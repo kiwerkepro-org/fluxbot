@@ -98,6 +98,50 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ── /api/secrets ──────────────────────────────────────────────────────────────
+//
+// GET  → gibt alle gespeicherten Secrets zurück (Klartext, nur hinter Auth!)
+// POST → schreibt Batch von Secrets in den Vault + löst Hot-Reload aus
+
+func (s *Server) handleSecrets(w http.ResponseWriter, r *http.Request) {
+	if s.vault == nil {
+		httpError(w, "Vault nicht initialisiert", http.StatusServiceUnavailable)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		all, err := s.vault.GetAll()
+		if err != nil {
+			httpError(w, "Vault konnte nicht gelesen werden: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if all == nil {
+			all = map[string]string{}
+		}
+		writeJSON(w, all)
+
+	case http.MethodPost:
+		var updates map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+			httpError(w, "Ungültiges JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := s.vault.SetBatch(updates); err != nil {
+			httpError(w, "Vault konnte nicht geschrieben werden: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// Hot-Reload: neue Werte sofort aktiv
+		if s.onReload != nil {
+			go s.onReload()
+		}
+		writeJSON(w, map[string]string{"status": "ok", "message": "Secrets gespeichert."})
+
+	default:
+		http.Error(w, "Methode nicht erlaubt", http.StatusMethodNotAllowed)
+	}
+}
+
 // ── /api/soul ─────────────────────────────────────────────────────────────────
 
 func (s *Server) handleSoul(w http.ResponseWriter, r *http.Request) {

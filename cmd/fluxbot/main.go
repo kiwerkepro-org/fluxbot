@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"io"
 	"log"
@@ -113,6 +114,32 @@ func runBot(ctx context.Context, configPath string) {
 			log.Printf("[Main] Terminal-Log: %s", logPath)
 		}
 	}
+
+	// ── Vault initialisieren (AES-256-GCM Secret-Speicher) ───────────────────
+	vault, err := security.NewVaultProvider(cfg.Workspace.Path)
+	if err != nil {
+		log.Fatalf("[Main] Vault konnte nicht initialisiert werden: %v", err)
+	}
+
+	// ── Einmalige Migration: Secrets aus config.json → Vault ─────────────────
+	configSecrets := extractSecrets(cfg)
+	if migrated, err := vault.MigrateFromConfig(configSecrets); err != nil {
+		log.Printf("[Main] Vault-Migration fehlgeschlagen: %v", err)
+	} else if migrated > 0 {
+		log.Printf("[Main] ✅ %d Secrets aus config.json in den Vault migriert.", migrated)
+		// Secrets aus config.json entfernen und Datei sauber speichern
+		clearSecretsFromConfig(cfg)
+		if data, err := json.MarshalIndent(cfg, "", "  "); err == nil {
+			if err := os.WriteFile(configPath, data, 0600); err != nil {
+				log.Printf("[Main] Warnung: config.json konnte nicht bereinigt werden: %v", err)
+			} else {
+				log.Println("[Main] ✅ config.json bereinigt – keine Secrets mehr im Klartext.")
+			}
+		}
+	}
+
+	// ── Secrets aus Vault in Config laden (für Runtime) ───────────────────────
+	applySecrets(cfg, vault)
 
 	// ── VirusTotal Scanner initialisieren ────────────────────────────────────
 	if cfg.Security.ScanUploads {
@@ -259,16 +286,39 @@ func runBot(ctx context.Context, configPath string) {
 
 	if cfg.Dashboard.Enabled {
 		logPath := filepath.Join(cfg.Workspace.Path, "logs", "fluxbot.log")
+		var dash *dashboard.Server
+
 		onReload := func() {
 			newCfg, err := config.Load(configPath)
 			if err != nil {
+				log.Printf("[Main] Reload: config.json konnte nicht geladen werden: %v", err)
 				return
 			}
+			// Vault-Secrets in neue Config übernehmen
+			applySecrets(newCfg, vault)
+
 			fluxAgent.UpdateImageGenerators(buildImageGenerators(newCfg))
 			fluxAgent.UpdateEmailSender(buildEmailSender(newCfg))
-			log.Printf("[Main] ✅ Config neu geladen.")
+
+			// Dashboard-Passwort Hot-Reload
+			if dash != nil {
+				if pass, err := vault.Get("DASHBOARD_PASSWORD"); err == nil && pass != "" {
+					dash.UpdatePassword(pass)
+				}
+			}
+			log.Printf("[Main] ✅ Config + Secrets neu geladen.")
 		}
-		dash := dashboard.New(configPath, cfg.Workspace.Path, cfg.Dashboard.Password, cfg.Dashboard.Port, manager.ActiveChannels, logPath, onReload)
+
+		dash = dashboard.New(
+			configPath,
+			cfg.Workspace.Path,
+			cfg.Dashboard.Password,
+			cfg.Dashboard.Port,
+			manager.ActiveChannels,
+			logPath,
+			vault,
+			onReload,
+		)
 		go dash.Start(ctx)
 	}
 
@@ -280,6 +330,250 @@ func runBot(ctx context.Context, configPath string) {
 	log.Println("[Main] FluxBot läuft.")
 	fluxAgent.Run(ctx)
 }
+
+// ── Secret-Verwaltung ─────────────────────────────────────────────────────────
+
+// extractSecrets baut die Migrations-Map aus der Config.
+// Enthält alle sensitiven Felder mit ihren aktuellen Werten.
+func extractSecrets(cfg *config.Config) map[string]string {
+	m := make(map[string]string)
+	// Kanäle
+	m["TELEGRAM_TOKEN"] = cfg.Channels.Telegram.Token
+	m["DISCORD_TOKEN"] = cfg.Channels.Discord.Token
+	m["SLACK_BOT_TOKEN"] = cfg.Channels.Slack.BotToken
+	m["SLACK_APP_TOKEN"] = cfg.Channels.Slack.AppToken
+	m["SLACK_SIGNING_SECRET"] = cfg.Channels.Slack.SigningSecret
+	m["MATRIX_TOKEN"] = cfg.Channels.Matrix.Token
+	m["WHATSAPP_API_KEY"] = cfg.Channels.WhatsApp.APIKey
+	m["WHATSAPP_WEBHOOK_SECRET"] = cfg.Channels.WhatsApp.WebhookSecret
+	// AI Provider
+	m["PROVIDER_OPENROUTER"] = cfg.Providers.OpenRouter.APIKey
+	m["PROVIDER_ANTHROPIC"] = cfg.Providers.Anthropic.APIKey
+	m["PROVIDER_OPENAI"] = cfg.Providers.OpenAI.APIKey
+	m["PROVIDER_GOOGLE"] = cfg.Providers.Google.APIKey
+	m["PROVIDER_XAI"] = cfg.Providers.XAI.APIKey
+	m["PROVIDER_GROQ"] = cfg.Providers.Groq.APIKey
+	m["PROVIDER_MISTRAL"] = cfg.Providers.Mistral.APIKey
+	m["PROVIDER_TOGETHER"] = cfg.Providers.Together.APIKey
+	m["PROVIDER_DEEPSEEK"] = cfg.Providers.DeepSeek.APIKey
+	m["PROVIDER_PERPLEXITY"] = cfg.Providers.Perplexity.APIKey
+	m["PROVIDER_COHERE"] = cfg.Providers.Cohere.APIKey
+	m["PROVIDER_FIREWORKS"] = cfg.Providers.Fireworks.APIKey
+	m["PROVIDER_CUSTOM"] = cfg.Providers.Custom.APIKey
+	// Voice
+	m["VOICE_API_KEY"] = cfg.Voice.APIKey
+	// Bild-Generierung
+	m["IMG_OPENROUTER"] = cfg.ImageGen.OpenRouter.APIKey
+	m["IMG_FAL"] = cfg.ImageGen.Fal.APIKey
+	m["IMG_OPENAI"] = cfg.ImageGen.OpenAI.APIKey
+	m["IMG_STABILITY"] = cfg.ImageGen.Stability.APIKey
+	m["IMG_TOGETHER"] = cfg.ImageGen.Together.APIKey
+	m["IMG_REPLICATE"] = cfg.ImageGen.Replicate.APIKey
+	// Video-Generierung
+	m["VID_RUNWAY"] = cfg.VideoGen.Runway.APIKey
+	m["VID_KLING"] = cfg.VideoGen.Kling.APIKey
+	m["VID_LUMA"] = cfg.VideoGen.Luma.APIKey
+	m["VID_PIKA"] = cfg.VideoGen.Pika.APIKey
+	m["VID_HAILUO"] = cfg.VideoGen.Hailuo.APIKey
+	m["VID_SORA"] = cfg.VideoGen.Sora.APIKey
+	m["VID_VEO"] = cfg.VideoGen.Veo.APIKey
+	// System
+	m["SKILL_SECRET"] = cfg.SkillSecret
+	m["VIRUSTOTAL_API_KEY"] = cfg.Security.VirusTotalAPIKey
+	m["DASHBOARD_PASSWORD"] = cfg.Dashboard.Password
+	// Integrationen (dynamisch)
+	for _, integ := range cfg.Integrations {
+		if integ.Value != "" {
+			m["INTEG_"+integ.Name] = integ.Value
+		}
+	}
+	return m
+}
+
+// applySecrets füllt sensitive Config-Felder aus dem Vault.
+// Vault-Werte überschreiben config.json-Werte (Vault hat Priorität).
+func applySecrets(cfg *config.Config, vault *security.VaultProvider) {
+	all, err := vault.GetAll()
+	if err != nil || len(all) == 0 {
+		return
+	}
+	get := func(key string) string { return all[key] }
+
+	// Kanäle
+	if v := get("TELEGRAM_TOKEN"); v != "" {
+		cfg.Channels.Telegram.Token = v
+	}
+	if v := get("DISCORD_TOKEN"); v != "" {
+		cfg.Channels.Discord.Token = v
+	}
+	if v := get("SLACK_BOT_TOKEN"); v != "" {
+		cfg.Channels.Slack.BotToken = v
+	}
+	if v := get("SLACK_APP_TOKEN"); v != "" {
+		cfg.Channels.Slack.AppToken = v
+	}
+	if v := get("SLACK_SIGNING_SECRET"); v != "" {
+		cfg.Channels.Slack.SigningSecret = v
+	}
+	if v := get("MATRIX_TOKEN"); v != "" {
+		cfg.Channels.Matrix.Token = v
+	}
+	if v := get("WHATSAPP_API_KEY"); v != "" {
+		cfg.Channels.WhatsApp.APIKey = v
+	}
+	if v := get("WHATSAPP_WEBHOOK_SECRET"); v != "" {
+		cfg.Channels.WhatsApp.WebhookSecret = v
+	}
+	// AI Provider
+	if v := get("PROVIDER_OPENROUTER"); v != "" {
+		cfg.Providers.OpenRouter.APIKey = v
+	}
+	if v := get("PROVIDER_ANTHROPIC"); v != "" {
+		cfg.Providers.Anthropic.APIKey = v
+	}
+	if v := get("PROVIDER_OPENAI"); v != "" {
+		cfg.Providers.OpenAI.APIKey = v
+	}
+	if v := get("PROVIDER_GOOGLE"); v != "" {
+		cfg.Providers.Google.APIKey = v
+	}
+	if v := get("PROVIDER_XAI"); v != "" {
+		cfg.Providers.XAI.APIKey = v
+	}
+	if v := get("PROVIDER_GROQ"); v != "" {
+		cfg.Providers.Groq.APIKey = v
+	}
+	if v := get("PROVIDER_MISTRAL"); v != "" {
+		cfg.Providers.Mistral.APIKey = v
+	}
+	if v := get("PROVIDER_TOGETHER"); v != "" {
+		cfg.Providers.Together.APIKey = v
+	}
+	if v := get("PROVIDER_DEEPSEEK"); v != "" {
+		cfg.Providers.DeepSeek.APIKey = v
+	}
+	if v := get("PROVIDER_PERPLEXITY"); v != "" {
+		cfg.Providers.Perplexity.APIKey = v
+	}
+	if v := get("PROVIDER_COHERE"); v != "" {
+		cfg.Providers.Cohere.APIKey = v
+	}
+	if v := get("PROVIDER_FIREWORKS"); v != "" {
+		cfg.Providers.Fireworks.APIKey = v
+	}
+	if v := get("PROVIDER_CUSTOM"); v != "" {
+		cfg.Providers.Custom.APIKey = v
+	}
+	// Voice
+	if v := get("VOICE_API_KEY"); v != "" {
+		cfg.Voice.APIKey = v
+	}
+	// Bild-Generierung
+	if v := get("IMG_OPENROUTER"); v != "" {
+		cfg.ImageGen.OpenRouter.APIKey = v
+	}
+	if v := get("IMG_FAL"); v != "" {
+		cfg.ImageGen.Fal.APIKey = v
+	}
+	if v := get("IMG_OPENAI"); v != "" {
+		cfg.ImageGen.OpenAI.APIKey = v
+	}
+	if v := get("IMG_STABILITY"); v != "" {
+		cfg.ImageGen.Stability.APIKey = v
+	}
+	if v := get("IMG_TOGETHER"); v != "" {
+		cfg.ImageGen.Together.APIKey = v
+	}
+	if v := get("IMG_REPLICATE"); v != "" {
+		cfg.ImageGen.Replicate.APIKey = v
+	}
+	// Video-Generierung
+	if v := get("VID_RUNWAY"); v != "" {
+		cfg.VideoGen.Runway.APIKey = v
+	}
+	if v := get("VID_KLING"); v != "" {
+		cfg.VideoGen.Kling.APIKey = v
+	}
+	if v := get("VID_LUMA"); v != "" {
+		cfg.VideoGen.Luma.APIKey = v
+	}
+	if v := get("VID_PIKA"); v != "" {
+		cfg.VideoGen.Pika.APIKey = v
+	}
+	if v := get("VID_HAILUO"); v != "" {
+		cfg.VideoGen.Hailuo.APIKey = v
+	}
+	if v := get("VID_SORA"); v != "" {
+		cfg.VideoGen.Sora.APIKey = v
+	}
+	if v := get("VID_VEO"); v != "" {
+		cfg.VideoGen.Veo.APIKey = v
+	}
+	// System
+	if v := get("SKILL_SECRET"); v != "" {
+		cfg.SkillSecret = v
+	}
+	if v := get("VIRUSTOTAL_API_KEY"); v != "" {
+		cfg.Security.VirusTotalAPIKey = v
+	}
+	if v := get("DASHBOARD_PASSWORD"); v != "" {
+		cfg.Dashboard.Password = v
+	}
+	// Integrationen: Vault-Werte in die Liste einfügen
+	for i, integ := range cfg.Integrations {
+		if v := get("INTEG_" + integ.Name); v != "" {
+			cfg.Integrations[i].Value = v
+		}
+	}
+}
+
+// clearSecretsFromConfig setzt alle sensitiven Felder der Config auf "".
+// Dient zur Bereinigung der config.json nach Vault-Migration.
+func clearSecretsFromConfig(cfg *config.Config) {
+	cfg.Channels.Telegram.Token = ""
+	cfg.Channels.Discord.Token = ""
+	cfg.Channels.Slack.BotToken = ""
+	cfg.Channels.Slack.AppToken = ""
+	cfg.Channels.Slack.SigningSecret = ""
+	cfg.Channels.Matrix.Token = ""
+	cfg.Channels.WhatsApp.APIKey = ""
+	cfg.Channels.WhatsApp.WebhookSecret = ""
+	cfg.Providers.OpenRouter.APIKey = ""
+	cfg.Providers.Anthropic.APIKey = ""
+	cfg.Providers.OpenAI.APIKey = ""
+	cfg.Providers.Google.APIKey = ""
+	cfg.Providers.XAI.APIKey = ""
+	cfg.Providers.Groq.APIKey = ""
+	cfg.Providers.Mistral.APIKey = ""
+	cfg.Providers.Together.APIKey = ""
+	cfg.Providers.DeepSeek.APIKey = ""
+	cfg.Providers.Perplexity.APIKey = ""
+	cfg.Providers.Cohere.APIKey = ""
+	cfg.Providers.Fireworks.APIKey = ""
+	cfg.Providers.Custom.APIKey = ""
+	cfg.Voice.APIKey = ""
+	cfg.ImageGen.OpenRouter.APIKey = ""
+	cfg.ImageGen.Fal.APIKey = ""
+	cfg.ImageGen.OpenAI.APIKey = ""
+	cfg.ImageGen.Stability.APIKey = ""
+	cfg.ImageGen.Together.APIKey = ""
+	cfg.ImageGen.Replicate.APIKey = ""
+	cfg.VideoGen.Runway.APIKey = ""
+	cfg.VideoGen.Kling.APIKey = ""
+	cfg.VideoGen.Luma.APIKey = ""
+	cfg.VideoGen.Pika.APIKey = ""
+	cfg.VideoGen.Hailuo.APIKey = ""
+	cfg.VideoGen.Sora.APIKey = ""
+	cfg.VideoGen.Veo.APIKey = ""
+	cfg.SkillSecret = ""
+	cfg.Security.VirusTotalAPIKey = ""
+	cfg.Dashboard.Password = ""
+	for i := range cfg.Integrations {
+		cfg.Integrations[i].Value = ""
+	}
+}
+
+// ── Provider-Hilfsfunktionen ──────────────────────────────────────────────────
 
 func getProviderAPIKey(cfg *config.Config, p string) string {
 	switch p {
