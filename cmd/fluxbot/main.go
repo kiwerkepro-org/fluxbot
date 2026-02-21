@@ -98,10 +98,6 @@ func runBot(ctx context.Context, configPath string) {
 		log.Fatalf("[Main] Konfigurationsfehler: %v\n  → Kopiere workspace/config.example.json nach workspace/config.json", err)
 	}
 
-	if err := cfg.Validate(); err != nil {
-		log.Fatalf("%v", err)
-	}
-
 	if err := os.MkdirAll(cfg.Workspace.Path, 0755); err != nil {
 		log.Fatalf("[Main] Workspace-Verzeichnis konnte nicht erstellt werden: %v", err)
 	}
@@ -140,6 +136,11 @@ func runBot(ctx context.Context, configPath string) {
 
 	// ── Secrets aus Vault in Config laden (für Runtime) ───────────────────────
 	applySecrets(cfg, vault)
+
+	// ── Konfiguration validieren (NACH applySecrets – Secrets kommen aus Vault) ─
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("%v", err)
+	}
 
 	// ── VirusTotal Scanner initialisieren ────────────────────────────────────
 	if cfg.Security.ScanUploads {
