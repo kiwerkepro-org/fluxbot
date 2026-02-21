@@ -1,0 +1,32 @@
+name: FluxBot CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Get Secrets from Bitwarden
+        uses: bitwarden/sm-action@v2
+        with:
+          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          secrets: |
+            a3966058-dc3a-4b03-952a-b3f70152a01d > FLUXBOT_HMAC_SECRET
+
+      - name: Verify Secret Load (Masked)
+        run: |
+          if [ -z "$FLUXBOT_HMAC_SECRET" ]; then
+            echo "Secret loading failed"
+            exit 1
+          else
+            echo "Secret loaded successfully"
+          fi
+
+      # Hier folgen deine weiteren Build/Deploy Schritte
