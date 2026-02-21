@@ -19,6 +19,7 @@ type Config struct {
 	Dashboard    DashboardConfig `json:"dashboard"`
 	Integrations []Integration   `json:"integrations,omitempty"` // externe API-Keys für Skills
 	SkillSecret  string          `json:"skillSecret,omitempty"`  // HMAC-Key für Skill-Signierung
+	Security     SecurityConfig  `json:"security"`               // vt-go Implementierung
 }
 
 // Integration speichert einen benannten API-Key für externe Dienste.
@@ -77,13 +78,13 @@ type MatrixChannelConfig struct {
 // WhatsAppChannelConfig – nutzt die WhatsApp Business Cloud API (Meta)
 type WhatsAppChannelConfig struct {
 	Enabled       bool     `json:"enabled"`
-	Provider      string   `json:"provider"`       // "meta" (weitere folgen)
-	PhoneNumber   string   `json:"phoneNumber"`    // Anzeige-Rufnummer
-	PhoneNumberID string   `json:"phoneNumberId"`  // Meta Phone Number ID (aus Developer Portal)
-	APIKey        string   `json:"apiKey"`         // Meta Access Token (permanent)
-	WebhookSecret string   `json:"webhookSecret"`  // HMAC-Verifizierungsschlüssel
-	WebhookPort   int      `json:"webhookPort"`    // Port für Webhook-Server (default: 8443)
-	AllowFrom     []string `json:"allowFrom"`      // Erlaubte Rufnummern (leer = alle)
+	Provider      string   `json:"provider"`      // "meta" (weitere folgen)
+	PhoneNumber   string   `json:"phoneNumber"`   // Anzeige-Rufnummer
+	PhoneNumberID string   `json:"phoneNumberId"` // Meta Phone Number ID (aus Developer Portal)
+	APIKey        string   `json:"apiKey"`        // Meta Access Token (permanent)
+	WebhookSecret string   `json:"webhookSecret"` // HMAC-Verifizierungsschlüssel
+	WebhookPort   int      `json:"webhookPort"`   // Port für Webhook-Server (default: 8443)
+	AllowFrom     []string `json:"allowFrom"`     // Erlaubte Rufnummern (leer = alle)
 }
 
 // ProvidersConfig enthält alle KI-Provider-Konfigurationen.
@@ -146,7 +147,7 @@ type WorkspaceConfig struct {
 // VoiceConfig konfiguriert die Sprachverarbeitung (optional)
 type VoiceConfig struct {
 	Enabled   bool   `json:"enabled"`
-	Provider  string `json:"provider"`  // groq, openai, ollama
+	Provider  string `json:"provider"` // groq, openai, ollama
 	APIKey    string `json:"apiKey"`
 	Language  string `json:"language"`  // ISO-639-1 Code, z.B. "de" – leer = auto
 	OllamaURL string `json:"ollamaUrl"` // Ollama API URL, z.B. http://ollama:11434
@@ -184,13 +185,13 @@ type VideoGenConfig struct {
 	Default string `json:"default"` // "runway","kling","luma","pika","hailuo","sora","veo","" = aus
 
 	// ── Provider ──────────────────────────────────────────────────────────────
-	Runway  VideoGenProviderConfig `json:"runway"`  // Runway Gen-4
-	Kling   VideoGenProviderConfig `json:"kling"`   // Kling AI 2.0
-	Luma    VideoGenProviderConfig `json:"luma"`    // Luma Dream Machine
-	Pika    VideoGenProviderConfig `json:"pika"`    // Pika Labs
-	Hailuo  VideoGenProviderConfig `json:"hailuo"`  // HailuoAI (Minimax)
-	Sora    VideoGenProviderConfig `json:"sora"`    // OpenAI Sora
-	Veo     VideoGenProviderConfig `json:"veo"`     // Google Veo 3
+	Runway VideoGenProviderConfig `json:"runway"` // Runway Gen-4
+	Kling  VideoGenProviderConfig `json:"kling"`  // Kling AI 2.0
+	Luma   VideoGenProviderConfig `json:"luma"`   // Luma Dream Machine
+	Pika   VideoGenProviderConfig `json:"pika"`   // Pika Labs
+	Hailuo VideoGenProviderConfig `json:"hailuo"` // HailuoAI (Minimax)
+	Sora   VideoGenProviderConfig `json:"sora"`   // OpenAI Sora
+	Veo    VideoGenProviderConfig `json:"veo"`    // Google Veo 3
 
 	// ── Parameter ─────────────────────────────────────────────────────────────
 	Duration    int    `json:"duration"`    // Videolänge in Sekunden (default: 5)
@@ -355,4 +356,11 @@ func DefaultModels() map[string]string {
 		"ocr":     "mistralai/pixtral-12b",
 		"image":   "google/gemini-2.0-flash-001",
 	}
+}
+
+// SecurityConfig definiert die Einstellungen für Laufzeit-Scans (vt-go)
+type SecurityConfig struct {
+	VirusTotalAPIKey string `json:"virustotal_api_key"`
+	ScanUploads      bool   `json:"scan_uploads"`
+	ActionOnUnknown  string `json:"action_on_unknown"` // "block", "allow", "analyze"
 }

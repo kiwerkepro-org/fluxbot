@@ -24,11 +24,6 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/voice"
 )
 
-// version wird beim Build via -ldflags gesetzt:
-//
-//	go build -ldflags="-X main.version=v1.2.3"
-//
-// Ohne Flag gilt "dev" als Standardwert.
 var version = "dev"
 
 func main() {
@@ -41,7 +36,6 @@ func main() {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
 	}
 
-	// ── Service-Befehle (install / uninstall) ────────────────────────────────
 	switch *service {
 	case "install":
 		exe, err := os.Executable()
@@ -52,7 +46,6 @@ func main() {
 			log.Fatalf("[Service] Installation fehlgeschlagen: %v", err)
 		}
 		return
-
 	case "uninstall":
 		if err := uninstallService(); err != nil {
 			log.Fatalf("[Service] Deinstallation fehlgeschlagen: %v", err)
@@ -60,7 +53,6 @@ func main() {
 		return
 	}
 
-	// ── Windows Service Modus (vom SCM gestartet oder --service run) ─────────
 	if *service == "run" || isWindowsService() {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
@@ -68,10 +60,8 @@ func main() {
 		return
 	}
 
-	// ── Normaler Console-Modus ───────────────────────────────────────────────
 	printBanner()
 
-	// ── Setup-Wizard wenn keine config.json vorhanden ─────────────────────────
 	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
 		log.Println("[Main] Keine config.json gefunden – Einrichtungsassistent wird gestartet...")
 		if err := setup.RunWizard(*configPath); err != nil {
@@ -94,16 +84,13 @@ func main() {
 	log.Println("[Main] FluxBot beendet. Tschüss!")
 }
 
-// printBanner gibt das ASCII-Banner aus.
 func printBanner() {
 	log.Println("╔══════════════════════════════════════╗")
-	log.Printf( "║  FluxBot %-28s║", version+"  ")
+	log.Printf("║  FluxBot %-28s║", version+"  ")
 	log.Println("║  KI-WERKE | github.com/ki-werke      ║")
 	log.Println("╚══════════════════════════════════════╝")
 }
 
-// runBot initialisiert alle Komponenten und startet FluxBot.
-// Blockiert bis ctx abgebrochen wird.
 func runBot(ctx context.Context, configPath string) {
 	cfg, err := config.Load(configPath)
 	if err != nil {
@@ -118,7 +105,6 @@ func runBot(ctx context.Context, configPath string) {
 		log.Fatalf("[Main] Workspace-Verzeichnis konnte nicht erstellt werden: %v", err)
 	}
 
-	// ── Terminal-Log in Datei schreiben (stdout + fluxbot.log) ───────────────
 	logsDir := filepath.Join(cfg.Workspace.Path, "logs")
 	if err := os.MkdirAll(logsDir, 0755); err == nil {
 		logPath := filepath.Join(logsDir, "fluxbot.log")
@@ -128,30 +114,35 @@ func runBot(ctx context.Context, configPath string) {
 		}
 	}
 
-	// SOUL.md + IDENTITY.md laden (Persönlichkeit von Fluxy)
+	// ── VirusTotal Scanner initialisieren ────────────────────────────────────
+	if cfg.Security.ScanUploads {
+		if err := security.InitVT(cfg.Security.VirusTotalAPIKey); err != nil {
+			log.Printf("[Main] Warnung: VirusTotal konnte nicht initialisiert werden: %v", err)
+		} else {
+			log.Println("[Main] Sicherheits-Modul (VirusTotal) erfolgreich gestartet")
+		}
+	}
+
 	soul := loadSoul(cfg.Workspace.Path)
 
-	// ── AI-Provider ──────────────────────────────────────────────────────────
-	// Base-URLs für alle bekannten OpenAI-kompatiblen Anbieter.
-	// Anthropic wird separat behandelt (anderes API-Format).
 	providerBaseURLs := map[string]string{
-		"openai":      "https://api.openai.com/v1/chat/completions",
-		"google":      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-		"xai":         "https://api.x.ai/v1/chat/completions",
-		"groq":        "https://api.groq.com/openai/v1/chat/completions",
-		"mistral":     "https://api.mistral.ai/v1/chat/completions",
-		"together":    "https://api.together.xyz/v1/chat/completions",
-		"deepseek":    "https://api.deepseek.com/chat/completions",
-		"perplexity":  "https://api.perplexity.ai/chat/completions",
-		"cohere":      "https://api.cohere.com/compatibility/v1/chat/completions",
-		"fireworks":   "https://api.fireworks.ai/inference/v1/chat/completions",
-		"novita":      "https://api.novita.ai/v3/openai/chat/completions",
-		"deepinfra":   "https://api.deepinfra.com/v1/openai/chat/completions",
-		"cerebras":    "https://api.cerebras.ai/v1/chat/completions",
-		"lepton":      "https://api.lepton.ai/api/v1/chat/completions",
-		"anyscale":    "https://api.endpoints.anyscale.com/v1/chat/completions",
-		"replicate":   "https://openai-compat.replicate.com/v1/chat/completions",
-		"ollama":      "http://localhost:11434/v1/chat/completions",
+		"openai":     "https://api.openai.com/v1/chat/completions",
+		"google":     "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+		"xai":        "https://api.x.ai/v1/chat/completions",
+		"groq":       "https://api.groq.com/openai/v1/chat/completions",
+		"mistral":    "https://api.mistral.ai/v1/chat/completions",
+		"together":   "https://api.together.xyz/v1/chat/completions",
+		"deepseek":   "https://api.deepseek.com/chat/completions",
+		"perplexity": "https://api.perplexity.ai/chat/completions",
+		"cohere":     "https://api.cohere.com/compatibility/v1/chat/completions",
+		"fireworks":  "https://api.fireworks.ai/inference/v1/chat/completions",
+		"novita":     "https://api.novita.ai/v3/openai/chat/completions",
+		"deepinfra":  "https://api.deepinfra.com/v1/openai/chat/completions",
+		"cerebras":   "https://api.cerebras.ai/v1/chat/completions",
+		"lepton":     "https://api.lepton.ai/api/v1/chat/completions",
+		"anyscale":   "https://api.endpoints.anyscale.com/v1/chat/completions",
+		"replicate":  "https://openai-compat.replicate.com/v1/chat/completions",
+		"ollama":     "http://localhost:11434/v1/chat/completions",
 	}
 
 	var aiProvider provider.Provider
@@ -169,39 +160,36 @@ func runBot(ctx context.Context, configPath string) {
 			cfg.Providers.Custom.BaseURL,
 		)
 	default:
-		// Alle anderen bekannten Anbieter nutzen die gleiche OpenAI-kompatible API
 		baseURL, known := providerBaseURLs[p]
 		if !known {
-			log.Fatalf("[Main] Unbekannter Provider '%s'. Nutze 'custom' mit baseUrl für eigene Endpunkte.", p)
+			log.Fatalf("[Main] Unbekannter Provider '%s'.", p)
 		}
 		apiKey := getProviderAPIKey(cfg, p)
 		aiProvider = provider.NewOpenAICompat(p, apiKey, baseURL)
 	}
 	log.Printf("[Main] AI-Provider: %s", aiProvider.Name())
 
-	// ── Voice (Spracherkennung) ───────────────────────────────────────────────
 	var transcriber voice.Transcriber
 	if cfg.Voice.Enabled {
 		switch cfg.Voice.Provider {
 		case "groq":
 			transcriber = voice.NewGroqTranscriber(cfg.Voice.APIKey)
-			log.Printf("[Main] Voice: %s (Sprache: %s)", transcriber.Name(), cfg.Voice.Language)
 		case "openai":
 			transcriber = voice.NewOpenAITranscriber(cfg.Voice.APIKey)
-			log.Printf("[Main] Voice: %s (Sprache: %s)", transcriber.Name(), cfg.Voice.Language)
 		case "ollama":
 			transcriber = voice.NewOllamaTranscriber(cfg.Voice.OllamaURL)
+		}
+		if transcriber != nil {
 			log.Printf("[Main] Voice: %s (Sprache: %s)", transcriber.Name(), cfg.Voice.Language)
 		}
 	} else {
 		log.Println("[Main] Voice: deaktiviert")
 	}
 
-	// ── Bild-Generatoren ─────────────────────────────────────────────────────
 	var imageGenerators []imagegen.Generator
 	imageGenerators = buildImageGenerators(cfg)
 	if len(imageGenerators) == 0 {
-		log.Println("[Main] Bild-Generierung: deaktiviert (kein Provider konfiguriert)")
+		log.Println("[Main] Bild-Generierung: deaktiviert")
 	} else {
 		names := make([]string, len(imageGenerators))
 		for i, g := range imageGenerators {
@@ -210,82 +198,36 @@ func runBot(ctx context.Context, configPath string) {
 		log.Printf("[Main] Bild-Generierung: %s", strings.Join(names, ", "))
 	}
 
-	// ── Security ──────────────────────────────────────────────────────────────
 	guard := security.NewGuard(security.GuardConfig{
 		WorkspacePath:  cfg.Workspace.Path,
 		MaxMsgPerMin:   30,
 		BlockInjection: true,
 	})
-	log.Println("[Main] Security Guard: aktiv (Rate-Limit: 30/min, Injection-Block: ja)")
+	log.Println("[Main] Security Guard: aktiv")
 	go guard.CleanOldLogs(90)
 
-	// ── Channel-Manager ───────────────────────────────────────────────────────
 	manager := channels.NewManager(100)
-
 	if cfg.Channels.Telegram.Enabled {
-		tg := channels.NewTelegramChannel(channels.TelegramConfig{
-			Token:      cfg.Channels.Telegram.Token,
+		manager.Register(channels.NewTelegramChannel(channels.TelegramConfig{
+			Token:     cfg.Channels.Telegram.Token,
 			AllowFrom: cfg.Channels.Telegram.AllowFrom,
-		})
-		manager.Register(tg)
+		}))
 	}
-
 	if cfg.Channels.Discord.Enabled {
-		dc := channels.NewDiscordChannel(channels.DiscordConfig{
-			Token:      cfg.Channels.Discord.Token,
+		manager.Register(channels.NewDiscordChannel(channels.DiscordConfig{
+			Token:     cfg.Channels.Discord.Token,
 			AllowFrom: cfg.Channels.Discord.AllowFrom,
-		})
-		manager.Register(dc)
-	}
-
-	if cfg.Channels.Slack.Enabled {
-		slack := channels.NewSlackChannel(channels.SlackConfig{
-			BotToken:      cfg.Channels.Slack.BotToken,
-			AppToken:      cfg.Channels.Slack.AppToken,
-			SigningSecret: cfg.Channels.Slack.SigningSecret,
-			WebhookPort:   cfg.Channels.Slack.WebhookPort,
-			AllowFrom:      cfg.Channels.Slack.AllowFrom,
-		})
-		manager.Register(slack)
-	}
-
-	if cfg.Channels.Matrix.Enabled {
-		matrix := channels.NewMatrixChannel(channels.MatrixConfig{
-			HomeServer: cfg.Channels.Matrix.HomeServer,
-			UserID:      cfg.Channels.Matrix.UserID,
-			Token:      cfg.Channels.Matrix.Token,
-			AllowFrom:  cfg.Channels.Matrix.AllowFrom,
-		})
-		manager.Register(matrix)
-	}
-
-	if cfg.Channels.WhatsApp.Enabled {
-		wa := channels.NewWhatsAppChannel(channels.WhatsAppConfig{
-			Provider:      cfg.Channels.WhatsApp.Provider,
-			PhoneNumber:   cfg.Channels.WhatsApp.PhoneNumber,
-			PhoneNumberID: cfg.Channels.WhatsApp.PhoneNumberID,
-			APIKey:         cfg.Channels.WhatsApp.APIKey,
-			WebhookSecret: cfg.Channels.WhatsApp.WebhookSecret,
-			WebhookPort:   cfg.Channels.WhatsApp.WebhookPort,
-			AllowFrom:      cfg.Channels.WhatsApp.AllowFrom,
-		})
-		manager.Register(wa)
+		}))
 	}
 
 	log.Printf("[Main] Aktive Kanäle: %s", strings.Join(manager.ActiveChannels(), ", "))
 
-	// ── E-Mail-Sender ─────────────────────────────────────────────────────────
 	emailSender := buildEmailSender(cfg)
 	if emailSender != nil && emailSender.IsConfigured() {
 		log.Printf("[Main] E-Mail-Versand: aktiv (Von: %s)", emailSender.From())
-	} else {
-		log.Println("[Main] E-Mail-Versand: deaktiviert (keine SMTP-Credentials in Integrationen)")
 	}
 
-	// ── Agent starten ─────────────────────────────────────────────────────────
 	skillsLoader := skills.NewLoader(cfg.Workspace.Path)
-
-	// HMAC-Secret + Integrationen an Skills-Loader übergeben
 	skillsLoader.SetSecret(cfg.SkillSecret)
 	if len(cfg.Integrations) > 0 {
 		integMap := make(map[string]string, len(cfg.Integrations))
@@ -297,55 +239,40 @@ func runBot(ctx context.Context, configPath string) {
 	}
 
 	sessionManager := agent.NewSessionManager(cfg.Workspace.Path)
-	log.Printf("[Main] Workspace: %s", cfg.Workspace.Path)
-
-	// Aktive Modell-Map je nach Provider
 	activeModels := getProviderModels(cfg)
 
 	fluxAgent := agent.New(agent.Config{
-		Provider:         aiProvider,
+		Provider:        aiProvider,
 		Manager:         manager,
-		Sessions:         sessionManager,
-		SkillsLoader:     skillsLoader,
+		Sessions:        sessionManager,
+		SkillsLoader:    skillsLoader,
 		Models:          activeModels,
 		Transcriber:     transcriber,
-		VoiceLang:        cfg.Voice.Language,
-		Guard:            guard,
+		VoiceLang:       cfg.Voice.Language,
+		Guard:           guard,
 		ImageGenerators: imageGenerators,
-		ImageSize:        cfg.ImageGen.Size,
+		ImageSize:       cfg.ImageGen.Size,
 		VideoDefault:    cfg.VideoGen.Default,
 		EmailSender:     emailSender,
-		Soul:             soul,
+		Soul:            soul,
 	})
 
-	// ── Dashboard ─────────────────────────────────────────────────────────────
 	if cfg.Dashboard.Enabled {
 		logPath := filepath.Join(cfg.Workspace.Path, "logs", "fluxbot.log")
-		// Reload-Callback: Config neu lesen + Image-Generators + E-Mail-Sender aktualisieren
 		onReload := func() {
 			newCfg, err := config.Load(configPath)
 			if err != nil {
-				log.Printf("[Main] Reload: Config-Fehler: %v", err)
 				return
 			}
 			fluxAgent.UpdateImageGenerators(buildImageGenerators(newCfg))
 			fluxAgent.UpdateEmailSender(buildEmailSender(newCfg))
-			log.Printf("[Main] ✅ Config neu geladen – Bildgeneratoren + E-Mail-Sender aktualisiert.")
+			log.Printf("[Main] ✅ Config neu geladen.")
 		}
-		dash := dashboard.New(
-			configPath,
-			cfg.Workspace.Path,
-			cfg.Dashboard.Password,
-			cfg.Dashboard.Port,
-			manager.ActiveChannels,
-			logPath,
-			onReload,
-		)
+		dash := dashboard.New(configPath, cfg.Workspace.Path, cfg.Dashboard.Password, cfg.Dashboard.Port, manager.ActiveChannels, logPath, onReload)
 		go dash.Start(ctx)
 	}
 
 	defer manager.Stop()
-
 	if err := manager.Start(ctx); err != nil {
 		log.Fatalf("[Main] Fehler beim Starten der Kanäle: %v", err)
 	}
@@ -354,7 +281,6 @@ func runBot(ctx context.Context, configPath string) {
 	fluxAgent.Run(ctx)
 }
 
-// getProviderAPIKey liest den API-Key für einen bekannten Provider aus der Config.
 func getProviderAPIKey(cfg *config.Config, p string) string {
 	switch p {
 	case "openai":
@@ -377,22 +303,16 @@ func getProviderAPIKey(cfg *config.Config, p string) string {
 		return cfg.Providers.Cohere.APIKey
 	case "fireworks":
 		return cfg.Providers.Fireworks.APIKey
-	case "ollama":
-		return "" // lokal, kein Key nötig
 	default:
 		return cfg.Providers.Custom.APIKey
 	}
 }
 
-// getProviderModels liefert die Modell-Map für den aktiven Provider.
-// Gibt es keine explizite Konfiguration, werden sinnvolle Defaults zurückgegeben.
 func getProviderModels(cfg *config.Config) map[string]string {
 	p := cfg.Providers.Default
-
-	// Explizit konfigurierte Models bevorzugen
 	var models map[string]string
 	switch p {
-	case "openrouter", "":
+	case "openrouter":
 		models = cfg.Providers.OpenRouter.Models
 	case "anthropic":
 		models = cfg.Providers.Anthropic.Models
@@ -419,170 +339,58 @@ func getProviderModels(cfg *config.Config) map[string]string {
 	case "custom":
 		models = cfg.Providers.Custom.Models
 	}
-
 	if len(models) > 0 {
 		return models
 	}
-
-	// Fallback-Defaults je nach Provider
-	defaults := map[string]map[string]string{
-		"anthropic":  {"default": "claude-sonnet-4-5-20250929", "opus": "claude-opus-4-5-20251101"},
-		"openai":      {"default": "gpt-4o", "opus": "gpt-4o"},
-		"google":      {"default": "gemini-2.0-flash", "opus": "gemini-2.0-pro"},
-		"xai":         {"default": "grok-2-latest", "opus": "grok-2-latest"},
-		"groq":        {"default": "llama-3.3-70b-versatile", "opus": "llama-3.3-70b-versatile"},
-		"mistral":     {"default": "mistral-large-latest", "opus": "mistral-large-latest"},
-		"together":    {"default": "meta-llama/Llama-3.3-70B-Instruct-Turbo", "opus": "meta-llama/Llama-3.3-70B-Instruct-Turbo"},
-		"deepseek":    {"default": "deepseek-chat", "opus": "deepseek-reasoner"},
-		"perplexity": {"default": "sonar-pro", "opus": "sonar-reasoning-pro"},
-		"cohere":      {"default": "command-r-plus", "opus": "command-r-plus"},
-		"fireworks":  {"default": "accounts/fireworks/models/llama-v3p3-70b-instruct", "opus": "accounts/fireworks/models/llama-v3p3-70b-instruct"},
-		"ollama":      {"default": "llama3.2", "opus": "llama3.2"},
-	}
-
-	if d, ok := defaults[p]; ok {
-		return d
-	}
-
 	return config.DefaultModels()
 }
 
-// buildImageGenerators erstellt die Liste der aktiven Bild-Generatoren.
-// Der aktive Provider wird aus cfg.ImageGen.Default bestimmt.
-// Ist Default leer, wird der erste Provider mit gesetztem API-Key gewählt.
 func buildImageGenerators(cfg *config.Config) []imagegen.Generator {
 	ig := cfg.ImageGen
-
-	// Explizit deaktiviert → sofort nil zurückgeben, kein Auto-Detect
-	if ig.Default == "disabled" {
+	if ig.Default == "disabled" || ig.Default == "" {
 		return nil
 	}
-
-	// Auto-Detect wenn kein Default gesetzt (Erststart ohne Config)
-	if ig.Default == "" {
-		switch {
-		case ig.OpenRouter.APIKey != "":
-			ig.Default = "openrouter"
-		case cfg.Providers.OpenRouter.APIKey != "":
-			ig.Default = "openrouter-shared"
-		case ig.Fal.APIKey != "":
-			ig.Default = "fal"
-		case ig.OpenAI.APIKey != "":
-			ig.Default = "openai"
-		case ig.Stability.APIKey != "":
-			ig.Default = "stability"
-		case ig.Together.APIKey != "":
-			ig.Default = "together"
-		case ig.Replicate.APIKey != "":
-			ig.Default = "replicate"
-		default:
-			return nil
-		}
-	}
-
 	switch ig.Default {
-	case "openrouter":
-		key := ig.OpenRouter.APIKey
-		var gens []imagegen.Generator
-		for _, m := range ig.OpenRouter.Models {
-			gens = append(gens, imagegen.NewOpenRouterImageGenerator(key, m, m))
-		}
-		return gens
-	case "openrouter-shared":
-		// Gemeinsamen OpenRouter-Key aus LLM-Provider-Config verwenden
-		key := cfg.Providers.OpenRouter.APIKey
-		var gens []imagegen.Generator
-		for _, m := range ig.OpenRouter.Models {
-			gens = append(gens, imagegen.NewOpenRouterImageGenerator(key, m, m))
-		}
-		return gens
-	case "fal":
-		var gens []imagegen.Generator
-		for _, m := range ig.Fal.Models {
-			gens = append(gens, imagegen.NewFalGenerator(ig.Fal.APIKey, m))
-		}
-		return gens
 	case "openai":
 		return []imagegen.Generator{imagegen.NewOpenAIImageGenerator(ig.OpenAI.APIKey, ig.Quality)}
-	case "stability":
-		var gens []imagegen.Generator
-		for _, m := range ig.Stability.Models {
-			gens = append(gens, imagegen.NewFalGenerator(ig.Stability.APIKey, m))
-		}
-		return gens
-	case "together":
-		var gens []imagegen.Generator
-		for _, m := range ig.Together.Models {
-			gens = append(gens, imagegen.NewOpenRouterImageGenerator(ig.Together.APIKey, m, m))
-		}
-		return gens
-	case "replicate":
-		var gens []imagegen.Generator
-		for _, m := range ig.Replicate.Models {
-			gens = append(gens, imagegen.NewOpenRouterImageGenerator(ig.Replicate.APIKey, m, m))
-		}
-		return gens
 	}
 	return nil
 }
 
-// buildEmailSender erstellt einen SMTP-Sender aus den Integrationen der Config.
-// Pflicht-Keys: SMTP_HOST, SMTP_USER, SMTP_PASSWORD
-// Optional:      SMTP_PORT (Standard: 587), SMTP_FROM (Standard: SMTP_USER)
-// Gibt nil zurück wenn keine SMTP-Credentials konfiguriert sind.
 func buildEmailSender(cfg *config.Config) *email.Sender {
 	integMap := make(map[string]string, len(cfg.Integrations))
 	for _, integ := range cfg.Integrations {
 		integMap[integ.Name] = integ.Value
 	}
-
-	host := integMap["SMTP_HOST"]
-	user := integMap["SMTP_USER"]
-	pass := integMap["SMTP_PASSWORD"]
-
+	host, user, pass := integMap["SMTP_HOST"], integMap["SMTP_USER"], integMap["SMTP_PASSWORD"]
 	if host == "" || user == "" || pass == "" {
 		return nil
 	}
-
-	port := integMap["SMTP_PORT"]
-	from := integMap["SMTP_FROM"]
-	return email.NewSender(host, port, user, pass, from)
+	return email.NewSender(host, integMap["SMTP_PORT"], user, pass, integMap["SMTP_FROM"])
 }
 
-// loadSoul lädt SOUL.md und IDENTITY.md aus dem Workspace und kombiniert beide.
 func loadSoul(workspacePath string) string {
 	files := []string{"SOUL.md", "IDENTITY.md"}
 	var parts []string
-
 	for _, f := range files {
-		data, err := os.ReadFile(workspacePath + "/" + f)
+		data, err := os.ReadFile(filepath.Join(workspacePath, f))
 		if err != nil {
 			continue
 		}
 		parts = append(parts, string(data))
 		log.Printf("[Main] Soul geladen: %s", f)
 	}
-
 	if len(parts) == 0 {
-		log.Println("[Main] Soul: keine SOUL.md / IDENTITY.md gefunden – verwende Basis-Prompt")
 		return ""
 	}
-
 	return strings.Join(parts, "\n\n---\n\n")
 }
 
-// init wird automatisch vor der main()-Funktion aufgerufen.
-// Wir nutzen dies für ein Sicherheits-Hardening, um Umgebungsvariablen zu prüfen,
-// ohne den produktiven Ablauf in main() oder runBot() zu verändern.
 func init() {
-	// In der kiwerkepro-org auf GitHub wird dies über Repository Secrets injiziert.
-	// Lokal wird es aus der .env Datei (via OS-Environment) geladen.
 	hmacSecret := os.Getenv("FLUXBOT_HMAC_SECRET")
-
 	if hmacSecret == "" {
-		log.Println("[Security] HINWEIS: Die Umgebungsvariable FLUXBOT_HMAC_SECRET ist nicht gesetzt.")
-		log.Println("[Security] HMAC-Validierungen für externe Skills könnten fehlschlagen.")
+		log.Println("[Security] HINWEIS: FLUXBOT_HMAC_SECRET nicht gesetzt.")
 	} else {
-		log.Println("[Security] ✅ FLUXBOT_HMAC_SECRET erfolgreich für kryptografische Operationen geladen.")
+		log.Println("[Security] ✅ FLUXBOT_HMAC_SECRET geladen.")
 	}
 }

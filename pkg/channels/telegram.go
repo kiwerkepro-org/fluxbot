@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
 // TelegramChannel implementiert das Channel-Interface für Telegram.
@@ -93,6 +95,19 @@ func (t *TelegramChannel) Start(ctx context.Context, bus chan<- Message) error {
 						MediaPath: "", // leer = Download fehlgeschlagen
 					}
 				} else {
+					// --- NEU: VirusTotal Scan ---
+					fileBytes, readErr := os.ReadFile(localPath)
+					if readErr == nil {
+						isSafe, scanErr := security.ScanFile(fileBytes)
+						if scanErr == nil && !isSafe {
+							log.Printf("[Telegram] 🚨 Datei als Malware erkannt! Lösche: %s", localPath)
+							os.Remove(localPath)
+							t.Send(chatID, "🚨 Sicherheitswarnung: Die hochgeladene Datei wurde als potenziell schädlich eingestuft und blockiert.")
+							continue // Bricht hier ab, geht nicht in den Bus
+						}
+					}
+					// --- ENDE VT-SCAN ---
+
 					bus <- Message{
 						ID:        fmt.Sprintf("tg_%d", u.UpdateID),
 						ChannelID: "telegram",
@@ -290,5 +305,3 @@ type telegramUpdate struct {
 		} `json:"voice"`
 	} `json:"message"`
 }
-
-
