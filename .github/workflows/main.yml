@@ -17,6 +17,7 @@ jobs:
         uses: bitwarden/sm-action@v2
         with:
           access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          base_url: "https://api.bitwarden.eu"
           secrets: |
             a3966058-dc3a-4b03-952a-b3f70152a01d > FLUXBOT_HMAC_SECRET
             05d4a165-8acd-492b-afc3-b3f80007ec1b > VIRUSTOTAL_API_KEY
