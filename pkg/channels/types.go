@@ -17,8 +17,10 @@ type Message struct {
 	ChannelID string      // Name des Channels (z.B. "telegram", "discord")
 	ChatID    string      // Chat/Raum-ID (für Antworten)
 	SenderID  string      // Absender-ID
+	UserName  string      // NEU: Absender-Name (für Agent/Security)
 	Type      MessageType // Nachrichtentyp
 	Text      string      // Textinhalt
+	VoiceData []byte      // NEU: Sprachdaten im RAM (für Scanner/Transkription)
 	MediaPath string      // Lokaler Pfad zu heruntergeladenen Medien
 	RawData   interface{} // Channel-spezifische Rohdaten
 }

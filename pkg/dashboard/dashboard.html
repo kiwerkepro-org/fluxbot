@@ -894,6 +894,7 @@
 
 <script>
 let configData = null;
+let secretsData = {}; // Vault-Secrets (API-Keys, Tokens, Passwörter)
 let pendingEditTarget = null;
 
 // ── Eye-Toggle ─────────────────────────────────────────────────────────────
@@ -1103,67 +1104,79 @@ async function loadStatus() {
 
 // ── CONFIG: Laden ──────────────────────────────────────────────────────────
 async function loadConfig() {
-  configData = await api('/api/config');
+  // Config (nicht-sensitiv) + Secrets (sensitiv) parallel laden
+  [configData, secretsData] = await Promise.all([
+    api('/api/config'),
+    api('/api/secrets').catch(() => ({}))
+  ]);
+  secretsData = secretsData || {};
+
   const c   = configData.channels  || {};
   const p   = configData.providers || {};
   const v   = configData.voice     || {};
   const img = configData.imageGen  || {};
   const vid = configData.videoGen  || {};
 
+  // ── Kanäle (Token/Keys kommen aus Vault) ────────────────────────────────
   setVal('tg-enabled',       c.telegram?.enabled,    'toggle');
-  setVal('tg-token',         c.telegram?.token       || '');
+  setVal('tg-token',         secretsData['TELEGRAM_TOKEN']       || '');
   setVal('tg-allowfrom',     (c.telegram?.allowFrom  || []).join(', '));
   setVal('dc-enabled',       c.discord?.enabled,     'toggle');
-  setVal('dc-token',         c.discord?.token        || '');
+  setVal('dc-token',         secretsData['DISCORD_TOKEN']        || '');
   setVal('slack-enabled',    c.slack?.enabled,       'toggle');
-  setVal('slack-bot-token',  c.slack?.botToken       || '');
-  setVal('slack-signing',    c.slack?.signingSecret  || '');
+  setVal('slack-bot-token',  secretsData['SLACK_BOT_TOKEN']      || '');
+  setVal('slack-signing',    secretsData['SLACK_SIGNING_SECRET'] || '');
   setVal('matrix-enabled',   c.matrix?.enabled,      'toggle');
   setVal('matrix-homeserver',c.matrix?.homeServer    || '');
-  setVal('matrix-token',     c.matrix?.token         || '');
+  setVal('matrix-token',     secretsData['MATRIX_TOKEN']         || '');
   setVal('wa-enabled',       c.whatsapp?.enabled,    'toggle');
   setVal('wa-phoneid',       c.whatsapp?.phoneNumberId || '');
-  setVal('wa-token',         c.whatsapp?.apiKey      || '');
+  setVal('wa-token',         secretsData['WHATSAPP_API_KEY']     || '');
 
+  // ── AI Provider (API-Key aus Vault) ──────────────────────────────────────
   const activeProvider = p.default || 'openrouter';
   setVal('ai-provider', activeProvider, 'select');
-  document.getElementById('ai-apikey').value = getDashProviderKey(p, activeProvider);
-  setVal('ai-custom-url',   p.custom?.baseUrl        || '');
-  setVal('ai-custom-name',  p.custom?.name           || '');
+  document.getElementById('ai-apikey').value =
+    secretsData['PROVIDER_' + activeProvider.toUpperCase()] || '';
+  setVal('ai-custom-url',   p.custom?.baseUrl         || '');
+  setVal('ai-custom-name',  p.custom?.name            || '');
   setVal('ai-custom-model', p.custom?.models?.default || '');
   onDashProviderChange();
 
+  // ── Bild-Generierung (Keys aus Vault) ────────────────────────────────────
   setVal('img-default',          img.default            || 'disabled', 'select');
-  setVal('img-openrouter-key',   img.openrouter?.apiKey || '');
+  setVal('img-openrouter-key',   secretsData['IMG_OPENROUTER'] || '');
   setVal('img-openrouter-models',(img.openrouter?.models || []).join(', '));
-  setVal('img-fal-key',          img.fal?.apiKey        || '');
+  setVal('img-fal-key',          secretsData['IMG_FAL']        || '');
   setVal('img-fal-models',       (img.fal?.models       || []).join(', '));
-  setVal('img-openai-key',       img.openai?.apiKey     || '');
+  setVal('img-openai-key',       secretsData['IMG_OPENAI']     || '');
   setVal('img-quality',          img.quality            || 'standard', 'select');
-  setVal('img-stability-key',    img.stability?.apiKey  || '');
+  setVal('img-stability-key',    secretsData['IMG_STABILITY']  || '');
   setVal('img-stability-models', (img.stability?.models || []).join(', '));
-  setVal('img-together-key',     img.together?.apiKey   || '');
+  setVal('img-together-key',     secretsData['IMG_TOGETHER']   || '');
   setVal('img-together-models',  (img.together?.models  || []).join(', '));
-  setVal('img-replicate-key',    img.replicate?.apiKey  || '');
+  setVal('img-replicate-key',    secretsData['IMG_REPLICATE']  || '');
   setVal('img-replicate-models', (img.replicate?.models || []).join(', '));
   onImgProviderChange();
 
+  // ── Video-Generierung (Keys aus Vault) ───────────────────────────────────
   setVal('vid-default',      vid.default || '',   'select');
   ['runway','kling','luma','pika','hailuo','sora','veo'].forEach(pv => {
-    setVal('vid-' + pv + '-key',   vid[pv]?.apiKey || '');
+    setVal('vid-' + pv + '-key',   secretsData['VID_' + pv.toUpperCase()] || '');
     setVal('vid-' + pv + '-model', vid[pv]?.model  || '');
   });
   onVidProviderChange();
 
+  // ── Voice (API-Key aus Vault) ────────────────────────────────────────────
   setVal('voice-enabled',  v.enabled,           'toggle');
   setVal('voice-provider', v.provider || 'groq', 'select');
   setVal('voice-lang',     v.language || 'de',   'select');
-  setVal('voice-apikey',   v.apiKey   || '');
+  setVal('voice-apikey',   secretsData['VOICE_API_KEY'] || '');
 
   // JSON-Tab immer mit Blur starten
   reBlur('json');
 
-  // Integrationen laden
+  // Integrationen laden (Werte kommen aus Vault)
   renderIntegrations(configData.integrations || []);
 }
 
@@ -1185,8 +1198,10 @@ function getVal(id, type = 'text') {
 async function saveConfig() {
   const rawTab = document.getElementById('tab-raw').classList.contains('active');
   let newConfig;
+  const secretsPatch = {}; // Vault-Secrets – gehen an /api/secrets
 
   if (rawTab) {
+    // Raw-JSON-Tab: nur config.json, keine Secrets (Sicherheit)
     const ta = document.getElementById('raw-config');
     if (ta.classList.contains('blurred')) {
       toast('JSON-Editor ist noch gesperrt. Bitte erst entsperren.', true);
@@ -1194,91 +1209,125 @@ async function saveConfig() {
     }
     try { newConfig = JSON.parse(ta.value); }
     catch(e) { toast('Ungültiges JSON: ' + e.message, true); return; }
-    // Nach Speichern wieder sperren
     setTimeout(() => reBlur('json'), 500);
   } else {
     newConfig = JSON.parse(JSON.stringify(configData));
 
+    // ── Kanäle (Tokens → Vault, Rest → config.json) ──────────────────────
     const ch = newConfig.channels = newConfig.channels || {};
     ch.telegram = ch.telegram || {};
     ch.telegram.enabled   = getVal('tg-enabled', 'toggle');
-    ch.telegram.token     = getVal('tg-token');
+    ch.telegram.token     = '';  // im Vault, nicht in config.json
     ch.telegram.allowFrom = getVal('tg-allowfrom').split(',').map(s=>s.trim()).filter(Boolean);
     ch.discord = ch.discord || {};
     ch.discord.enabled = getVal('dc-enabled', 'toggle');
-    ch.discord.token   = getVal('dc-token');
+    ch.discord.token   = '';  // im Vault
     ch.slack = ch.slack || {};
     ch.slack.enabled       = getVal('slack-enabled', 'toggle');
-    ch.slack.botToken      = getVal('slack-bot-token');
-    ch.slack.signingSecret = getVal('slack-signing');
+    ch.slack.botToken      = '';  // im Vault
+    ch.slack.signingSecret = '';  // im Vault
     ch.matrix = ch.matrix || {};
     ch.matrix.enabled    = getVal('matrix-enabled', 'toggle');
     ch.matrix.homeServer = getVal('matrix-homeserver');
-    ch.matrix.token      = getVal('matrix-token');
+    ch.matrix.token      = '';  // im Vault
     ch.whatsapp = ch.whatsapp || {};
     ch.whatsapp.enabled       = getVal('wa-enabled', 'toggle');
     ch.whatsapp.phoneNumberId = getVal('wa-phoneid');
-    ch.whatsapp.apiKey        = getVal('wa-token');
+    ch.whatsapp.apiKey        = '';  // im Vault
 
+    // Vault-Patch für Kanäle
+    secretsPatch['TELEGRAM_TOKEN']       = getVal('tg-token');
+    secretsPatch['DISCORD_TOKEN']        = getVal('dc-token');
+    secretsPatch['SLACK_BOT_TOKEN']      = getVal('slack-bot-token');
+    secretsPatch['SLACK_SIGNING_SECRET'] = getVal('slack-signing');
+    secretsPatch['MATRIX_TOKEN']         = getVal('matrix-token');
+    secretsPatch['WHATSAPP_API_KEY']     = getVal('wa-token');
+
+    // ── AI Provider (Key → Vault) ─────────────────────────────────────────
     const selProvider = getVal('ai-provider', 'select');
     const selKey      = getVal('ai-apikey');
     newConfig.providers = newConfig.providers || {};
     newConfig.providers.default = selProvider;
-    setDashProviderKey(newConfig.providers, selProvider, selKey);
+    // API-Key geht in den Vault, NICHT in config.json
+    secretsPatch['PROVIDER_' + selProvider.toUpperCase()] = selKey;
     if (selProvider === 'custom') {
       newConfig.providers.custom = newConfig.providers.custom || {};
       newConfig.providers.custom.baseUrl = getVal('ai-custom-url');
       newConfig.providers.custom.name    = getVal('ai-custom-name');
       const m = getVal('ai-custom-model');
       if (m) newConfig.providers.custom.models = { default: m, opus: m };
+      newConfig.providers.custom.apiKey = '';  // im Vault
     }
 
-    // Hilfsfunktion: kommagetrennte Eingabe → Array (leere Einträge filtern)
+    // Hilfsfunktion: kommagetrennte Eingabe → Array
     const toModels = id => getVal(id).split(',').map(s=>s.trim()).filter(Boolean);
 
+    // ── Bild-Generierung (Keys → Vault) ──────────────────────────────────
     newConfig.imageGen = newConfig.imageGen || {};
     newConfig.imageGen.default = getVal('img-default', 'select');
     newConfig.imageGen.openrouter = newConfig.imageGen.openrouter || {};
-    newConfig.imageGen.openrouter.apiKey  = getVal('img-openrouter-key');
+    newConfig.imageGen.openrouter.apiKey  = '';  // im Vault
     newConfig.imageGen.openrouter.models  = toModels('img-openrouter-models');
     newConfig.imageGen.fal = newConfig.imageGen.fal || {};
-    newConfig.imageGen.fal.apiKey  = getVal('img-fal-key');
+    newConfig.imageGen.fal.apiKey  = '';  // im Vault
     newConfig.imageGen.fal.models  = toModels('img-fal-models');
     newConfig.imageGen.openai = newConfig.imageGen.openai || {};
-    newConfig.imageGen.openai.apiKey = getVal('img-openai-key');
+    newConfig.imageGen.openai.apiKey = '';  // im Vault
     newConfig.imageGen.stability = newConfig.imageGen.stability || {};
-    newConfig.imageGen.stability.apiKey  = getVal('img-stability-key');
+    newConfig.imageGen.stability.apiKey  = '';  // im Vault
     newConfig.imageGen.stability.models  = toModels('img-stability-models');
     newConfig.imageGen.together = newConfig.imageGen.together || {};
-    newConfig.imageGen.together.apiKey  = getVal('img-together-key');
+    newConfig.imageGen.together.apiKey  = '';  // im Vault
     newConfig.imageGen.together.models  = toModels('img-together-models');
     newConfig.imageGen.replicate = newConfig.imageGen.replicate || {};
-    newConfig.imageGen.replicate.apiKey  = getVal('img-replicate-key');
+    newConfig.imageGen.replicate.apiKey  = '';  // im Vault
     newConfig.imageGen.replicate.models  = toModels('img-replicate-models');
     newConfig.imageGen.quality = getVal('img-quality', 'select');
 
+    // Vault-Patch für Bild-Keys
+    secretsPatch['IMG_OPENROUTER'] = getVal('img-openrouter-key');
+    secretsPatch['IMG_FAL']        = getVal('img-fal-key');
+    secretsPatch['IMG_OPENAI']     = getVal('img-openai-key');
+    secretsPatch['IMG_STABILITY']  = getVal('img-stability-key');
+    secretsPatch['IMG_TOGETHER']   = getVal('img-together-key');
+    secretsPatch['IMG_REPLICATE']  = getVal('img-replicate-key');
+
+    // ── Video-Generierung (Keys → Vault) ─────────────────────────────────
     newConfig.videoGen = newConfig.videoGen || {};
     newConfig.videoGen.default = getVal('vid-default', 'select');
     ['runway','kling','luma','pika','hailuo','sora','veo'].forEach(pv => {
       newConfig.videoGen[pv] = newConfig.videoGen[pv] || {};
-      newConfig.videoGen[pv].apiKey = getVal('vid-' + pv + '-key');
+      newConfig.videoGen[pv].apiKey = '';  // im Vault
       newConfig.videoGen[pv].model  = getVal('vid-' + pv + '-model');
+      secretsPatch['VID_' + pv.toUpperCase()] = getVal('vid-' + pv + '-key');
     });
-    // vid-duration / vid-aspect / vid-quality werden vom Bot beim Nutzer abgefragt
 
+    // ── Voice (API-Key → Vault) ───────────────────────────────────────────
     newConfig.voice = newConfig.voice || {};
     newConfig.voice.enabled  = getVal('voice-enabled',  'toggle');
     newConfig.voice.provider = getVal('voice-provider', 'select');
     newConfig.voice.language = getVal('voice-lang',     'select');
-    newConfig.voice.apiKey   = getVal('voice-apikey');
+    newConfig.voice.apiKey   = '';  // im Vault
+    secretsPatch['VOICE_API_KEY'] = getVal('voice-apikey');
 
-    // Integrationen aus der dynamischen Liste lesen
-    newConfig.integrations = collectIntegrations();
+    // ── Integrationen (Values → Vault, Name+Desc → config.json) ──────────
+    const { configList, secretsMap } = collectIntegrations();
+    newConfig.integrations = configList;
+    Object.assign(secretsPatch, secretsMap);
   }
 
+  // 1. Nicht-sensitive Config → config.json
   const result = await api('/api/config', 'PUT', newConfig);
-  if (result.error) { toast('Fehler: ' + result.error, true); return; }
+  if (result.error) { toast('Fehler (Config): ' + result.error, true); return; }
+
+  // 2. Sensitive Secrets → Vault (sofort aktiv per Hot-Reload)
+  const secResult = await api('/api/secrets', 'POST', secretsPatch);
+  if (secResult && secResult.error) {
+    toast('Fehler (Secrets): ' + secResult.error, true); return;
+  }
+
   configData = newConfig;
+  secretsData = Object.assign({}, secretsData, secretsPatch);
   const n = document.getElementById('config-notice');
   n.style.display = 'block';
   setTimeout(() => { n.style.display = 'none'; }, 4000);
@@ -1586,26 +1635,25 @@ function fallbackCopy(text) {
 const SMTP_KEYS = ['SMTP_HOST','SMTP_PORT','SMTP_USER','SMTP_PASSWORD','SMTP_FROM'];
 
 function renderIntegrations(list) {
-  // SMTP-Felder in die dedizierten Inputs füllen, den Rest in die generische Liste
-  const smtpMap = {};
-  const otherList = [];
-  for (const item of (list || [])) {
-    if (SMTP_KEYS.includes(item.name)) smtpMap[item.name] = item.value;
-    else otherList.push(item);
-  }
-  setVal('smtp-host',     smtpMap['SMTP_HOST']     || '');
-  setVal('smtp-port',     smtpMap['SMTP_PORT']     || '587');
-  setVal('smtp-user',     smtpMap['SMTP_USER']     || '');
-  setVal('smtp-password', smtpMap['SMTP_PASSWORD'] || '');
-  setVal('smtp-from',     smtpMap['SMTP_FROM']     || '');
+  // SMTP-Werte kommen jetzt aus dem Vault (secretsData), nicht aus item.value
+  setVal('smtp-host',     secretsData['INTEG_SMTP_HOST']     || '');
+  setVal('smtp-port',     secretsData['INTEG_SMTP_PORT']     || '587');
+  setVal('smtp-user',     secretsData['INTEG_SMTP_USER']     || '');
+  setVal('smtp-password', secretsData['INTEG_SMTP_PASSWORD'] || '');
+  setVal('smtp-from',     secretsData['INTEG_SMTP_FROM']     || '');
 
   // Provider-Button aktivieren wenn Host bekannt
-  detectSmtpProvider(smtpMap['SMTP_HOST'] || '');
+  detectSmtpProvider(secretsData['INTEG_SMTP_HOST'] || '');
 
+  // Nur nicht-SMTP-Einträge in die generische Liste (config speichert nur name+description)
+  const otherList = (list || []).filter(item => !SMTP_KEYS.includes(item.name));
   const container = document.getElementById('integrations-list');
   container.innerHTML = '';
   if (otherList.length === 0) { addIntegration(); return; }
-  otherList.forEach(item => addIntegration(item.name, item.description, item.value));
+  // Wert kommt aus Vault: secretsData['INTEG_' + item.name]
+  otherList.forEach(item => addIntegration(
+    item.name, item.description, secretsData['INTEG_' + item.name] || ''
+  ));
 }
 
 // Setzt Host/Port automatisch und zeigt Hinweis-Link für bekannte Anbieter
@@ -1686,9 +1734,13 @@ function addIntegration(name = '', description = '', value = '') {
 }
 
 function collectIntegrations() {
-  const result = [];
+  // Gibt { configList, secretsMap } zurück:
+  //   configList  → geht in config.json  (nur name + description, KEIN value)
+  //   secretsMap  → geht in den Vault    (INTEG_* Keys mit den Werten)
+  const configList = [];
+  const secretsMap = {};
 
-  // SMTP-Felder zuerst (nur wenn befüllt)
+  // SMTP-Felder (nur wenn befüllt)
   const smtpDefs = [
     { id: 'smtp-host',     name: 'SMTP_HOST',     desc: 'SMTP-Server' },
     { id: 'smtp-port',     name: 'SMTP_PORT',     desc: 'SMTP-Port' },
@@ -1698,7 +1750,10 @@ function collectIntegrations() {
   ];
   for (const f of smtpDefs) {
     const val = (document.getElementById(f.id)?.value || '').trim();
-    if (val) result.push({ name: f.name, description: f.desc, value: val });
+    if (val) {
+      configList.push({ name: f.name, description: f.desc });
+      secretsMap['INTEG_' + f.name] = val;
+    }
   }
 
   // Generische Integrationen
@@ -1706,9 +1761,12 @@ function collectIntegrations() {
     const name  = row.querySelector('.int-name').value.trim();
     const desc  = row.querySelector('.int-desc').value.trim();
     const value = row.querySelector('.int-value').value;
-    if (name) result.push({ name, description: desc, value });
+    if (name) {
+      configList.push({ name, description: desc });
+      if (value) secretsMap['INTEG_' + name] = value;
+    }
   });
-  return result;
+  return { configList, secretsMap };
 }
 
 function escHtml(s) {

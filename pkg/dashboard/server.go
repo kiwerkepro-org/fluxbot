@@ -7,7 +7,10 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"sync"
 	"time"
+
+	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
 //go:embed dashboard.html
@@ -19,17 +22,20 @@ type Server struct {
 	configPath    string
 	workspacePath string
 	password      string
+	passwordMu    sync.RWMutex    // schützt Hot-Reload des Passworts
 	port          int
 	startTime     time.Time
-	getChannels   func() []string // Callback: liefert aktive Kanäle zur Laufzeit
-	logPath       string          // Pfad zur Terminal-Log-Datei (fluxbot.log)
-	onReload      func()          // Callback: wird nach Config-Änderung aufgerufen
+	getChannels   func() []string         // Callback: liefert aktive Kanäle zur Laufzeit
+	logPath       string                  // Pfad zur Terminal-Log-Datei (fluxbot.log)
+	vault         *security.VaultProvider // Secret-Speicher (AES-256-GCM)
+	onReload      func()                  // Callback: wird nach Config-Änderung aufgerufen
 }
 
 // New erstellt einen neuen Dashboard-Server.
 // logPath: Pfad zur fluxbot.log – wenn leer, wird kein Terminal-Log angezeigt.
-// onReload: wird nach jeder Config-Änderung über das Dashboard aufgerufen.
-func New(configPath, workspacePath, password string, port int, getChannels func() []string, logPath string, onReload func()) *Server {
+// vault: Secret-Speicher für API-Keys und Passwörter (AES-256-GCM).
+// onReload: wird nach jeder Config- oder Secret-Änderung aufgerufen.
+func New(configPath, workspacePath, password string, port int, getChannels func() []string, logPath string, vault *security.VaultProvider, onReload func()) *Server {
 	return &Server{
 		configPath:    configPath,
 		workspacePath: workspacePath,
@@ -38,7 +44,18 @@ func New(configPath, workspacePath, password string, port int, getChannels func(
 		startTime:     time.Now(),
 		getChannels:   getChannels,
 		logPath:       logPath,
+		vault:         vault,
 		onReload:      onReload,
+	}
+}
+
+// UpdatePassword aktualisiert das Dashboard-Passwort zur Laufzeit (Hot-Reload).
+func (s *Server) UpdatePassword(pass string) {
+	s.passwordMu.Lock()
+	defer s.passwordMu.Unlock()
+	if pass != "" {
+		s.password = pass
+		log.Println("[Dashboard] Passwort aktualisiert.")
 	}
 }
 
@@ -53,6 +70,7 @@ func (s *Server) Start(ctx context.Context) {
 	// ── API-Endpunkte ─────────────────────────────────────────────────────────
 	mux.HandleFunc("/api/status", s.auth(s.handleStatus))
 	mux.HandleFunc("/api/config", s.auth(s.handleConfig))
+	mux.HandleFunc("/api/secrets", s.auth(s.handleSecrets))
 	mux.HandleFunc("/api/soul", s.auth(s.handleSoul))
 	mux.HandleFunc("/api/logs", s.auth(s.handleLogs))
 	mux.HandleFunc("/api/logs/terminal", s.auth(s.handleTerminalLogs))
@@ -81,9 +99,12 @@ func (s *Server) Start(ctx context.Context) {
 // Wenn kein Passwort konfiguriert ist, wird kein Auth geprüft.
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if s.password != "" {
+		s.passwordMu.RLock()
+		pw := s.password
+		s.passwordMu.RUnlock()
+		if pw != "" {
 			_, pass, ok := r.BasicAuth()
-			if !ok || pass != s.password {
+			if !ok || pass != pw {
 				w.Header().Set("WWW-Authenticate", `Basic realm="FluxBot Dashboard"`)
 				http.Error(w, "Zugriff verweigert", http.StatusUnauthorized)
 				return

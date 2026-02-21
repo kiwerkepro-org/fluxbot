@@ -1,9 +1,10 @@
 package security
 
 import (
-	"context"
+	"crypto/sha256"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,10 +14,10 @@ import (
 var (
 	vtClient    *vt.Client
 	scanEnabled bool
-	// Cache für bereits gescannte Hashes (Vermeidung von Doppel-Scans)
+	// Cache für bereits gescannte Hashes
 	scanCache  = make(map[string]bool)
 	cacheMutex sync.RWMutex
-	// Einfaches Rate-Limiting für Public API (4 Requests pro Minute)
+	// Rate-Limiting für Public API (max 4/min)
 	lastScan  time.Time
 	scanMutex sync.Mutex
 )
@@ -32,66 +33,80 @@ func InitVT(apiKey string) error {
 	return nil
 }
 
-// ScanFileHash prüft einen SHA-256 Hash bei VirusTotal
-func ScanFileHash(hash string) (bool, error) {
+// ScanFile ist die Hauptfunktion für Channel-Handler.
+// Sie berechnet den Hash und prüft ihn bei VirusTotal.
+func ScanFile(data []byte) (bool, error) {
 	if !scanEnabled || vtClient == nil {
-		return true, nil // Wenn nicht aktiv, lassen wir die Datei durch
+		return true, nil
 	}
+	hash := fmt.Sprintf("%x", sha256.Sum256(data))
+	return ScanFileHash(hash)
+}
 
-	// 1. Im Cache nachsehen
+// ScanFileHash prüft einen SHA-256 Hash direkt
+func ScanFileHash(hash string) (bool, error) {
+	// 1. Cache-Check
 	cacheMutex.RLock()
 	isClean, found := scanCache[hash]
 	cacheMutex.RUnlock()
 	if found {
-		log.Printf("[Security-VT] Hash im lokalen Cache gefunden: %s (Clean: %v)", hash, isClean)
+		log.Printf("[Security-VT] Hash im Cache: %s (Clean: %v)", hash, isClean)
 		return isClean, nil
 	}
 
-	// 2. Rate-Limiting (Pause einlegen, wenn der letzte Scan zu kurz her ist)
+	// 2. Rate-Limit Schutz
 	scanMutex.Lock()
 	elapsed := time.Since(lastScan)
-	if elapsed < 15*time.Second { // Max 4 pro Minute -> alle 15 Sek einer
+	if elapsed < 15*time.Second {
 		time.Sleep(15*time.Second - elapsed)
 	}
 	lastScan = time.Now()
 	scanMutex.Unlock()
 
-	log.Printf("[Security-VT] Frage VirusTotal für Hash ab: %s", hash)
+	log.Printf("[Security-VT] Scan-Anfrage für Hash: %s", hash)
 
-	// API Abfrage
 	url := vt.URL("files/%s", hash)
-	obj, err := vtClient.Get(context.Background(), url)
+	obj, err := vtClient.GetObject(url)
 	if err != nil {
-		// Wenn der Hash unbekannt ist (404), stufen wir ihn als "unbekannt/sicher" ein
-		// oder lassen ihn zur Analyse hochladen (Zukunft-Feature)
-		if err.Error() == "NotFoundError" || err.Error() == "not_found" {
-			log.Printf("[Security-VT] Datei bei VT unbekannt (neu).")
+		// Bulletproof Fehler-Check: Wandelt den Fehler inkl. dynamischer Inhalte in einen String um
+		errMsg := strings.ToLower(fmt.Sprintf("%v", err))
+
+		// Datei unbekannt -> als sicher einstufen (da kein Treffer in der Datenbank)
+		if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "notfounderror") {
+			log.Printf("[Security-VT] Datei unbekannt (keine Bedrohung gelistet).")
 			return true, nil
 		}
 		return false, fmt.Errorf("VT-API Fehler: %v", err)
 	}
 
-	// Ergebnisse auswerten
-	stats, err := obj.GetMap("last_analysis_stats")
+	// Analyse-Stats auslesen
+	statsInterface, err := obj.Get("last_analysis_stats")
 	if err != nil {
-		return false, fmt.Errorf("konnte Analyse-Stats nicht lesen: %v", err)
+		return false, fmt.Errorf("Stats-Format ungültig: %v", err)
 	}
 
-	malicious := stats["malicious"].(float64)
-	suspicious := stats["suspicious"].(float64)
+	stats, ok := statsInterface.(map[string]interface{})
+	if !ok {
+		return false, fmt.Errorf("Stats-Mapping fehlgeschlagen")
+	}
 
-	isSafe := malicious == 0 && suspicious <= 2 // Kleine Toleranz für Fehlalarme (max 2 suspicious)
+	var malicious, suspicious float64
+	if v, ok := stats["malicious"].(float64); ok {
+		malicious = v
+	}
+	if v, ok := stats["suspicious"].(float64); ok {
+		suspicious = v
+	}
 
-	// 3. Ergebnis in den Cache schreiben
+	isSafe := malicious == 0 && suspicious <= 2
+
+	// 3. Cache aktualisieren
 	cacheMutex.Lock()
 	scanCache[hash] = isSafe
 	cacheMutex.Unlock()
 
 	if !isSafe {
-		log.Printf("[Security-VT] 🚨 WARNUNG: Datei als bösartig eingestuft! (Malicious: %v, Suspicious: %v)", malicious, suspicious)
-	} else {
-		log.Printf("[Security-VT] Datei ist sauber. (Malicious: 0, Suspicious: %v)", suspicious)
+		log.Printf("[Security-VT] 🚨 MALWARE ERKANNT! (M:%v S:%v)", malicious, suspicious)
 	}
-
 	return isSafe, nil
 }

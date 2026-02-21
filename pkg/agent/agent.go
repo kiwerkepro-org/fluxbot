@@ -29,9 +29,9 @@ type Agent struct {
 	guard           *security.Guard
 	imageGenerators []imagegen.Generator // Alle verfügbaren Bildgeneratoren (in Auswahl-Reihenfolge)
 	imageSize       string
-	videoDefault    string       // "disabled" oder Provider-Name – steuert Video-Meldung
+	videoDefault    string        // "disabled" oder Provider-Name – steuert Video-Meldung
 	emailSender     *email.Sender // nil = E-Mail deaktiviert
-	soul            string       // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
+	soul            string        // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
 	systemPromptFn  func(session *Session, rules string) string
 }
 
@@ -171,22 +171,41 @@ func (a *Agent) handleMessage(ctx context.Context, msg channels.Message) {
 
 // handleVoice verarbeitet Sprachnachrichten
 func (a *Agent) handleVoice(ctx context.Context, msg channels.Message, session *Session) {
-	if msg.MediaPath != "" {
-		defer os.Remove(msg.MediaPath)
-	}
-
 	if a.transcriber == nil {
 		a.manager.Reply(msg, "🎙️ Spracherkennung ist nicht aktiviert.\nFüge in config.json hinzu:\n\"voice\": {\"enabled\": true, \"provider\": \"groq\", \"apiKey\": \"DEIN_GROQ_KEY\"}")
 		return
 	}
 
-	if msg.MediaPath == "" {
-		a.manager.Reply(msg, "❌ Sprachnachricht konnte nicht heruntergeladen werden.")
+	var mediaPath string
+
+	// Fall 1: Sprachdaten kommen aus dem RAM (vom Security-Scanner durchgereicht)
+	if len(msg.VoiceData) > 0 {
+		tmpFile, err := os.CreateTemp("", "voice-*.ogg")
+		if err != nil {
+			log.Printf("[Agent] Fehler beim Erstellen der Temp-Datei: %v", err)
+			a.manager.Reply(msg, "❌ Interner Fehler bei der Sprachverarbeitung.")
+			return
+		}
+		if _, err := tmpFile.Write(msg.VoiceData); err != nil {
+			tmpFile.Close()
+			log.Printf("[Agent] Fehler beim Schreiben der Temp-Datei: %v", err)
+			return
+		}
+		tmpFile.Close()
+		mediaPath = tmpFile.Name()
+		defer os.Remove(mediaPath) // Sofort nach der Transkription restlos löschen
+	} else if msg.MediaPath != "" {
+		// Fall 2: Klassischer Datei-Download (Fallback)
+		mediaPath = msg.MediaPath
+		defer os.Remove(mediaPath)
+	} else {
+		// Weder RAM-Daten noch lokaler Pfad vorhanden
+		a.manager.Reply(msg, "❌ Sprachnachricht konnte nicht geladen werden.")
 		return
 	}
 
 	log.Printf("[Agent] Transkribiere | Provider: %s", a.transcriber.Name())
-	text, err := a.transcriber.Transcribe(ctx, msg.MediaPath, a.voiceLang)
+	text, err := a.transcriber.Transcribe(ctx, mediaPath, a.voiceLang)
 	if err != nil {
 		log.Printf("[Agent] Transkriptions-Fehler: %v", err)
 		a.manager.Reply(msg, fmt.Sprintf("❌ Transkription fehlgeschlagen: %v", err))
@@ -256,7 +275,6 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 		}
 		return a.handleImageRequest(ctx, msg, session, text)
 	}
-
 
 	// ── MERKEN-LOGIK ───────────────────────────────────────────────────────
 	if a.isMemoryCommand(text) {
