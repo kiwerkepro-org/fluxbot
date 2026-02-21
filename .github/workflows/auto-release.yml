@@ -16,12 +16,7 @@
 name: Auto Release
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - "**.md"
-      - ".github/workflows/auto-release.yml"
+  workflow_dispatch:
 
 permissions:
   contents: write
