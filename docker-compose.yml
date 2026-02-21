@@ -3,8 +3,34 @@ version: "3.8"
 # FluxBot – Multi-Channel AI Agent
 # Credentials: Bitte workspace/config.json ausfüllen (KEINE Credentials hier eintragen!)
 # Kopiere workspace/config.example.json → workspace/config.json
+# Umgebungsvariablen: .env-Datei (siehe .env.example)
 
 services:
+
+  # ── Tailscale VPN-Sidecar ──────────────────────────────────────────────────
+  # Dashboard (Port 9090) ist NUR über das Tailscale-Netzwerk erreichbar.
+  # Lokal: Tailscale auf dem Host installiert → http://localhost:9090 wie gewohnt.
+  # VPS / Hetzner: Zugriff via http://fluxbot.DEIN-TAILNET.ts.net:9090
+  # Auth-Key: https://login.tailscale.com/admin/settings/keys (Reusable + Ephemeral)
+  tailscale:
+    image: tailscale/tailscale:latest
+    container_name: fluxbot_tailscale
+    hostname: fluxbot
+    environment:
+      - TS_AUTHKEY=${TAILSCALE_AUTH_KEY:-}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_HOSTNAME=fluxbot
+      - TS_ACCEPT_DNS=true
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    networks:
+      - fluxnet
+    restart: unless-stopped
+
   fluxbot:
     build: .
     container_name: fluxbot_ai
@@ -16,12 +42,16 @@ services:
     environment:
       - FLUXBOT_VAULT_KEY=${FLUXBOT_VAULT_KEY:-}
     ports:
-      - "9090:9090"
+      # Nur localhost – kein direkter Internetzugriff auf das Dashboard!
+      # Zugriff via Tailscale oder lokal über http://localhost:9090
+      - "127.0.0.1:9090:9090"
     volumes:
       # Workspace enthält config.json, Gedächtnis, Skills
       - ./workspace:/app/workspace
     networks:
       - fluxnet
+    depends_on:
+      - tailscale
     restart: unless-stopped
     dns:
       - 8.8.8.8
@@ -83,6 +113,7 @@ networks:
     driver: bridge
 
 volumes:
+  tailscale_state:   # Tailscale-Status (Gerät bleibt nach Neustart im Netz)
   ollama_data:
   wp_data:
   db_data:
