@@ -178,6 +178,22 @@
   .cache-hint { background: rgba(245,166,35,0.07); border: 1px solid rgba(245,166,35,0.22); border-radius: 8px; padding: 14px 18px; font-size: 13px; color: var(--muted); line-height: 1.7; margin-top: 20px; }
   .cache-hint strong { color: var(--yellow); }
   kbd { background: var(--border); padding: 2px 7px; border-radius: 4px; font-size: 12px; color: var(--text); font-family: 'Courier New', monospace; }
+
+  /* ── VirusTotal Section ── */
+  .vt-status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+  .vt-status-badge.active  { background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); }
+  .vt-status-badge.inactive { background: rgba(245,166,35,0.1); color: var(--yellow); border: 1px solid rgba(245,166,35,0.3); }
+  .vt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .vt-table th { text-align: left; padding: 10px 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .vt-table td { padding: 10px 12px; border-bottom: 1px solid rgba(42,51,71,0.6); vertical-align: middle; }
+  .vt-table tr:last-child td { border-bottom: none; }
+  .vt-table tr:hover td { background: rgba(255,255,255,0.025); }
+  .vt-badge-safe    { display: inline-block; background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .vt-badge-blocked { display: inline-block; background: rgba(226,93,93,0.15); color: var(--red); border: 1px solid rgba(226,93,93,0.3); border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .vt-badge-cached  { display: inline-block; background: rgba(91,141,238,0.12); color: var(--accent); border: 1px solid rgba(91,141,238,0.25); border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .vt-type-file { color: var(--yellow); font-size: 13px; }
+  .vt-type-url  { color: var(--accent); font-size: 13px; }
+  .vt-empty { text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px; }
 </style>
 </head>
 <body>
@@ -202,6 +218,9 @@
   </div>
   <div class="nav-item" onclick="showSection('system', this)">
     <span class="nav-icon">🔧</span> System
+  </div>
+  <div class="nav-item" onclick="showSection('virustotal', this)">
+    <span class="nav-icon">🛡️</span> VirusTotal
   </div>
   <div class="sidebar-footer">KI-WERKE · FluxBot v1.0</div>
 </div>
@@ -874,6 +893,83 @@
     </div>
   </div>
 
+  <!-- VIRUSTOTAL -->
+  <div class="section" id="section-virustotal">
+    <h2>🛡️ VirusTotal</h2>
+    <p class="subtitle">Scan-Status, Statistiken und Scan-History in Echtzeit</p>
+
+    <!-- Status + Stats Karten -->
+    <div class="cards" id="vt-cards">
+      <div class="card">
+        <div class="card-label">Status</div>
+        <div id="vt-status-badge" style="margin-top:6px">
+          <span class="vt-status-badge inactive">⏳ Laden…</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-label">Dateien gescannt</div>
+        <div class="card-value blue" id="vt-stat-files">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">URLs geprüft</div>
+        <div class="card-value blue" id="vt-stat-urls">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Blockiert</div>
+        <div class="card-value" id="vt-stat-blocked" style="color:var(--red)">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Cache-Hits</div>
+        <div class="card-value" style="color:var(--muted)" id="vt-stat-cache">–</div>
+      </div>
+    </div>
+
+    <!-- Info-Banner wenn VT inaktiv -->
+    <div id="vt-inactive-banner" style="display:none" class="warn-banner">
+      <span class="warn-icon">⚠️</span>
+      <div>
+        <strong>VirusTotal nicht aktiv</strong>
+        Kein API-Key konfiguriert. Trage <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px">VIRUSTOTAL_API_KEY</code> im Vault ein (Konfiguration → Integrationen) um den Scan zu aktivieren.<br>
+        <a href="https://www.virustotal.com/gui/join-us" target="_blank" style="color:var(--accent);font-size:12px;margin-top:4px;display:inline-block">→ Kostenloser VirusTotal API-Key</a>
+      </div>
+    </div>
+
+    <!-- History Tabelle -->
+    <div class="panel">
+      <div class="panel-title" style="justify-content:space-between">
+        <span>📋 Scan-History</span>
+        <div style="display:flex;gap:10px;align-items:center">
+          <span id="vt-history-count" style="font-size:12px;color:var(--muted);font-weight:400">–</span>
+          <button class="btn btn-secondary" onclick="loadVTData()" style="padding:5px 12px;font-size:12px">🔄 Aktualisieren</button>
+          <button class="btn btn-danger" onclick="clearVTHistory()" style="padding:5px 12px;font-size:12px" id="vt-clear-btn">🗑 Leeren</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="vt-table">
+          <thead>
+            <tr>
+              <th>Zeit</th>
+              <th>Typ</th>
+              <th>Ziel (Hash / URL)</th>
+              <th>Ergebnis</th>
+            </tr>
+          </thead>
+          <tbody id="vt-history-body">
+            <tr><td colspan="4" class="vt-empty">Noch keine Scans seit dem letzten Start.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Info-Box unten -->
+    <div class="howto-box" style="margin-top:4px">
+      <strong>ℹ️ Hinweise zur Scan-History:</strong><br>
+      Die History wird im Arbeitsspeicher gespeichert und beim Neustart von FluxBot zurückgesetzt (max. 100 Einträge).<br>
+      <strong>Cache-Hits</strong> bedeuten: der Hash wurde bereits früher gescannt und das Ergebnis war gecacht (kein neuer API-Call).<br>
+      Unbekannte Dateien (nicht in der VT-Datenbank) gelten als <span style="color:var(--green)">sicher</span>.
+    </div>
+  </div>
+
 </div><!-- /main -->
 
 <!-- ── Confirmation Modal ── -->
@@ -911,11 +1007,12 @@ function showSection(name, el) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('section-' + name).classList.add('active');
   if (el) el.classList.add('active');
-  if (name === 'status')  loadStatus();
-  if (name === 'config')  loadConfig();
-  if (name === 'soul')    loadSoul();
-  if (name === 'logs')    loadCurrentLogs();
-  if (name === 'system')  updateSystemCmds();
+  if (name === 'status')     loadStatus();
+  if (name === 'config')     loadConfig();
+  if (name === 'soul')       loadSoul();
+  if (name === 'logs')       loadCurrentLogs();
+  if (name === 'system')     updateSystemCmds();
+  if (name === 'virustotal') loadVTData();
 }
 
 function showTab(name, el) {
@@ -1081,10 +1178,58 @@ function toast(msg, isError = false) {
   setTimeout(() => { t.className = ''; }, 3500);
 }
 
+// ── HMAC Request-Signing ──────────────────────────────────────────────────
+// hmacCryptoKey wird beim Init geladen (null = HMAC deaktiviert)
+let hmacCryptoKey = null;
+
+// Lädt das HMAC-Secret vom Server und importiert es als CryptoKey.
+// Wird einmalig beim Start aufgerufen – schlägt lautlos fehl wenn deaktiviert.
+async function initHMAC() {
+  try {
+    const resp = await fetch('/api/hmac-token');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.enabled || !data.secret) return;
+    const enc = new TextEncoder();
+    hmacCryptoKey = await crypto.subtle.importKey(
+      'raw',
+      enc.encode(data.secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    console.log('[HMAC] Dashboard Request-Signing aktiv ✅');
+  } catch (e) {
+    console.warn('[HMAC] Initialisierung fehlgeschlagen (optional):', e);
+  }
+}
+
+// Berechnet HMAC-SHA256("{timestamp}.{body}", key) → Hex-String
+async function signPayload(timestamp, bodyStr) {
+  if (!hmacCryptoKey) return null;
+  const enc = new TextEncoder();
+  const payload = `${timestamp}.${bodyStr}`;
+  const sigBuf = await crypto.subtle.sign('HMAC', hmacCryptoKey, enc.encode(payload));
+  return Array.from(new Uint8Array(sigBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // ── API Helpers ────────────────────────────────────────────────────────────
 async function api(url, method = 'GET', body = null) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
-  if (body) opts.body = JSON.stringify(body);
+  const bodyStr = body ? JSON.stringify(body) : '';
+  if (bodyStr) opts.body = bodyStr;
+
+  // HMAC-Signierung für schreibende Requests (POST, PUT, DELETE)
+  const mutating = ['POST', 'PUT', 'DELETE'].includes((method || 'GET').toUpperCase());
+  if (mutating && hmacCryptoKey) {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const sig = await signPayload(timestamp, bodyStr);
+    if (sig) {
+      opts.headers['X-Timestamp'] = timestamp;
+      opts.headers['X-Signature'] = sig;
+    }
+  }
+
   const resp = await fetch(url, opts);
   return resp.json();
 }
@@ -1810,7 +1955,90 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+// ── VIRUSTOTAL ─────────────────────────────────────────────────────────────
+
+async function loadVTData() {
+  const [stats, history] = await Promise.all([
+    api('/api/vt/status').catch(() => null),
+    api('/api/vt/history').catch(() => [])
+  ]);
+  if (stats) renderVTStats(stats);
+  renderVTHistory(history || []);
+}
+
+function renderVTStats(stats) {
+  // Status-Badge
+  const badgeEl = document.getElementById('vt-status-badge');
+  const banner  = document.getElementById('vt-inactive-banner');
+  if (stats.enabled) {
+    badgeEl.innerHTML = '<span class="vt-status-badge active">✅ Aktiv</span>';
+    banner.style.display = 'none';
+  } else {
+    badgeEl.innerHTML = '<span class="vt-status-badge inactive">⚠️ Inaktiv – API-Key fehlt</span>';
+    banner.style.display = 'flex';
+  }
+  // Statistik-Karten
+  document.getElementById('vt-stat-files').textContent  = stats.total_files   ?? '–';
+  document.getElementById('vt-stat-urls').textContent   = stats.total_urls    ?? '–';
+  const blocked = (stats.blocked_files || 0) + (stats.blocked_urls || 0);
+  const blockedEl = document.getElementById('vt-stat-blocked');
+  blockedEl.textContent = blocked;
+  blockedEl.style.color = blocked > 0 ? 'var(--red)' : 'var(--green)';
+  document.getElementById('vt-stat-cache').textContent  = stats.cache_hits    ?? '–';
+}
+
+function renderVTHistory(entries) {
+  const tbody = document.getElementById('vt-history-body');
+  const countEl = document.getElementById('vt-history-count');
+  countEl.textContent = entries.length > 0 ? entries.length + ' Einträge' : '';
+
+  if (!entries || entries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="vt-empty">Noch keine Scans seit dem letzten Start.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const ts = new Date(e.time);
+    const timeStr = ts.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                  + ' ' + ts.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit' });
+
+    const typeIcon = e.type === 'file'
+      ? '<span class="vt-type-file">📄 Datei</span>'
+      : '<span class="vt-type-url">🔗 URL</span>';
+
+    let resultBadge;
+    if (e.cached) {
+      resultBadge = `<span class="vt-badge-cached">💾 Cache</span>`;
+    } else if (e.safe) {
+      resultBadge = `<span class="vt-badge-safe">✅ Sicher</span>`;
+    } else {
+      resultBadge = `<span class="vt-badge-blocked">🚨 Blockiert</span>`;
+    }
+
+    const targetHtml = `<code style="font-size:12px;color:var(--muted);word-break:break-all">${escHtml(e.target || '–')}</code>`;
+
+    return `<tr>
+      <td style="white-space:nowrap;font-size:12px;color:var(--muted)">${escHtml(timeStr)}</td>
+      <td>${typeIcon}</td>
+      <td>${targetHtml}</td>
+      <td>${resultBadge}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function clearVTHistory() {
+  if (!confirm('Scan-History und Statistiken wirklich zurücksetzen?')) return;
+  const result = await api('/api/vt/clear', 'POST', {});
+  if (result && result.error) {
+    toast('Fehler: ' + result.error, true);
+  } else {
+    toast('✅ VT-History zurückgesetzt');
+    loadVTData();
+  }
+}
+
 // ── Init ───────────────────────────────────────────────────────────────────
+initHMAC(); // HMAC-Secret laden (lautlos falls nicht konfiguriert)
 loadStatus();
 updateSystemCmds();
 </script>

@@ -12,6 +12,26 @@ import (
 	"github.com/VirusTotal/vt-go"
 )
 
+// ScanEntry ist ein einzelner Eintrag in der Scan-History.
+type ScanEntry struct {
+	Time    time.Time `json:"time"`
+	Type    string    `json:"type"`   // "file" | "url"
+	Target  string    `json:"target"` // Hash (gekürzt) oder URL
+	Safe    bool      `json:"safe"`
+	Cached  bool      `json:"cached"`
+}
+
+// VTStats enthält aggregierte Scan-Statistiken.
+type VTStats struct {
+	Enabled      bool `json:"enabled"`
+	TotalFiles   int  `json:"total_files"`
+	TotalURLs    int  `json:"total_urls"`
+	BlockedFiles int  `json:"blocked_files"`
+	BlockedURLs  int  `json:"blocked_urls"`
+	CacheHits    int  `json:"cache_hits"`
+	HistoryLen   int  `json:"history_len"`
+}
+
 var (
 	vtClient    *vt.Client
 	scanEnabled bool
@@ -21,7 +41,19 @@ var (
 	// Rate-Limiting für Public API (max 4/min → 15 Sekunden Abstand)
 	lastScan  time.Time
 	scanMutex sync.Mutex
+	// Scan-History (in-memory, max 100 Einträge)
+	scanHistory  []ScanEntry
+	historyMutex sync.RWMutex
+	// Statistik-Zähler
+	statsFiles        int
+	statsURLs         int
+	statsBlockedFiles int
+	statsBlockedURLs  int
+	statsCacheHits    int
+	statsMutex        sync.Mutex
 )
+
+const maxHistory = 100
 
 // Einheitliche Benutzer-Warnmeldungen – alle Kanäle nutzen diese Konstanten.
 const (
@@ -72,6 +104,7 @@ func ScanFileHash(hash string) (bool, error) {
 	cacheMutex.RUnlock()
 	if found {
 		log.Printf("[Security-VT] Hash im Cache: %s (Clean: %v)", hash[:16]+"...", isClean)
+		recordScan("file", hash[:16]+"...", isClean, true)
 		return isClean, nil
 	}
 
@@ -114,6 +147,7 @@ func ScanFileHash(hash string) (bool, error) {
 	if !isSafe {
 		log.Printf("[Security-VT] 🚨 MALWARE ERKANNT! (Hash: %s...)", hash[:16])
 	}
+	recordScan("file", hash[:16]+"...", isSafe, false)
 	return isSafe, nil
 }
 
@@ -154,6 +188,12 @@ func ScanURL(rawURL string) (bool, error) {
 	if !isSafe {
 		log.Printf("[Security-VT] 🚨 MALWARE-URL ERKANNT! URL: %s", rawURL)
 	}
+	// URL für die History kürzen (max 80 Zeichen)
+	displayURL := rawURL
+	if len(displayURL) > 80 {
+		displayURL = displayURL[:77] + "..."
+	}
+	recordScan("url", displayURL, isSafe, false)
 	return isSafe, nil
 }
 
@@ -194,6 +234,82 @@ func ExtractURLs(text string) []string {
 func vtURLIdentifier(rawURL string) string {
 	sum := sha256.Sum256([]byte(rawURL))
 	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+// recordScan fügt einen Eintrag zur Scan-History hinzu und aktualisiert die Statistiken.
+func recordScan(scanType, target string, safe, cached bool) {
+	statsMutex.Lock()
+	if cached {
+		statsCacheHits++
+	} else if scanType == "file" {
+		statsFiles++
+		if !safe {
+			statsBlockedFiles++
+		}
+	} else if scanType == "url" {
+		statsURLs++
+		if !safe {
+			statsBlockedURLs++
+		}
+	}
+	statsMutex.Unlock()
+
+	entry := ScanEntry{
+		Time:   time.Now(),
+		Type:   scanType,
+		Target: target,
+		Safe:   safe,
+		Cached: cached,
+	}
+	historyMutex.Lock()
+	// Neuester Eintrag vorne
+	scanHistory = append([]ScanEntry{entry}, scanHistory...)
+	if len(scanHistory) > maxHistory {
+		scanHistory = scanHistory[:maxHistory]
+	}
+	historyMutex.Unlock()
+}
+
+// GetStats gibt die aktuellen Scan-Statistiken zurück (thread-safe).
+func GetStats() VTStats {
+	statsMutex.Lock()
+	s := VTStats{
+		Enabled:      IsEnabled(),
+		TotalFiles:   statsFiles,
+		TotalURLs:    statsURLs,
+		BlockedFiles: statsBlockedFiles,
+		BlockedURLs:  statsBlockedURLs,
+		CacheHits:    statsCacheHits,
+	}
+	statsMutex.Unlock()
+	historyMutex.RLock()
+	s.HistoryLen = len(scanHistory)
+	historyMutex.RUnlock()
+	return s
+}
+
+// GetHistory gibt eine Kopie der Scan-History zurück (thread-safe).
+func GetHistory() []ScanEntry {
+	historyMutex.RLock()
+	defer historyMutex.RUnlock()
+	result := make([]ScanEntry, len(scanHistory))
+	copy(result, scanHistory)
+	return result
+}
+
+// ClearHistory leert die Scan-History und setzt alle Statistik-Zähler zurück.
+func ClearHistory() {
+	historyMutex.Lock()
+	scanHistory = nil
+	historyMutex.Unlock()
+	statsMutex.Lock()
+	statsFiles = 0
+	statsURLs = 0
+	statsBlockedFiles = 0
+	statsBlockedURLs = 0
+	statsCacheHits = 0
+	statsMutex.Unlock()
+	log.Println("[Security-VT] History und Statistiken zurückgesetzt.")
 }
 
 // extractSafetyFromStats liest die last_analysis_stats aus einem VT-Objekt

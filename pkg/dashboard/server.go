@@ -2,11 +2,19 @@ package dashboard
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
+	"math"
 	"net/http"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -23,6 +31,8 @@ type Server struct {
 	workspacePath string
 	password      string
 	passwordMu    sync.RWMutex    // schützt Hot-Reload des Passworts
+	hmacSecret    string
+	hmacSecretMu  sync.RWMutex    // schützt Hot-Reload des HMAC-Secrets
 	port          int
 	startTime     time.Time
 	getChannels   func() []string         // Callback: liefert aktive Kanäle zur Laufzeit
@@ -35,17 +45,29 @@ type Server struct {
 // logPath: Pfad zur fluxbot.log – wenn leer, wird kein Terminal-Log angezeigt.
 // vault: Secret-Speicher für API-Keys und Passwörter (AES-256-GCM).
 // onReload: wird nach jeder Config- oder Secret-Änderung aufgerufen.
-func New(configPath, workspacePath, password string, port int, getChannels func() []string, logPath string, vault *security.VaultProvider, onReload func()) *Server {
+// hmacSecret: HMAC-Schlüssel für Dashboard-API-Request-Signierung (leer = deaktiviert).
+func New(configPath, workspacePath, password string, port int, getChannels func() []string, logPath string, vault *security.VaultProvider, onReload func(), hmacSecret string) *Server {
 	return &Server{
 		configPath:    configPath,
 		workspacePath: workspacePath,
 		password:      password,
+		hmacSecret:    hmacSecret,
 		port:          port,
 		startTime:     time.Now(),
 		getChannels:   getChannels,
 		logPath:       logPath,
 		vault:         vault,
 		onReload:      onReload,
+	}
+}
+
+// UpdateHMACSecret aktualisiert das HMAC-Secret zur Laufzeit (Hot-Reload).
+func (s *Server) UpdateHMACSecret(secret string) {
+	s.hmacSecretMu.Lock()
+	defer s.hmacSecretMu.Unlock()
+	if secret != "" {
+		s.hmacSecret = secret
+		log.Println("[Dashboard] HMAC-Secret aktualisiert.")
 	}
 }
 
@@ -67,13 +89,19 @@ func (s *Server) Start(ctx context.Context) {
 	// ── UI (eingebettetes HTML) ───────────────────────────────────────────────
 	mux.HandleFunc("/", s.auth(s.handleUI))
 
-	// ── API-Endpunkte ─────────────────────────────────────────────────────────
+	// ── API-Endpunkte (lesend – kein HMAC erforderlich) ─────────────────────
 	mux.HandleFunc("/api/status", s.auth(s.handleStatus))
-	mux.HandleFunc("/api/config", s.auth(s.handleConfig))
-	mux.HandleFunc("/api/secrets", s.auth(s.handleSecrets))
-	mux.HandleFunc("/api/soul", s.auth(s.handleSoul))
 	mux.HandleFunc("/api/logs", s.auth(s.handleLogs))
 	mux.HandleFunc("/api/logs/terminal", s.auth(s.handleTerminalLogs))
+	mux.HandleFunc("/api/hmac-token", s.auth(s.handleHMACToken))
+	mux.HandleFunc("/api/vt/status", s.auth(s.handleVTStatus))
+	mux.HandleFunc("/api/vt/history", s.auth(s.handleVTHistory))
+
+	// ── API-Endpunkte (schreibend – HMAC-Signierung erforderlich) ───────────
+	mux.HandleFunc("/api/config", s.auth(s.hmacVerify(s.handleConfig)))
+	mux.HandleFunc("/api/secrets", s.auth(s.hmacVerify(s.handleSecrets)))
+	mux.HandleFunc("/api/soul", s.auth(s.hmacVerify(s.handleSoul)))
+	mux.HandleFunc("/api/vt/clear", s.auth(s.hmacVerify(s.handleVTClear)))
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),
@@ -114,6 +142,92 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		next(w, r)
 	}
+}
+
+// hmacVerify ist HMAC-SHA256 Middleware für schreibende API-Requests (POST, PUT, DELETE).
+// GET-Requests werden ohne HMAC-Prüfung durchgelassen.
+// Wenn kein HMAC-Secret konfiguriert ist, wird die Prüfung übersprungen (Abwärtskompatibilität).
+// Payload: HMAC-SHA256("{timestamp}.{body}", secret) als Hex-String im Header X-Signature.
+// Replay-Schutz: X-Timestamp muss Unix-Sekunden sein und darf max. 5 Minuten abweichen.
+func (s *Server) hmacVerify(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// GET-Requests haben keinen Body – keine Signierung nötig
+		if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+			next(w, r)
+			return
+		}
+
+		s.hmacSecretMu.RLock()
+		secret := s.hmacSecret
+		s.hmacSecretMu.RUnlock()
+
+		// Kein Secret konfiguriert → Middleware transparent (Abwärtskompatibilität)
+		if secret == "" {
+			next(w, r)
+			return
+		}
+
+		// Timestamp aus Header lesen und Replay-Schutz prüfen
+		tsStr := r.Header.Get("X-Timestamp")
+		if tsStr == "" {
+			http.Error(w, "X-Timestamp fehlt", http.StatusUnauthorized)
+			return
+		}
+		ts, err := strconv.ParseInt(tsStr, 10, 64)
+		if err != nil {
+			http.Error(w, "X-Timestamp ungültig", http.StatusUnauthorized)
+			return
+		}
+		diff := math.Abs(float64(time.Now().Unix() - ts))
+		if diff > 300 { // 5 Minuten
+			http.Error(w, "X-Timestamp abgelaufen (Replay-Schutz)", http.StatusUnauthorized)
+			return
+		}
+
+		// Signatur aus Header lesen
+		sig := r.Header.Get("X-Signature")
+		if sig == "" {
+			http.Error(w, "X-Signature fehlt", http.StatusUnauthorized)
+			return
+		}
+
+		// Body lesen (und für Handler wiederherstellen)
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Body konnte nicht gelesen werden", http.StatusBadRequest)
+			return
+		}
+
+		// HMAC-Payload: "{timestamp}.{body}"
+		payload := fmt.Sprintf("%s.%s", tsStr, string(bodyBytes))
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write([]byte(payload))
+		expected := hex.EncodeToString(mac.Sum(nil))
+
+		if !hmac.Equal([]byte(sig), []byte(expected)) {
+			log.Printf("[Dashboard] ⚠️ HMAC-Verifikation fehlgeschlagen: %s %s", r.Method, r.URL.Path)
+			http.Error(w, "Ungültige Signatur", http.StatusUnauthorized)
+			return
+		}
+
+		// Body für den eigentlichen Handler wiederherstellen
+		r.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+		next(w, r)
+	}
+}
+
+// handleHMACToken liefert das HMAC-Secret an das authentifizierte Frontend.
+// Das Secret wird nur übertragen wenn HMAC aktiviert ist.
+func (s *Server) handleHMACToken(w http.ResponseWriter, r *http.Request) {
+	s.hmacSecretMu.RLock()
+	secret := s.hmacSecret
+	s.hmacSecretMu.RUnlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"enabled": secret != "",
+		"secret":  secret,
+	})
 }
 
 // handleUI liefert das eingebettete dashboard.html
