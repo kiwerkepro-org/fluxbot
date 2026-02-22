@@ -36,10 +36,11 @@ type Agent struct {
 	imageSize        string
 	videoDefault     string        // "disabled" oder Provider-Name – steuert Video-Meldung
 	emailSender      *email.Sender // nil = E-Mail deaktiviert
-	calcomBaseURL    string        // Cal.com / Cal.eu API-Basis-URL
-	calcomAPIKey     string        // Cal.com API-Key
-	calcomOwnerEmail string        // Standard-E-Mail für Buchungen
-	soul             string        // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
+	calcomBaseURL     string // Cal.com / Cal.eu API-Basis-URL
+	calcomAPIKey      string // Cal.com API-Key
+	calcomOwnerEmail  string // Standard-E-Mail für Buchungen
+	calcomEventTypeID int    // Optional: fixe Event Type ID (0 = auto-fetch)
+	soul              string // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
 	systemPromptFn   func(session *Session, rules string) string
 }
 
@@ -57,10 +58,11 @@ type Config struct {
 	ImageSize       string
 	VideoDefault     string        // "disabled" oder Provider-Name – steuert Video-Meldung
 	EmailSender      *email.Sender // Optional – nil = E-Mail deaktiviert
-	CalcomBaseURL    string        // Optional – Cal.com / Cal.eu API-Basis-URL
-	CalcomAPIKey     string        // Optional – Cal.com API-Key
-	CalcomOwnerEmail string        // Optional – Standard-E-Mail für Buchungen
-	Soul             string        // Inhalt von SOUL.md + IDENTITY.md (leer = nur Basis-Prompt)
+	CalcomBaseURL     string // Optional – Cal.com / Cal.eu API-Basis-URL
+	CalcomAPIKey      string // Optional – Cal.com API-Key
+	CalcomOwnerEmail  string // Optional – Standard-E-Mail für Buchungen
+	CalcomEventTypeID int    // Optional – fixe Event Type ID (0 = auto-fetch)
+	Soul              string // Inhalt von SOUL.md + IDENTITY.md (leer = nur Basis-Prompt)
 }
 
 // New erstellt einen neuen Agent
@@ -82,9 +84,10 @@ func New(cfg Config) *Agent {
 		imageSize:       cfg.ImageSize,
 		videoDefault:    cfg.VideoDefault,
 		emailSender:      cfg.EmailSender,
-		calcomBaseURL:    cfg.CalcomBaseURL,
-		calcomAPIKey:     cfg.CalcomAPIKey,
-		calcomOwnerEmail: cfg.CalcomOwnerEmail,
+		calcomBaseURL:     cfg.CalcomBaseURL,
+		calcomAPIKey:      cfg.CalcomAPIKey,
+		calcomOwnerEmail:  cfg.CalcomOwnerEmail,
+		calcomEventTypeID: cfg.CalcomEventTypeID,
 		soul:             cfg.Soul,
 	}
 	a.systemPromptFn = a.buildSystemPrompt
@@ -119,14 +122,19 @@ func (a *Agent) UpdateEmailSender(sender *email.Sender) {
 
 // UpdateCalcomConfig aktualisiert die Cal.com-Konfiguration zur Laufzeit.
 // Wird aufgerufen wenn die Config im Dashboard geändert wird (Hot-Reload).
-func (a *Agent) UpdateCalcomConfig(baseURL, apiKey, ownerEmail string) {
+func (a *Agent) UpdateCalcomConfig(baseURL, apiKey, ownerEmail string, eventTypeID int) {
 	a.calcomBaseURL = baseURL
 	a.calcomAPIKey = apiKey
 	a.calcomOwnerEmail = ownerEmail
+	a.calcomEventTypeID = eventTypeID
 	if baseURL == "" || apiKey == "" {
 		log.Println("[Agent] 🔄 Cal.com deaktiviert (keine Zugangsdaten).")
 	} else {
-		log.Printf("[Agent] 🔄 Cal.com aktiv (%s)", baseURL)
+		if eventTypeID > 0 {
+			log.Printf("[Agent] 🔄 Cal.com aktiv (%s | EventTypeID: %d)", baseURL, eventTypeID)
+		} else {
+			log.Printf("[Agent] 🔄 Cal.com aktiv (%s | EventTypeID: auto)", baseURL)
+		}
 	}
 }
 
@@ -791,12 +799,14 @@ func (a *Agent) handleCalcomBooking(response string) string {
 		}
 	}
 
-	// Event Type ID auto-ermitteln
-	eventTypeID, err := a.fetchCalcomEventTypeID()
+	// Event Type ID: konfigurierte ID verwenden oder auto-ermitteln
+	eventTypeID, err := a.resolveCalcomEventTypeID()
 	if err != nil {
-		log.Printf("[Agent] ❌ Cal.com Event Types: %v", err)
-		return fmt.Sprintf("❌ Cal.com Event Types konnten nicht geladen werden:\n_%v_\n\n"+
-			"Prüfe API-Adresse und API-Key im Dashboard → Integrationen → Cal.com.", err)
+		log.Printf("[Agent] ❌ Cal.com Event Type ID: %v", err)
+		return fmt.Sprintf("❌ Cal.com Event Type ID konnte nicht ermittelt werden:\n_%v_\n\n"+
+			"Lösung: Gehe zu Cal.com/Cal.eu → Event Types → öffne deinen Termin-Typ → "+
+			"die Zahl in der URL (z.B. /event-types/**123456**) im Dashboard → "+
+			"Integrationen → Cal.com → Event Type ID eintragen.", err)
 	}
 
 	// Buchungs-Payload zusammenstellen
@@ -844,35 +854,57 @@ func (a *Agent) handleCalcomBooking(response string) string {
 	return fmt.Sprintf("❌ Cal.com API Fehler (%d):\n_%s_", resp.StatusCode, string(respBody))
 }
 
-// fetchCalcomEventTypeID holt die erste verfügbare Event Type ID via GET /event-types.
-func (a *Agent) fetchCalcomEventTypeID() (int, error) {
-	apiURL := strings.TrimRight(a.calcomBaseURL, "/") + "/event-types?apiKey=" + a.calcomAPIKey
+// resolveCalcomEventTypeID gibt die konfigurierte Event Type ID zurück oder ermittelt sie via API.
+func (a *Agent) resolveCalcomEventTypeID() (int, error) {
+	// Konfigurierte ID direkt verwenden (kein API-Call nötig)
+	if a.calcomEventTypeID > 0 {
+		log.Printf("[Agent] 📅 Cal.com EventTypeID: %d (konfiguriert)", a.calcomEventTypeID)
+		return a.calcomEventTypeID, nil
+	}
+
+	// Auto-Ermittlung: verschiedene Endpunkte probieren
+	baseURL := strings.TrimRight(a.calcomBaseURL, "/")
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	resp, err := client.Get(apiURL)
-	if err != nil {
-		return 0, err
+	// Versuch 1: Standard V1 Endpunkt (query-param auth)
+	endpoints := []string{
+		baseURL + "/event-types?apiKey=" + a.calcomAPIKey,
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode >= 400 {
+	for _, apiURL := range endpoints {
+		req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+		if err != nil {
+			continue
+		}
+		// Auch Bearer-Auth mitschicken (für neuere API-Versionen)
+		req.Header.Set("Authorization", "Bearer "+a.calcomAPIKey)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("[Agent] Cal.com GET %s Fehler: %v", apiURL, err)
+			continue
+		}
 		body, _ := io.ReadAll(resp.Body)
-		return 0, fmt.Errorf("API Fehler %d: %s", resp.StatusCode, string(body))
+		resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			log.Printf("[Agent] Cal.com GET %s → %d: %s", apiURL, resp.StatusCode, string(body))
+			continue
+		}
+
+		// Antwort parsen – Cal.com V1: { "event_types": [...] }
+		var result struct {
+			EventTypes []struct {
+				ID int `json:"id"`
+			} `json:"event_types"`
+		}
+		if err := json.Unmarshal(body, &result); err == nil && len(result.EventTypes) > 0 {
+			log.Printf("[Agent] 📅 Cal.com EventTypeID auto-ermittelt: %d", result.EventTypes[0].ID)
+			return result.EventTypes[0].ID, nil
+		}
 	}
 
-	// Cal.com V1 gibt { "event_types": [...] } zurück
-	var result struct {
-		EventTypes []struct {
-			ID int `json:"id"`
-		} `json:"event_types"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return 0, fmt.Errorf("Antwort konnte nicht geparst werden: %w", err)
-	}
-	if len(result.EventTypes) == 0 {
-		return 0, fmt.Errorf("keine Event Types in Cal.com gefunden – erstelle zuerst einen Event Type in deinem Cal.com Dashboard")
-	}
-	return result.EventTypes[0].ID, nil
+	return 0, fmt.Errorf("konnte nicht automatisch ermittelt werden – bitte Event Type ID manuell im Dashboard → Integrationen → Cal.com eintragen")
 }
 
 // handleCalcomList lädt die nächsten anstehenden Termine via GET /bookings.
