@@ -759,7 +759,44 @@ type calcomBookingPayload struct {
 	TimeZone      string `json:"timeZone"`
 }
 
+// isV2API gibt true zurück wenn die konfigurierte Base-URL auf V2 hinweist.
+func (a *Agent) isV2API() bool {
+	return strings.Contains(a.calcomBaseURL, "/v2")
+}
+
+// calcomRequest erstellt einen HTTP-Request mit den richtigen Auth-Headern für V1 oder V2.
+// V1: ?apiKey= als Query-Parameter + Bearer als Fallback-Header
+// V2: Authorization: Bearer + cal-api-version Header (kein Query-Parameter)
+func (a *Agent) calcomRequest(method, path string, bodyBytes []byte) (*http.Request, error) {
+	baseURL := strings.TrimRight(a.calcomBaseURL, "/")
+	var apiURL string
+	if a.isV2API() {
+		apiURL = baseURL + path // kein ?apiKey= für V2
+	} else {
+		apiURL = baseURL + path + "?apiKey=" + a.calcomAPIKey
+	}
+
+	var reqBody *bytes.Reader
+	if bodyBytes != nil {
+		reqBody = bytes.NewReader(bodyBytes)
+	} else {
+		reqBody = bytes.NewReader([]byte{})
+	}
+
+	req, err := http.NewRequest(method, apiURL, reqBody)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+a.calcomAPIKey)
+	if a.isV2API() {
+		req.Header.Set("cal-api-version", "2024-06-14")
+	}
+	return req, nil
+}
+
 // handleCalcomBooking parst den __CALCOM_BOOK__-Marker und erstellt einen echten Termin via Cal.com API.
+// Unterstützt V1 ({ "responses": {...} }) und V2 ({ "attendee": {...} }) Payload-Format.
 func (a *Agent) handleCalcomBooking(response string) string {
 	if a.calcomBaseURL == "" || a.calcomAPIKey == "" {
 		return "❌ Cal.com ist nicht konfiguriert.\n\n" +
@@ -780,7 +817,7 @@ func (a *Agent) handleCalcomBooking(response string) string {
 		return fmt.Sprintf("❌ Cal.com Buchungs-Format ungültig: %v", err)
 	}
 
-	// Defaults setzen
+	// Defaults
 	if booking.AttendeeName == "" {
 		booking.AttendeeName = "JJ"
 	}
@@ -790,58 +827,69 @@ func (a *Agent) handleCalcomBooking(response string) string {
 	if booking.TimeZone == "" {
 		booking.TimeZone = "Europe/Vienna"
 	}
-	// End-Zeit: wenn nicht angegeben, start + 60 Minuten
 	if booking.End == "" && booking.Start != "" {
 		if t, err := time.Parse(time.RFC3339, booking.Start); err == nil {
 			booking.End = t.Add(60 * time.Minute).Format(time.RFC3339)
 		} else {
-			booking.End = booking.Start // Fallback
+			booking.End = booking.Start
 		}
 	}
 
-	// Event Type ID: konfigurierte ID verwenden oder auto-ermitteln
+	// Event Type ID ermitteln
 	eventTypeID, err := a.resolveCalcomEventTypeID()
 	if err != nil {
 		log.Printf("[Agent] ❌ Cal.com Event Type ID: %v", err)
 		return fmt.Sprintf("❌ Cal.com Event Type ID konnte nicht ermittelt werden:\n_%v_\n\n"+
-			"Lösung: Gehe zu Cal.com/Cal.eu → Event Types → öffne deinen Termin-Typ → "+
-			"die Zahl in der URL (z.B. /event-types/**123456**) im Dashboard → "+
-			"Integrationen → Cal.com → Event Type ID eintragen.", err)
+			"Lösung: Cal.com/Cal.eu öffnen → Event Types → Termin-Typ anklicken → "+
+			"Zahl aus der URL kopieren (z.B. /event-types/**123456**) → "+
+			"Dashboard → Integrationen → Cal.com → Feld „Event Type ID" eintragen → Speichern.", err)
 	}
 
-	// Buchungs-Payload zusammenstellen
-	payload := map[string]interface{}{
-		"eventTypeId": eventTypeID,
-		"start":       booking.Start,
-		"end":         booking.End,
-		"responses": map[string]string{
-			"name":  booking.AttendeeName,
-			"email": booking.AttendeeEmail,
-		},
-		"timeZone": booking.TimeZone,
-		"metadata": map[string]interface{}{},
-	}
-	if booking.Title != "" {
-		payload["title"] = booking.Title
+	// Payload je nach API-Version aufbauen
+	var payload map[string]interface{}
+	if a.isV2API() {
+		// Cal.com V2: attendee-Objekt statt responses
+		payload = map[string]interface{}{
+			"start":       booking.Start,
+			"eventTypeId": eventTypeID,
+			"attendee": map[string]string{
+				"name":     booking.AttendeeName,
+				"email":    booking.AttendeeEmail,
+				"timeZone": booking.TimeZone,
+				"language": "de",
+			},
+		}
+	} else {
+		// Cal.com V1: responses-Objekt
+		payload = map[string]interface{}{
+			"eventTypeId": eventTypeID,
+			"start":       booking.Start,
+			"end":         booking.End,
+			"responses": map[string]string{
+				"name":  booking.AttendeeName,
+				"email": booking.AttendeeEmail,
+			},
+			"timeZone": booking.TimeZone,
+			"metadata": map[string]interface{}{},
+		}
+		if booking.Title != "" {
+			payload["title"] = booking.Title
+		}
 	}
 
 	body, _ := json.Marshal(payload)
-	apiURL := strings.TrimRight(a.calcomBaseURL, "/") + "/bookings?apiKey=" + a.calcomAPIKey
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(body))
+	req, err := a.calcomRequest(http.MethodPost, "/bookings", body)
 	if err != nil {
 		return fmt.Sprintf("❌ HTTP-Request konnte nicht erstellt werden: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
 
+	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("[Agent] ❌ Cal.com POST /bookings: %v", err)
 		return fmt.Sprintf("❌ Cal.com Buchung fehlgeschlagen:\n_%v_", err)
 	}
 	defer resp.Body.Close()
-
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
@@ -855,111 +903,139 @@ func (a *Agent) handleCalcomBooking(response string) string {
 }
 
 // resolveCalcomEventTypeID gibt die konfigurierte Event Type ID zurück oder ermittelt sie via API.
+// Unterstützt V1 { "event_types": [...] } und V2 { "data": { "eventTypeGroups": [...] } }.
 func (a *Agent) resolveCalcomEventTypeID() (int, error) {
-	// Konfigurierte ID direkt verwenden (kein API-Call nötig)
 	if a.calcomEventTypeID > 0 {
 		log.Printf("[Agent] 📅 Cal.com EventTypeID: %d (konfiguriert)", a.calcomEventTypeID)
 		return a.calcomEventTypeID, nil
 	}
 
-	// Auto-Ermittlung: verschiedene Endpunkte probieren
-	baseURL := strings.TrimRight(a.calcomBaseURL, "/")
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	// Versuch 1: Standard V1 Endpunkt (query-param auth)
-	endpoints := []string{
-		baseURL + "/event-types?apiKey=" + a.calcomAPIKey,
+	req, err := a.calcomRequest(http.MethodGet, "/event-types", nil)
+	if err != nil {
+		return 0, err
 	}
 
-	for _, apiURL := range endpoints {
-		req, err := http.NewRequest(http.MethodGet, apiURL, nil)
-		if err != nil {
-			continue
-		}
-		// Auch Bearer-Auth mitschicken (für neuere API-Versionen)
-		req.Header.Set("Authorization", "Bearer "+a.calcomAPIKey)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
 
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Printf("[Agent] Cal.com GET %s Fehler: %v", apiURL, err)
-			continue
-		}
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return 0, fmt.Errorf("API Fehler %d: %s", resp.StatusCode, string(body))
+	}
 
-		if resp.StatusCode >= 400 {
-			log.Printf("[Agent] Cal.com GET %s → %d: %s", apiURL, resp.StatusCode, string(body))
-			continue
+	// V2: { "status": "success", "data": { "eventTypeGroups": [{ "eventTypes": [{ "id": 1 }] }] } }
+	if a.isV2API() {
+		var v2 struct {
+			Data struct {
+				EventTypeGroups []struct {
+					EventTypes []struct {
+						ID int `json:"id"`
+					} `json:"eventTypes"`
+				} `json:"eventTypeGroups"`
+			} `json:"data"`
 		}
-
-		// Antwort parsen – Cal.com V1: { "event_types": [...] }
-		var result struct {
+		if err := json.Unmarshal(body, &v2); err == nil {
+			for _, g := range v2.Data.EventTypeGroups {
+				if len(g.EventTypes) > 0 {
+					log.Printf("[Agent] 📅 Cal.com V2 EventTypeID auto: %d", g.EventTypes[0].ID)
+					return g.EventTypes[0].ID, nil
+				}
+			}
+		}
+	} else {
+		// V1: { "event_types": [...] }
+		var v1 struct {
 			EventTypes []struct {
 				ID int `json:"id"`
 			} `json:"event_types"`
 		}
-		if err := json.Unmarshal(body, &result); err == nil && len(result.EventTypes) > 0 {
-			log.Printf("[Agent] 📅 Cal.com EventTypeID auto-ermittelt: %d", result.EventTypes[0].ID)
-			return result.EventTypes[0].ID, nil
+		if err := json.Unmarshal(body, &v1); err == nil && len(v1.EventTypes) > 0 {
+			log.Printf("[Agent] 📅 Cal.com V1 EventTypeID auto: %d", v1.EventTypes[0].ID)
+			return v1.EventTypes[0].ID, nil
 		}
 	}
 
-	return 0, fmt.Errorf("konnte nicht automatisch ermittelt werden – bitte Event Type ID manuell im Dashboard → Integrationen → Cal.com eintragen")
+	return 0, fmt.Errorf("keine Event Types gefunden – bitte Event Type ID manuell im Dashboard → Integrationen → Cal.com eintragen")
 }
 
-// handleCalcomList lädt die nächsten anstehenden Termine via GET /bookings.
+// handleCalcomList lädt die anstehenden Termine via GET /bookings.
+// Unterstützt V1 und V2 Antwort-Formate.
 func (a *Agent) handleCalcomList() string {
 	if a.calcomBaseURL == "" || a.calcomAPIKey == "" {
 		return "❌ Cal.com ist nicht konfiguriert.\n\n" +
 			"Trage im Dashboard → Integrationen → Cal.com die API-Adresse und den API-Key ein."
 	}
 
-	apiURL := strings.TrimRight(a.calcomBaseURL, "/") + "/bookings?apiKey=" + a.calcomAPIKey
-	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := a.calcomRequest(http.MethodGet, "/bookings", nil)
+	if err != nil {
+		return fmt.Sprintf("❌ Request konnte nicht erstellt werden: %v", err)
+	}
 
-	resp, err := client.Get(apiURL)
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Sprintf("❌ Termine konnten nicht geladen werden:\n_%v_", err)
 	}
 	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
 		return fmt.Sprintf("❌ Cal.com API Fehler (%d):\n_%s_", resp.StatusCode, string(body))
 	}
 
-	// Cal.com V1: { "bookings": [ { "id": 1, "title": "...", "startTime": "...", "endTime": "..." } ] }
-	var result struct {
-		Bookings []struct {
-			ID        int    `json:"id"`
-			Title     string `json:"title"`
-			StartTime string `json:"startTime"`
-			EndTime   string `json:"endTime"`
-			Status    string `json:"status"`
-		} `json:"bookings"`
+	type bookingEntry struct {
+		Title     string `json:"title"`
+		StartTime string `json:"startTime"`
+		Status    string `json:"status"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return fmt.Sprintf("❌ Termine konnten nicht geparst werden: %v", err)
+	var bookings []bookingEntry
+
+	if a.isV2API() {
+		// V2: { "status": "success", "data": [ { "title": ..., "start": ..., "status": ... } ] }
+		var v2 struct {
+			Data []struct {
+				Title  string `json:"title"`
+				Start  string `json:"start"`
+				Status string `json:"status"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(body, &v2); err == nil {
+			for _, b := range v2.Data {
+				bookings = append(bookings, bookingEntry{Title: b.Title, StartTime: b.Start, Status: b.Status})
+			}
+		}
+	} else {
+		// V1: { "bookings": [...] }
+		var v1 struct {
+			Bookings []bookingEntry `json:"bookings"`
+		}
+		if err := json.Unmarshal(body, &v1); err == nil {
+			bookings = v1.Bookings
+		}
 	}
 
-	if len(result.Bookings) == 0 {
-		return "📅 Keine bevorstehenden Termine in Cal.com gefunden."
+	if len(bookings) == 0 {
+		return "📅 Keine bevorstehenden Termine gefunden."
 	}
 
 	var sb strings.Builder
 	sb.WriteString("📅 *Deine nächsten Termine:*\n\n")
 	limit := 10
-	if len(result.Bookings) < limit {
-		limit = len(result.Bookings)
+	if len(bookings) < limit {
+		limit = len(bookings)
 	}
-	for _, b := range result.Bookings[:limit] {
+	for _, b := range bookings[:limit] {
 		status := ""
 		if b.Status == "CANCELLED" {
 			status = " ~~abgesagt~~"
 		}
 		sb.WriteString(fmt.Sprintf("• *%s* – %s%s\n", b.Title, b.StartTime, status))
 	}
-	log.Printf("[Agent] 📅 Cal.com Terminliste: %d Einträge geladen", len(result.Bookings))
+	log.Printf("[Agent] 📅 Cal.com Terminliste: %d Einträge", len(bookings))
 	return strings.TrimRight(sb.String(), "\n")
 }
 
