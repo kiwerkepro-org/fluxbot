@@ -848,19 +848,21 @@ func (a *Agent) handleCalcomBooking(response string) string {
 	// Payload je nach API-Version aufbauen
 	var payload map[string]interface{}
 	if a.isV2API() {
-		// Cal.com V2: attendee-Objekt statt responses
+		// Cal.com V2: timeZone + language + metadata auf Root-Ebene (nicht im attendee-Objekt).
+		// responses enthält name + email des Teilnehmers.
 		payload = map[string]interface{}{
-			"start":       booking.Start,
 			"eventTypeId": eventTypeID,
-			"attendee": map[string]string{
-				"name":     booking.AttendeeName,
-				"email":    booking.AttendeeEmail,
-				"timeZone": booking.TimeZone,
-				"language": "de",
+			"start":       booking.Start,
+			"timeZone":    booking.TimeZone,
+			"language":    "de",
+			"metadata":    map[string]interface{}{},
+			"responses": map[string]string{
+				"name":  booking.AttendeeName,
+				"email": booking.AttendeeEmail,
 			},
 		}
 	} else {
-		// Cal.com V1: responses-Objekt
+		// Cal.com V1
 		payload = map[string]interface{}{
 			"eventTypeId": eventTypeID,
 			"start":       booking.Start,
