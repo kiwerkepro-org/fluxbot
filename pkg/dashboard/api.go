@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
 // ── /api/status ───────────────────────────────────────────────────────────────
@@ -45,7 +47,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Status:   "running",
 		Uptime:   uptimeStr,
 		Channels: channels,
-		Version:  "1.0.0",
+		Version:  "1.1.1",
 	})
 }
 
