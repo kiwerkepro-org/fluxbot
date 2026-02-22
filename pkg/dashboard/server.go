@@ -97,6 +97,10 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/vt/status", s.auth(s.handleVTStatus))
 	mux.HandleFunc("/api/vt/history", s.auth(s.handleVTHistory))
 
+	// ── Google OAuth2 (kein HMAC nötig – auth reicht; Callback ist öffentlich) ──
+	mux.HandleFunc("/api/google/auth-url", s.auth(s.handleGoogleAuthURL))
+	mux.HandleFunc("/api/google/oauth-callback", s.handleGoogleOAuthCallback) // Kein Auth (Google-Redirect)
+
 	// ── API-Endpunkte (schreibend – HMAC-Signierung erforderlich) ───────────
 	mux.HandleFunc("/api/config", s.auth(s.hmacVerify(s.handleConfig)))
 	mux.HandleFunc("/api/secrets", s.auth(s.hmacVerify(s.handleSecrets)))

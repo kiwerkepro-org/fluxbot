@@ -831,6 +831,48 @@
             </div>
           </div>
 
+          <!-- Google Workspace Panel -->
+          <div class="panel" style="margin-bottom:0" id="google-integ-panel">
+            <div class="panel-title" style="display:flex;align-items:center;gap:10px">
+              <span>🔵 Google Workspace – Calendar, Docs, Sheets, Drive, Gmail</span>
+              <span id="google-integ-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Nicht konfiguriert</span>
+            </div>
+            <div style="background:rgba(91,141,238,0.07);border:1px solid rgba(91,141,238,0.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.7">
+              FluxBot benötigt ein <strong>Google OAuth2 App-Zugangsdaten</strong> (Client ID + Client Secret) sowie einen <strong>Refresh Token</strong> für deinen Account.<br>
+              <strong>Einmalige Einrichtung:</strong>
+              <ol style="margin:8px 0 0 16px;padding:0">
+                <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console → Credentials → OAuth 2.0 Client ID</a> erstellen (Typ: Web-Anwendung)</li>
+                <li>Redirect URI hinzufügen: <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px">http://localhost:9090/api/google/oauth-callback</code></li>
+                <li>APIs aktivieren: Calendar, Docs, Sheets, Drive, Gmail</li>
+                <li>Client ID + Secret unten eintragen → <strong>Speichern</strong> → dann <strong>„Google-Konto verbinden"</strong></li>
+              </ol>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+              <div>
+                <label>Google Client ID</label>
+                <input id="google-client-id" type="text" placeholder="...apps.googleusercontent.com" autocomplete="off">
+              </div>
+              <div>
+                <label>Google Client Secret</label>
+                <div class="password-wrap">
+                  <input id="google-client-secret" type="password" placeholder="GOCSPX-..." autocomplete="new-password">
+                  <button class="eye-btn" onclick="togglePassword('google-client-secret',this)">👁</button>
+                </div>
+              </div>
+            </div>
+            <div style="margin-bottom:12px">
+              <label>Refresh Token <span style="font-weight:400;color:var(--muted)">(wird automatisch befüllt nach Autorisierung)</span></label>
+              <div class="password-wrap">
+                <input id="google-refresh-token" type="password" placeholder="1//..." autocomplete="new-password">
+                <button class="eye-btn" onclick="togglePassword('google-refresh-token',this)">👁</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-secondary" onclick="googleStartOAuth()" id="google-oauth-btn">🔗 Google-Konto verbinden</button>
+              <span id="google-oauth-status" style="font-size:13px;color:var(--muted);align-self:center"></span>
+            </div>
+          </div>
+
           <!-- Generische API-Keys Panel -->
           <div class="panel" style="margin-bottom:0">
             <div class="panel-title">🔌 Weitere Integrationen</div>
@@ -1655,6 +1697,12 @@ async function loadConfig() {
   setVal('calcom-event-type-id', secretsData['CALCOM_EVENT_TYPE_ID'] || '');
   updateCalcomBadge();
 
+  // Google Workspace
+  setVal('google-client-id',      secretsData['GOOGLE_CLIENT_ID']      || '');
+  setVal('google-client-secret',  secretsData['GOOGLE_CLIENT_SECRET']  || '');
+  setVal('google-refresh-token',  secretsData['GOOGLE_REFRESH_TOKEN']  || '');
+  updateGoogleBadge();
+
   // Integrationen laden (Werte kommen aus Vault)
   renderIntegrations(configData.integrations || []);
 }
@@ -1807,6 +1855,14 @@ async function saveConfig() {
     const calcomEventTypeId = getVal('calcom-event-type-id');
     if (calcomEventTypeId) secretsPatch['CALCOM_EVENT_TYPE_ID'] = calcomEventTypeId;
 
+    // ── Google Workspace → Vault ──────────────────────────────────────────
+    const gClientId     = getVal('google-client-id');
+    const gClientSecret = getVal('google-client-secret');
+    const gRefreshToken = getVal('google-refresh-token');
+    if (gClientId)     secretsPatch['GOOGLE_CLIENT_ID']      = gClientId;
+    if (gClientSecret) secretsPatch['GOOGLE_CLIENT_SECRET']  = gClientSecret;
+    if (gRefreshToken) secretsPatch['GOOGLE_REFRESH_TOKEN']  = gRefreshToken;
+
     // ── Integrationen (Values → Vault, Name+Desc → config.json) ──────────
     const { configList, secretsMap } = collectIntegrations();
     newConfig.integrations = configList;
@@ -1828,6 +1884,7 @@ async function saveConfig() {
   // Badges im Integrationen-Panel aktualisieren
   updateVTIntegBadge(secretsData['VIRUSTOTAL_API_KEY'] || '');
   updateCalcomBadge();
+  updateGoogleBadge();
   const n = document.getElementById('config-notice');
   n.style.display = 'block';
   setTimeout(() => { n.style.display = 'none'; }, 4000);
@@ -2380,6 +2437,72 @@ function updateCalcomBadge() {
     badge.style.background = 'rgba(245,166,35,0.12)';
     badge.style.color = 'var(--yellow)';
     badge.style.borderColor = 'rgba(245,166,35,0.3)';
+  }
+}
+
+// ── GOOGLE WORKSPACE ────────────────────────────────────────────────────────
+
+function updateGoogleBadge() {
+  const badge = document.getElementById('google-integ-badge');
+  if (!badge) return;
+  const clientId     = (document.getElementById('google-client-id')?.value      || '').trim();
+  const clientSecret = (document.getElementById('google-client-secret')?.value  || '').trim();
+  const refreshToken = (document.getElementById('google-refresh-token')?.value  || '').trim();
+  if (clientId && clientSecret && refreshToken) {
+    badge.textContent = '✅ Verbunden';
+    badge.style.background = 'rgba(62,207,142,0.12)';
+    badge.style.color = 'var(--green)';
+    badge.style.borderColor = 'rgba(62,207,142,0.3)';
+  } else if (clientId && clientSecret) {
+    badge.textContent = '🔗 Autorisierung ausstehend';
+    badge.style.background = 'rgba(91,141,238,0.12)';
+    badge.style.color = 'var(--accent)';
+    badge.style.borderColor = 'rgba(91,141,238,0.3)';
+  } else {
+    badge.textContent = '⚠️ Nicht konfiguriert';
+    badge.style.background = 'rgba(245,166,35,0.12)';
+    badge.style.color = 'var(--yellow)';
+    badge.style.borderColor = 'rgba(245,166,35,0.3)';
+  }
+}
+
+async function googleStartOAuth() {
+  const clientId = (document.getElementById('google-client-id')?.value || '').trim();
+  if (!clientId) {
+    toast('Bitte zuerst Client ID eintragen und speichern.', true);
+    return;
+  }
+  const btn = document.getElementById('google-oauth-btn');
+  const status = document.getElementById('google-oauth-status');
+  btn.disabled = true;
+  status.textContent = 'Lade Autorisierungs-URL…';
+  const result = await api('/api/google/auth-url');
+  btn.disabled = false;
+  if (result.error || !result.url) {
+    status.textContent = '';
+    // Fallback: lokal bauen mit allen Scopes
+    const scopes = [
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/documents',
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/drive',
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/gmail.readonly'
+    ].join(' ');
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: window.location.origin + '/api/google/oauth-callback',
+      response_type: 'code',
+      scope: scopes,
+      access_type: 'offline',
+      prompt: 'consent'
+    });
+    const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
+    window.open(url, '_blank', 'width=600,height=700');
+    status.textContent = 'Fenster geöffnet – nach Autorisierung hier neu laden.';
+  } else {
+    window.open(result.url, '_blank', 'width=600,height=700');
+    status.textContent = 'Autorisierungs-Fenster geöffnet – nach Bestätigung wird der Refresh Token automatisch eingetragen.';
   }
 }
 
