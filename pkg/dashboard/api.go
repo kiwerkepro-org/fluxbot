@@ -253,6 +253,33 @@ func (s *Server) handleTerminalLogs(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, logsResponse{Lines: lines, File: "fluxbot.log"})
 }
 
+// ── /api/vt/status  /api/vt/stats  /api/vt/history  /api/vt/clear ───────────
+
+// handleVTStatus liefert VT-Status + Statistiken in einem kombinierten Response.
+func (s *Server) handleVTStatus(w http.ResponseWriter, r *http.Request) {
+	stats := security.GetStats()
+	writeJSON(w, stats)
+}
+
+// handleVTHistory liefert die letzten Scan-Einträge (max 100).
+func (s *Server) handleVTHistory(w http.ResponseWriter, r *http.Request) {
+	history := security.GetHistory()
+	if history == nil {
+		history = []security.ScanEntry{}
+	}
+	writeJSON(w, history)
+}
+
+// handleVTClear löscht History und Statistiken (POST, HMAC-geschützt).
+func (s *Server) handleVTClear(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Methode nicht erlaubt", http.StatusMethodNotAllowed)
+		return
+	}
+	security.ClearHistory()
+	writeJSON(w, map[string]string{"status": "ok", "message": "VT-History und Statistiken zurückgesetzt."})
+}
+
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
 func writeJSON(w http.ResponseWriter, v interface{}) {

@@ -27,7 +27,7 @@ pkg/
   dashboard/    ← HTTP-Server (port 9090), API-Handler, dashboard.html
   security/     ← HMAC Guard, VirusTotal (vt.go), Vault (secrets.go)
   skills/       ← Skill-Loader, HMAC-Signatur, Platzhalter-Substitution
-  provider/     ← AI-Provider (OpenRouter, Anthropic, OpenAI, Groq, etc.)
+  provider/     ← AI-Provider (OpenRouter, Anthropic, OpenAI, Groq, Ollama, etc.)
   voice/        ← Sprach-Input/Output (Groq)
   imagegen/     ← Bildgenerierung (FAL, OpenAI, Stability, etc.)
   email/        ← SMTP E-Mail-Versand
@@ -73,6 +73,8 @@ VOICE_API_KEY
 IMG_OPENROUTER, IMG_FAL, IMG_OPENAI, IMG_STABILITY, IMG_TOGETHER, IMG_REPLICATE
 VID_RUNWAY, VID_KLING, VID_LUMA, VID_PIKA, VID_HAILUO, VID_SORA, VID_VEO
 SKILL_SECRET, VIRUSTOTAL_API_KEY, DASHBOARD_PASSWORD
+HMAC_SECRET
+OLLAMA_BASE_URL  (optional, Default: http://localhost:11434)
 INTEG_{NAME}  z.B. INTEG_CALCOM_API_KEY, INTEG_CALCOM_BASE_URL
 ```
 
@@ -134,16 +136,51 @@ INTEG_{NAME}  z.B. INTEG_CALCOM_API_KEY, INTEG_CALCOM_BASE_URL
 - `IsEnabled()` – VT-Status für Dashboard
 WhatsApp: Media-Download über Meta Graph API vollständig implementiert (2-Schritt: Info-URL → Datei).
 
-### PRIORITÄT 2 – HMAC Compendium (ausstehende Items)
+### PRIORITÄT 2 – HMAC Compendium ✅ ERLEDIGT
 ```
-[ ] Prüfen welche HMAC-Items aus dem Compendium noch fehlen
-[ ] HMAC für Dashboard-API-Requests (nicht nur Skill-Signierung)
+[x] Prüfen welche HMAC-Items aus dem Compendium noch fehlen
+[x] HMAC für Dashboard-API-Requests (nicht nur Skill-Signierung)
 ```
+**Stand:** Dashboard-API-Request-Signing vollständig implementiert:
+- `pkg/dashboard/server.go`: `hmacVerify()` Middleware (HMAC-SHA256 + Replay-Schutz via Timestamp ±5 min)
+- `pkg/dashboard/server.go`: `handleHMACToken` Endpoint (`GET /api/hmac-token` → liefert Secret nach Auth)
+- `pkg/dashboard/server.go`: `UpdateHMACSecret()` für Hot-Reload
+- `pkg/dashboard/dashboard.html`: `initHMAC()` – lädt CryptoKey beim Start via Web Crypto API
+- `pkg/dashboard/dashboard.html`: `signPayload()` – HMAC-SHA256 im Browser (SubtleCrypto)
+- `pkg/dashboard/dashboard.html`: `api()` – fügt `X-Timestamp` + `X-Signature` bei POST/PUT/DELETE hinzu
+- `cmd/fluxbot/main.go`: `FLUXBOT_HMAC_SECRET` Env-Variable wird an `dashboard.New()` + Hot-Reload übergeben
+- Abwärtskompatibel: Wenn `FLUXBOT_HMAC_SECRET` nicht gesetzt → kein HMAC, kein Fehler
 
-### PRIORITÄT 3 – VT Dashboard Tab (Steps 7+8)
+### PRIORITÄT 3 – VT Dashboard Tab ✅ ERLEDIGT
 ```
-[ ] VirusTotal-Tab im Dashboard (Scan-History, Status, Statistiken)
+[x] VirusTotal-Tab im Dashboard (Scan-History, Status, Statistiken)
+[x] pkg/security/vt.go: ScanEntry/VTStats Structs, recordScan(), GetStats(), GetHistory(), ClearHistory()
+[x] pkg/security/vt.go: History-Tracking in ScanFileHash() + ScanURL() (Cache-Hits werden ebenfalls gezählt)
+[x] pkg/dashboard/api.go: handleVTStatus(), handleVTHistory(), handleVTClear()
+[x] pkg/dashboard/server.go: GET /api/vt/status, GET /api/vt/history, POST /api/vt/clear (HMAC-geschützt)
+[x] pkg/dashboard/dashboard.html: 🛡️ VirusTotal Sidebar-Eintrag
+[x] pkg/dashboard/dashboard.html: VT-Section (Status-Badge, 5 Stats-Karten, History-Tabelle, Info-Box)
+[x] pkg/dashboard/dashboard.html: loadVTData(), renderVTStats(), renderVTHistory(), clearVTHistory()
 ```
+**Stand:** In-Memory History (max 100 Einträge, FIFO, neueste zuerst). Statistiken zählen: Dateien, URLs, Geblockte, Cache-Hits. Badge-System: ✅ Sicher / 🚨 Blockiert / 💾 Cache. History-Reset per Button (HMAC-geschützt). Inaktiv-Banner wenn kein API-Key.
+
+### PRIORITÄT 7 – Ollama Integration (lokaler AI-Betrieb, kostenfrei)
+```
+[ ] pkg/provider/ollama.go – neuer Provider-Typ (OpenAI-kompatibler Client, Base-URL konfigurierbar)
+[ ] config/config.go – OllamaConfig Struct (BaseURL, Model, kein Pflicht-API-Key)
+[ ] Vault: OLLAMA_BASE_URL (Default: http://localhost:11434, optional Bearer-Token)
+[ ] Dashboard: "Ollama (lokal)" als wählbarer Provider im Provider-Tab
+[ ] Dashboard: Eingabefelder → Endpoint-URL + Modell-Name (z.B. llama3.1:8b, mistral, etc.)
+[ ] Dashboard: Hinweis wenn Ollama gewählt: Hardware-Anforderung (GPU empfohlen)
+[ ] Jeder User kann im Dashboard selbst zwischen Ollama und Cloud-Providern wählen
+[ ] Fallback-Logik: wenn Ollama nicht erreichbar → Warnung, kein Absturz
+```
+**Designentscheidungen:**
+- Ollama nutzt dieselbe OpenAI-kompatible API (`/v1/chat/completions`) → minimaler neuer Code
+- Kein API-Key nötig (optional: Bearer-Token falls Ollama hinter Auth läuft)
+- Sinnvoll bei: einfachen Use-Cases, hohem Volumen, Datenschutz-Anforderungen
+- Nicht empfohlen bei: komplexen Reasoning-Aufgaben, schwacher Hardware
+- `.env` wird NICHT verwendet – Endpoint kommt aus Vault oder Dashboard-Config
 
 ### PRIORITÄT 4 – Tests
 ```
@@ -195,7 +232,8 @@ Ohne eingetragenen Key bleibt der VT-Scan still deaktiviert – der User muss ak
 
 | Entscheidung | Begründung |
 |-------------|------------|
-| VaultProvider statt nativer Keyring | Cross-platform: Windows/Mac/Linux/VPS/Docker – nativer Keyring funktioniert nicht headless |
+| VaultProvider (Docker) / Keyring (lokal) | Hybridstrategie: Docker → Vault (headless-kompatibel), lokale Installation → System-Keyring (Windows Credential Manager / macOS Keychain / libsecret). Beide Pfade werden unterstützt. |
+| Ollama als optionaler lokaler Provider | OpenAI-kompatibler API-Endpunkt → minimaler Code-Aufwand. Kein API-Key. Spart Kosten bei einfachen Use-Cases. User wählt selbst im Dashboard. |
 | AES-256-GCM statt bcrypt für Vault | Vault-Daten müssen entschlüsselbar sein (kein One-Way-Hash) |
 | Tailscale statt 2FA im Dashboard | Einfacher, sicherer, zero-trust – "zweiter Faktor" ist VPN-Zugang |
 | cfg.Validate() nach applySecrets() | Secrets kommen aus Vault, nicht aus config.json – Validate vorher = Fehler |
@@ -204,8 +242,48 @@ Ohne eingetragenen Key bleibt der VT-Scan still deaktiviert – der User muss ak
 
 ---
 
+## Secret-Strategie: Keyring vs. Vault
+
+FluxBot unterstützt zwei Betriebsmodi mit unterschiedlicher Secret-Verwaltung:
+
+| Modus | Secret-Backend | Begründung |
+|-------|---------------|------------|
+| **Lokal** (direkt auf dem Rechner, kein Docker) | System-Keyring | Windows Credential Manager / macOS Keychain / libsecret (Linux). Sicher, OS-nativ, kein Passwort im Dateisystem. |
+| **Docker** (Container-Betrieb) | AES-256-GCM Vault (`.secrets.vault`) | Kein Display/Session-Bus → System-Keyring headless nicht nutzbar. Vault-Datei bleibt im `workspace/` Volume persistent. |
+
+### Secret-Priorität (Ladereihenfolge)
+
+```
+1. System-Keyring   ← bevorzugt bei lokaler Installation
+2. Vault            ← bevorzugt bei Docker
+3. Env-Variable     ← Fallback / CI-CD (z.B. FLUXBOT_HMAC_SECRET in .env)
+4. nicht gesetzt    ← Feature deaktiviert, Startup-Warnung
+```
+
+### Betrifft folgende Secrets
+
+- `HMAC_SECRET` – Dashboard-API-Request-Signierung (kein .env wenn vermeidbar)
+- `DASHBOARD_PASSWORD` – Dashboard Basic Auth
+- `SKILL_SECRET` – Skill-Datei-Signierung
+- Alle Provider-Keys, Kanal-Tokens, etc. folgen derselben Strategie
+
+### Implementierungs-Roadmap Keyring
+
+```
+[ ] pkg/security/keyring.go – Abstraktions-Schicht über System-Keyring (zalando/go-keyring oder 99designs/keyring)
+[ ] Detect-Funktion: läuft im Docker? → kein Keyring, direkt zu Vault
+[ ] Lokale Installation: Setup-Wizard speichert Secrets in Keyring + generiert .vaultkey aus Keyring
+[ ] main.go: loadSecrets() Funktion mit Prioritätskette (Keyring → Vault → Env)
+[ ] Dashboard: Hinweis anzeigen welches Backend aktiv ist (Keyring / Vault / Env)
+```
+
+> **Merke:** Die `.env` Datei ist nur für Infrastruktur-Secrets gedacht, die Docker selbst braucht (z.B. `TAILSCALE_AUTH_KEY`). Alle FluxBot-eigenen Secrets sollen mittelfristig über Keyring (lokal) oder Vault (Docker) laufen – nie im Klartext in einer Datei.
+
+---
+
 ## Bekannte Eigenheiten / Bugs
 
+- **HMAC_SECRET Quelle:** Priorität: Vault (`HMAC_SECRET`) → Env-Variable (`FLUXBOT_HMAC_SECRET`) → nicht gesetzt (Startup-Warnung, kein Crash). Ziel: .env so weit wie möglich vermeiden.
 - **HMAC_SECRET nicht gesetzt:** Startup-Warnung ist normal wenn nicht konfiguriert – kein Crash
 - **Pre-Commit Hook CRLF:** Windows-Zeilenenden in `.git/hooks/pre-commit` → `sed -i 's/\r//' .git/hooks/pre-commit && chmod +x` falls Hook-Fehler
 - **Git Push aus VM:** Token in Remote-URL hinterlegt – direkt `git push origin main` funktioniert
@@ -262,4 +340,30 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 - `pkg/channels/matrix.go`: verarbeitet m.image/m.video/m.audio/m.file Events, lädt mxc:// URLs herunter + scannt; URL-Scan für Text
 - `pkg/channels/whatsapp.go`: Media-Download über Meta Graph API (2-Schritt), scannt Audio/Bild/Dokument/Video/Sticker + URLs in Text
 
-**Nächster Schritt:** Priorität 2 – HMAC Compendium (ausstehende Items prüfen)
+**Erledigt Session 3 (Priorität 2 – HMAC Dashboard-API):**
+- `pkg/dashboard/server.go`: HMAC-SHA256 Middleware `hmacVerify()` für POST/PUT/DELETE-Endpoints
+- `pkg/dashboard/server.go`: Replay-Schutz via `X-Timestamp` (Unix-Sekunden, ±5 Minuten Toleranz)
+- `pkg/dashboard/server.go`: `GET /api/hmac-token` Endpoint (liefert Secret nach Basic Auth)
+- `pkg/dashboard/server.go`: `UpdateHMACSecret()` für Hot-Reload
+- `pkg/dashboard/dashboard.html`: `initHMAC()` – SubtleCrypto HMAC-Key Import beim Start
+- `pkg/dashboard/dashboard.html`: `signPayload()` – Browser-seitiges HMAC-SHA256 Signing
+- `pkg/dashboard/dashboard.html`: `api()` – automatisches Signing bei mutierenden Requests
+- `cmd/fluxbot/main.go`: `FLUXBOT_HMAC_SECRET` Env-Variable an `dashboard.New()` übergeben + Hot-Reload
+
+**Besprochen (noch nicht implementiert):**
+- Ollama-Integration als lokaler AI-Provider (Priorität 7) – spart OpenRouter-Kosten, User wählt im Dashboard
+- Secret-Strategie: HMAC_SECRET soll in den Vault (nicht .env), Keyring für lokale Installation geplant
+
+**Erledigt Session 4 (README + Assets):**
+- `assets/` Ordner erstellt – alle Logos mit sauberen Namen (`fluxion-logo.png`, `fluxion-character.png`, `virustotal-logo.png`, `bitwarden-logo.png`, `kiwerke-logo.png`)
+- `README.md` vollständig neu gestaltet: Header mit VirusTotal (links) + FluxBot-Logo (Mitte) + Bitwarden (rechts), alle Abschnitte als echte Markdown-Tabellen, Roadmap + Sicherheits-Tabelle aktualisiert
+- Originale Logos im Root noch vorhanden → per `git rm` entfernen sobald `assets/` committed ist
+
+**Erledigt Session 5 (Priorität 3 – VT Dashboard Tab):**
+- `pkg/security/vt.go`: `ScanEntry` + `VTStats` Structs; `recordScan()`, `GetStats()`, `GetHistory()`, `ClearHistory()`
+- `pkg/security/vt.go`: History-Tracking in `ScanFileHash()` (incl. Cache-Hits) und `ScanURL()`; Stats-Zähler für Dateien/URLs/Geblockte/Cache
+- `pkg/dashboard/api.go`: `handleVTStatus()` (Stats+Status), `handleVTHistory()` (letzte 100 Scans), `handleVTClear()` (Reset, HMAC-geschützt)
+- `pkg/dashboard/server.go`: Routen `GET /api/vt/status`, `GET /api/vt/history`, `POST /api/vt/clear` registriert
+- `pkg/dashboard/dashboard.html`: Sidebar-Eintrag 🛡️ VirusTotal; komplette Section mit Status-Badge, 5 Statistik-Karten, History-Tabelle (Zeit/Typ/Ziel/Ergebnis), Inaktiv-Banner, Info-Box; JS: `loadVTData()`, `renderVTStats()`, `renderVTHistory()`, `clearVTHistory()`
+
+**Nächster Schritt:** Priorität 4 – Tests (Vault-Persistenz, Hot-Reload, Cal.com Integration) oder Priorität 6 – VIRUSTOTAL_API_KEY im Integrationen-Tab des Dashboards sichtbar machen
