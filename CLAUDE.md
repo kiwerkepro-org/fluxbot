@@ -213,16 +213,18 @@ WhatsApp: Media-Download über Meta Graph API vollständig implementiert (2-Schr
 ```
 **Ziel:** Selbsterklärende Oberfläche – neuer Nutzer findet sich ohne externe Doku zurecht. Info-Punkte als schnelle Inline-Hilfe.
 
-### PRIORITÄT 6 – VirusTotal API-Key im Dashboard (Integrationen-Tab)
+### PRIORITÄT 6 – VirusTotal API-Key im Dashboard (Integrationen-Tab) ✅ ERLEDIGT
 ```
-[ ] Eigenen Bereich "VirusTotal" im Integrationen-Tab anlegen
-[ ] Eingabefeld für VIRUSTOTAL_API_KEY (→ Vault-Key: VIRUSTOTAL_API_KEY)
-[ ] Deutlich sichtbarer Hinweis: "Erforderlich für sicheren Bot-Betrieb"
-[ ] Erklärungstext: VT-Scan wird nur aktiv, wenn API-Key hinterlegt ist
-[ ] Link zur kostenlosen API-Key-Registrierung (virustotal.com)
-[ ] Visuelles Warnsignal (z.B. gelbes Icon/Badge) wenn Key fehlt
-[ ] Status-Anzeige: "VT aktiv ✅" oder "VT inaktiv ⚠️ – API-Key fehlt"
+[x] Eigenen Bereich "VirusTotal" im Integrationen-Tab angelegt
+[x] Eingabefeld für VIRUSTOTAL_API_KEY (→ Vault-Key: VIRUSTOTAL_API_KEY, Passwort-Feld mit Eye-Button)
+[x] Deutlich sichtbarer Hinweis: "Erforderlich für sicheren Bot-Betrieb" (rotes Banner)
+[x] Erklärungstext: VT-Scan wird nur aktiv, wenn API-Key hinterlegt ist
+[x] Link zur kostenlosen API-Key-Registrierung (virustotal.com/gui/join-us)
+[x] Visuelles Warnsignal: gelber ⚠️ Badge wenn Key fehlt, grüner ✅ Badge wenn aktiv
+[x] updateVTIntegBadge() – aktualisiert sich beim Laden + nach Speichern live
+[x] Info-Card rechts: VT-Abschnitt mit Link + Hinweis auf 500 API-Calls/Tag kostenlos
 ```
+**Stand:** VIRUSTOTAL_API_KEY direkt im Vault (kein INTEG_*-Prefix). Badge live. VT-Section (P3) verlinkt bereits auf Integrationen wenn Key fehlt.
 **Hintergrund:** VirusTotal erfordert einen eigenen API-Key pro Nutzer (kostenloser Plan verfügbar).
 Ohne eingetragenen Key bleibt der VT-Scan still deaktiviert – der User muss aktiv darauf hingewiesen werden.
 
@@ -366,4 +368,12 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 - `pkg/dashboard/server.go`: Routen `GET /api/vt/status`, `GET /api/vt/history`, `POST /api/vt/clear` registriert
 - `pkg/dashboard/dashboard.html`: Sidebar-Eintrag 🛡️ VirusTotal; komplette Section mit Status-Badge, 5 Statistik-Karten, History-Tabelle (Zeit/Typ/Ziel/Ergebnis), Inaktiv-Banner, Info-Box; JS: `loadVTData()`, `renderVTStats()`, `renderVTHistory()`, `clearVTHistory()`
 
-**Nächster Schritt:** Priorität 4 – Tests (Vault-Persistenz, Hot-Reload, Cal.com Integration) oder Priorität 6 – VIRUSTOTAL_API_KEY im Integrationen-Tab des Dashboards sichtbar machen
+**Erledigt Session 6 (Priorität 6 – VT API-Key im Integrationen-Tab):**
+- `pkg/dashboard/dashboard.html`: Eigener VT-Panel im Integrationen-Tab (zwischen SMTP und generischen Keys)
+- `pkg/dashboard/dashboard.html`: Rotes Wichtigkeits-Banner ("Erforderlich für sicheren Bot-Betrieb")
+- `pkg/dashboard/dashboard.html`: Passwort-Feld für VIRUSTOTAL_API_KEY mit Eye-Toggle
+- `pkg/dashboard/dashboard.html`: Gelber ⚠️-Badge → Grüner ✅-Badge (live per `updateVTIntegBadge()`)
+- `pkg/dashboard/dashboard.html`: Info-Card rechts ergänzt (VT, 500 API-Calls/Tag, kostenlos)
+- `pkg/dashboard/dashboard.html`: `loadConfig()` lädt VT-Key + Badge; `saveConfig()` speichert VT-Key in Vault
+
+**Nächster Schritt:** Priorität 4 – Tests (Vault-Persistenz, Hot-Reload, Cal.com Integration) oder Priorität 5 – Hilfe-System im Dashboard

@@ -703,6 +703,33 @@
             </div>
           </div>
 
+          <!-- VirusTotal Panel -->
+          <div class="panel" style="margin-bottom:0" id="vt-integ-panel">
+            <div class="panel-title" style="justify-content:space-between">
+              <span>🛡️ VirusTotal – Malware-Schutz</span>
+              <span id="vt-integ-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Inaktiv</span>
+            </div>
+
+            <!-- Wichtigkeits-Banner -->
+            <div style="background:rgba(226,93,93,0.07);border:1px solid rgba(226,93,93,0.25);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.6;color:#f08080">
+              <strong style="color:var(--red);display:block;margin-bottom:4px">🔒 Erforderlich für sicheren Bot-Betrieb</strong>
+              VirusTotal scannt alle eingehenden Dateien und Links auf Malware – auf allen Kanälen gleichzeitig (Telegram, Discord, Slack, Matrix, WhatsApp).<br>
+              <span style="color:var(--muted);font-size:12px;margin-top:4px;display:inline-block">Ohne API-Key bleibt der Scan deaktiviert – Dateien werden dann ungeprüft weitergeleitet.</span>
+            </div>
+
+            <div class="field">
+              <label>VIRUSTOTAL_API_KEY</label>
+              <div class="input-wrap">
+                <input id="vt-apikey" type="password" placeholder="Dein VirusTotal API-Key…" autocomplete="off">
+                <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:12px;line-height:1.6">
+              Kostenloser API-Key (500 Scans/Tag) verfügbar auf:
+              <a href="https://www.virustotal.com/gui/join-us" target="_blank" style="color:var(--accent)">virustotal.com/gui/join-us</a>
+            </div>
+          </div>
+
           <!-- Generische API-Keys Panel -->
           <div class="panel" style="margin-bottom:0">
             <div class="panel-title">🔌 Weitere Integrationen – API-Keys</div>
@@ -747,6 +774,12 @@
                 <span style="font-size:11px;color:var(--muted)">Normales E-Mail-Passwort reicht</span>
               </div>
             </div>
+            <hr class="divider">
+            <h4>🛡️ VirusTotal (kostenlos)</h4>
+            <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px">
+              Der kostenlose Plan bietet <strong style="color:var(--text)">500 API-Anfragen/Tag</strong> – mehr als ausreichend für die meisten Bot-Installationen.
+            </p>
+            <a href="https://www.virustotal.com/gui/join-us" target="_blank" class="info-link">🔑 Kostenlosen API-Key holen</a>
             <hr class="divider">
             <h4>🔌 Weitere API-Keys</h4>
             <div class="other-list">
@@ -1321,6 +1354,11 @@ async function loadConfig() {
   // JSON-Tab immer mit Blur starten
   reBlur('json');
 
+  // ── VirusTotal API-Key (direkt im Vault, nicht INTEG_*) ─────────────────
+  const vtKey = secretsData['VIRUSTOTAL_API_KEY'] || '';
+  setVal('vt-apikey', vtKey);
+  updateVTIntegBadge(vtKey);
+
   // Integrationen laden (Werte kommen aus Vault)
   renderIntegrations(configData.integrations || []);
 }
@@ -1455,6 +1493,9 @@ async function saveConfig() {
     newConfig.voice.apiKey   = '';  // im Vault
     secretsPatch['VOICE_API_KEY'] = getVal('voice-apikey');
 
+    // ── VirusTotal API-Key → Vault ────────────────────────────────────────
+    secretsPatch['VIRUSTOTAL_API_KEY'] = getVal('vt-apikey');
+
     // ── Integrationen (Values → Vault, Name+Desc → config.json) ──────────
     const { configList, secretsMap } = collectIntegrations();
     newConfig.integrations = configList;
@@ -1473,6 +1514,8 @@ async function saveConfig() {
 
   configData = newConfig;
   secretsData = Object.assign({}, secretsData, secretsPatch);
+  // VT-Badge im Integrationen-Panel aktualisieren
+  updateVTIntegBadge(secretsData['VIRUSTOTAL_API_KEY'] || '');
   const n = document.getElementById('config-notice');
   n.style.display = 'block';
   setTimeout(() => { n.style.display = 'none'; }, 4000);
@@ -1953,6 +1996,23 @@ function collectIntegrations() {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── VIRUSTOTAL Integration Badge ───────────────────────────────────────────
+function updateVTIntegBadge(key) {
+  const badge = document.getElementById('vt-integ-badge');
+  if (!badge) return;
+  if (key && key.trim()) {
+    badge.textContent = '✅ Aktiv';
+    badge.style.background = 'rgba(62,207,142,0.12)';
+    badge.style.color = 'var(--green)';
+    badge.style.borderColor = 'rgba(62,207,142,0.3)';
+  } else {
+    badge.textContent = '⚠️ Inaktiv';
+    badge.style.background = 'rgba(245,166,35,0.12)';
+    badge.style.color = 'var(--yellow)';
+    badge.style.borderColor = 'rgba(245,166,35,0.3)';
+  }
 }
 
 // ── VIRUSTOTAL ─────────────────────────────────────────────────────────────
