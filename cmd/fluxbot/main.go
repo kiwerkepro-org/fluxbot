@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -301,7 +302,8 @@ func runBot(ctx context.Context, configPath string) {
 		EmailSender:      emailSender,
 		CalcomBaseURL:    getIntegration(cfg, "CALCOM_BASE_URL"),
 		CalcomAPIKey:     getIntegration(cfg, "CALCOM_API_KEY"),
-		CalcomOwnerEmail: getIntegration(cfg, "CALCOM_OWNER_EMAIL"),
+		CalcomOwnerEmail:  getIntegration(cfg, "CALCOM_OWNER_EMAIL"),
+		CalcomEventTypeID: parseIntegrationInt(cfg, "CALCOM_EVENT_TYPE_ID"),
 		Soul:             soul,
 	})
 
@@ -327,6 +329,7 @@ func runBot(ctx context.Context, configPath string) {
 				getIntegration(newCfg, "CALCOM_BASE_URL"),
 				getIntegration(newCfg, "CALCOM_API_KEY"),
 				getIntegration(newCfg, "CALCOM_OWNER_EMAIL"),
+				parseIntegrationInt(newCfg, "CALCOM_EVENT_TYPE_ID"),
 			)
 
 			// Dashboard Hot-Reload: Passwort + HMAC-Secret
@@ -770,4 +773,17 @@ func getIntegration(cfg *config.Config, name string) string {
 		}
 	}
 	return ""
+}
+
+// parseIntegrationInt liest einen Integrations-Wert als int.
+func parseIntegrationInt(cfg *config.Config, name string) int {
+	v := getIntegration(cfg, name)
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return 0
+	}
+	return n
 }

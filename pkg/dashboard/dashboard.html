@@ -821,11 +821,11 @@
               <div style="font-size:11px;color:var(--muted);margin-top:4px">Wird automatisch als Teilnehmer beim Termin eingetragen – du wirst nie danach gefragt.</div>
             </div>
             <div class="field">
-              <label>Event Type ID</label>
-              <div style="background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--muted);user-select:none;cursor:default">
-                ✓ Wird automatisch von FluxBot ermittelt
+              <label>Event Type ID <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+              <input id="calcom-event-type-id" type="text" placeholder="z.B. 123456 – aus Cal.com → Event Types → URL" autocomplete="off">
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">
+                Leer lassen = FluxBot ermittelt automatisch. Falls das nicht klappt: Cal.com öffnen → Event Types → die Zahl aus der URL kopieren (z.B. <code style="background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px">/event-types/<strong>123456</strong></code>).
               </div>
-              <div style="font-size:11px;color:var(--muted);margin-top:4px">FluxBot erkennt deinen Event-Typ automatisch – du musst nichts eintragen.</div>
             </div>
           </div>
 
@@ -1649,7 +1649,8 @@ async function loadConfig() {
   // ── Cal.com (Werte direkt aus Vault) ─────────────────────────────────────
   setVal('calcom-base-url',    secretsData['CALCOM_BASE_URL']    || '');
   setVal('calcom-api-key',     secretsData['CALCOM_API_KEY']     || '');
-  setVal('calcom-owner-email', secretsData['CALCOM_OWNER_EMAIL'] || '');
+  setVal('calcom-owner-email',     secretsData['CALCOM_OWNER_EMAIL']     || '');
+  setVal('calcom-event-type-id', secretsData['CALCOM_EVENT_TYPE_ID'] || '');
   updateCalcomBadge();
 
   // Integrationen laden (Werte kommen aus Vault)
@@ -1800,7 +1801,9 @@ async function saveConfig() {
     // ── Cal.com → Vault ───────────────────────────────────────────────────
     secretsPatch['CALCOM_BASE_URL']    = getVal('calcom-base-url');
     secretsPatch['CALCOM_API_KEY']     = getVal('calcom-api-key');
-    secretsPatch['CALCOM_OWNER_EMAIL'] = getVal('calcom-owner-email');
+    secretsPatch['CALCOM_OWNER_EMAIL']     = getVal('calcom-owner-email');
+    const calcomEventTypeId = getVal('calcom-event-type-id');
+    if (calcomEventTypeId) secretsPatch['CALCOM_EVENT_TYPE_ID'] = calcomEventTypeId;
 
     // ── Integrationen (Values → Vault, Name+Desc → config.json) ──────────
     const { configList, secretsMap } = collectIntegrations();
