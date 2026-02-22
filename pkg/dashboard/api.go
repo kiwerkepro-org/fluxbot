@@ -89,10 +89,9 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 			httpError(w, "config.json konnte nicht gespeichert werden: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		// Reload-Callback aufrufen (z.B. Image-Generators neu laden)
-		if s.onReload != nil {
-			go s.onReload()
-		}
+		// KEIN Reload hier – das Dashboard speichert immer config UND secrets (saveConfig() sendet beide
+		// Requests). Der Reload passiert synchron nach dem POST /api/secrets, wenn die Vault-Werte
+		// bereits geschrieben sind. Separater Reload hier würde alten Vault-Stand lesen → Race Condition.
 		writeJSON(w, map[string]string{"status": "ok", "message": "config.json gespeichert."})
 
 	default:
@@ -133,9 +132,11 @@ func (s *Server) handleSecrets(w http.ResponseWriter, r *http.Request) {
 			httpError(w, "Vault konnte nicht geschrieben werden: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		// Hot-Reload: neue Werte sofort aktiv
+		// Hot-Reload: synchron (nicht go) – Vault ist jetzt geschrieben, Reload liest neue Werte.
+		// Synchron = Antwort wird erst gesendet wenn Skills korrekt neu geladen sind.
+		// Kein go = keine Race Condition mit dem parallelen PUT /api/config Reload.
 		if s.onReload != nil {
-			go s.onReload()
+			s.onReload()
 		}
 		writeJSON(w, map[string]string{"status": "ok", "message": "Secrets gespeichert."})
 
