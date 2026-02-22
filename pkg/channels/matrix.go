@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
 // MatrixConfig enthält die Konfiguration für den Matrix-Kanal
@@ -223,32 +225,129 @@ func (m *MatrixChannel) processSync(sync matrixSyncResponse) {
 				continue
 			}
 
-			msgType, _ := event.Content["msgtype"].(string)
-			if msgType != "m.text" {
-				continue
-			}
-
-			body, _ := event.Content["body"].(string)
-			body = strings.TrimSpace(body)
-			if body == "" {
-				continue
-			}
-
-			msg := Message{
-				ID:        event.EventID,
-				ChannelID: "matrix",
-				ChatID:    roomID,
-				SenderID:  event.Sender,
-				Type:      MessageTypeText,
-				Text:      body,
-			}
-
-			log.Printf("[Matrix] Nachricht von %s in %s: %.50s", event.Sender, roomID, body)
-			if m.bus != nil {
-				m.bus <- msg
-			}
+			m.processMatrixEvent(roomID, event)
 		}
 	}
+}
+
+// processMatrixEvent verarbeitet ein einzelnes Matrix-Nachrichten-Event
+// und unterstützt Text, Dateien, Bilder, Audio und Video.
+func (m *MatrixChannel) processMatrixEvent(roomID string, event matrixEvent) {
+	msgType, _ := event.Content["msgtype"].(string)
+
+	switch msgType {
+
+	// ── Textnachrichten + URL-Scan ──────────────────────────────────────────
+	case "m.text":
+		body, _ := event.Content["body"].(string)
+		body = strings.TrimSpace(body)
+		if body == "" {
+			return
+		}
+
+		// URL-Scan
+		isSafe, badURL, err := security.ScanURLsInText(body)
+		if err != nil {
+			log.Printf("[Matrix/Security] URL-Scan Warnung: %v", err)
+		}
+		if !isSafe {
+			log.Printf("[Matrix/Security] 🚨 Bösartige URL von %s: %s", event.Sender, badURL)
+			m.Send(roomID, security.VTURLBlockedMsg)
+			return
+		}
+
+		msg := Message{
+			ID:        event.EventID,
+			ChannelID: "matrix",
+			ChatID:    roomID,
+			SenderID:  event.Sender,
+			Type:      MessageTypeText,
+			Text:      body,
+		}
+		log.Printf("[Matrix] Text von %s in %s: %.50s", event.Sender, roomID, body)
+		if m.bus != nil {
+			m.bus <- msg
+		}
+
+	// ── Mediendateien: Bild, Video, Audio, Datei ────────────────────────────
+	case "m.image", "m.video", "m.audio", "m.file":
+		mxcURL, _ := event.Content["url"].(string)
+		if mxcURL == "" {
+			log.Printf("[Matrix] Media-Event ohne URL von %s (msgtype: %s)", event.Sender, msgType)
+			return
+		}
+
+		httpURL := m.mxcToHTTP(mxcURL)
+		if httpURL == "" {
+			log.Printf("[Matrix] Ungültige mxc:// URL: %s", mxcURL)
+			return
+		}
+
+		data, err := m.downloadMedia(httpURL)
+		if err != nil {
+			log.Printf("[Matrix] Media-Download Fehler (%s) von %s: %v", msgType, event.Sender, err)
+			return
+		}
+
+		isSafe, err := security.ScanFile(data)
+		if err != nil {
+			log.Printf("[Matrix/Security] Scan-Warnung (%s): %v", msgType, err)
+			// Bei VT-API-Fehler: nicht blockieren
+		}
+		if !isSafe {
+			log.Printf("[Matrix/Security] 🚨 Blockiere bösartige Datei (%s) von %s", msgType, event.Sender)
+			m.Send(roomID, security.VTFileBlockedMsg)
+			return
+		}
+
+		log.Printf("[Matrix/Security] ✅ Media sicher (%s) von %s", msgType, event.Sender)
+
+		// Audio-Nachrichten als Voice weitergeben
+		if msgType == "m.audio" {
+			if m.bus != nil {
+				m.bus <- Message{
+					ID:        event.EventID,
+					ChannelID: "matrix",
+					ChatID:    roomID,
+					SenderID:  event.Sender,
+					Type:      MessageTypeVoice,
+					VoiceData: data,
+				}
+			}
+		}
+		// Bilder, Videos, Dateien: gescannt und sicher – für zukünftige Erweiterung
+	}
+}
+
+// mxcToHTTP konvertiert eine mxc:// URL zu einer HTTP-Download-URL.
+// Format: mxc://server/mediaID → {homeserver}/_matrix/media/v3/download/server/mediaID
+func (m *MatrixChannel) mxcToHTTP(mxcURL string) string {
+	if !strings.HasPrefix(mxcURL, "mxc://") {
+		return ""
+	}
+	rest := strings.TrimPrefix(mxcURL, "mxc://")
+	return fmt.Sprintf("%s/_matrix/media/v3/download/%s", m.cfg.HomeServer, rest)
+}
+
+// downloadMedia lädt eine Matrix-Mediendatei via HTTP herunter.
+func (m *MatrixChannel) downloadMedia(httpURL string) ([]byte, error) {
+	req, err := http.NewRequest("GET", httpURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+m.cfg.Token)
+
+	resp, err := m.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("matrix: media-download fehlgeschlagen: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("matrix: media HTTP %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
 }
 
 // Matrix Sync Response Strukturen

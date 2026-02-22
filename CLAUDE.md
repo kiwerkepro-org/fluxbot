@@ -114,19 +114,25 @@ INTEG_{NAME}  z.B. INTEG_CALCOM_API_KEY, INTEG_CALCOM_BASE_URL
 
 ## Offene Punkte / Agenda 📋
 
-### PRIORITÄT 1 – VirusTotal auf alle Kanäle erweitern
+### PRIORITÄT 1 – VirusTotal auf alle Kanäle erweitern ✅ ERLEDIGT
 ```
-[ ] Gemeinsame Scan-Hilfsfunktion in pkg/security/ (nicht kanal-spezifisch)
-[ ] Telegram:   Dateien scannen (PDF, Bild, Dokument, Video, Audio)
-[ ] Telegram:   Links in Textnachrichten auf Malware prüfen
-[ ] Discord:    Datei-Uploads scannen
-[ ] Discord:    Links prüfen
-[ ] Slack:      Datei-Uploads scannen
-[ ] Matrix:     Datei-Uploads scannen
-[ ] WhatsApp:   Medien/Dokumente scannen
-[ ] Alle:       Einheitliche Benutzer-Fehlermeldung bei Fund
+[x] Gemeinsame Scan-Hilfsfunktion in pkg/security/ (nicht kanal-spezifisch)
+[x] Telegram:   Dateien scannen (PDF, Bild, Dokument, Video, Audio, VideoNote)
+[x] Telegram:   Links in Textnachrichten auf Malware prüfen
+[x] Discord:    Datei-Uploads scannen (alle Anhänge)
+[x] Discord:    Links prüfen
+[x] Slack:      Datei-Uploads scannen (file_share Events)
+[x] Matrix:     Datei-Uploads scannen (m.file, m.image, m.audio, m.video)
+[x] WhatsApp:   Medien/Dokumente scannen (Audio, Bild, Dokument, Video, Sticker)
+[x] Alle:       Einheitliche Benutzer-Fehlermeldung bei Fund (VTFileBlockedMsg, VTURLBlockedMsg)
 ```
-**Aktueller Stand:** VT nur in `pkg/channels/telegram.go` Zeile 77, nur Voice/Audio-Dateien.
+**Stand:** VT auf allen 5 Kanälen aktiv. Neue Funktionen in `pkg/security/vt.go`:
+- `ScanURL()` – URL-Prüfung via VT API (base64url SHA-256 Identifier)
+- `ScanURLsInText()` – extrahiert + prüft alle URLs aus Text
+- `ExtractURLs()` – HTTP/HTTPS-URL-Extraktor
+- `VTFileBlockedMsg` / `VTURLBlockedMsg` – einheitliche Fehlermeldungen (Konstanten)
+- `IsEnabled()` – VT-Status für Dashboard
+WhatsApp: Media-Download über Meta Graph API vollständig implementiert (2-Schritt: Info-URL → Datei).
 
 ### PRIORITÄT 2 – HMAC Compendium (ausstehende Items)
 ```
@@ -146,6 +152,42 @@ INTEG_{NAME}  z.B. INTEG_CALCOM_API_KEY, INTEG_CALCOM_BASE_URL
 [ ] Hot-Reload verifizieren
 [ ] Cal.com Integration mit korrekten Platzhaltern testen
 ```
+
+### PRIORITÄT 5 – Hilfe-System im Dashboard
+```
+[ ] HAUPTMENÜ: Tab "Hilfe" oder Dropdown-Menüpunkt in der Dashboard-Navigation
+[ ] HAUPT-INHALTE:
+    [ ] Kurzreferenz zu allen Dashboard-Bereichen (Status, Config, Kanäle, Integrationen, Skills, VT, Logs, System)
+    [ ] Erklärung des Platzhalter-Systems ({{NAME}} → INTEG_{NAME} im Vault)
+    [ ] Vault-Konzept verständlich erklären (kein Klartext, AES-256-GCM, Hot-Reload)
+    [ ] Skill-Signatur-Workflow (wann neu signieren, wie Befehl ausführen)
+    [ ] Kanal-Konfiguration Kurzübersicht (Token-Namen je Kanal)
+    [ ] Häufige Fehlermeldungen + Lösungen (HMAC_SECRET, CRLF Hook, VT API-Key, etc.)
+    [ ] Link zu externer Doku / GitHub-Repo (optional)
+[ ] UI HAUPTMENÜ: Modales Popup oder eigener Tab – TBD je nach Umfang
+[ ] UI SUCHFUNKTION: Suchfunktion innerhalb der Hilfe (optional, für später)
+
+[ ] INFO-PUNKTE ⓘ ÜBERALL:
+    [ ] Neben jedem Menüpunkt-Titel (Status, Kanäle, Integrationen, Skills, etc.)
+    [ ] Neben Sektions-Titeln (z.B. "Kanal-Typen", "E-Mail-Versand", "Weitere Integrationen")
+    [ ] Bei kritischen Settings (z.B. "Sicheres Dashboard", "Agent-Loop-Intervall")
+    [ ] Info-Icons sind anklickbar → zeigen Tooltip/Popover mit Kurzerklärung
+    [ ] Konsistentes Design: immer ⓘ im Kreis, gleiche Hover-Farbe, Popover oben/unten intelligent
+```
+**Ziel:** Selbsterklärende Oberfläche – neuer Nutzer findet sich ohne externe Doku zurecht. Info-Punkte als schnelle Inline-Hilfe.
+
+### PRIORITÄT 6 – VirusTotal API-Key im Dashboard (Integrationen-Tab)
+```
+[ ] Eigenen Bereich "VirusTotal" im Integrationen-Tab anlegen
+[ ] Eingabefeld für VIRUSTOTAL_API_KEY (→ Vault-Key: VIRUSTOTAL_API_KEY)
+[ ] Deutlich sichtbarer Hinweis: "Erforderlich für sicheren Bot-Betrieb"
+[ ] Erklärungstext: VT-Scan wird nur aktiv, wenn API-Key hinterlegt ist
+[ ] Link zur kostenlosen API-Key-Registrierung (virustotal.com)
+[ ] Visuelles Warnsignal (z.B. gelbes Icon/Badge) wenn Key fehlt
+[ ] Status-Anzeige: "VT aktiv ✅" oder "VT inaktiv ⚠️ – API-Key fehlt"
+```
+**Hintergrund:** VirusTotal erfordert einen eigenen API-Key pro Nutzer (kostenloser Plan verfügbar).
+Ohne eingetragenen Key bleibt der VT-Scan still deaktiviert – der User muss aktiv darauf hingewiesen werden.
 
 ---
 
@@ -200,9 +242,9 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 
 ---
 
-## Letzte Session (Stand: 2026-02-22)
+## Letzte Session (Stand: 2026-02-22, Session 2)
 
-**Erledigt:**
+**Erledigt Session 1:**
 - AES-256-GCM Vault vollständig implementiert + migriert
 - Dashboard lädt/speichert Secrets getrennt von Config
 - Bug gefixt: cfg.Validate() lief vor applySecrets() → zweiter Start schlug fehl
@@ -212,4 +254,12 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 - Info-Button ⓘ im Dashboard für Platzhalter-Erklärung
 - CLAUDE.md erstellt (dieses File)
 
-**Nächster Schritt:** VirusTotal auf alle Kanäle und Dateitypen erweitern
+**Erledigt Session 2 (Priorität 1 – VirusTotal auf alle Kanäle):**
+- `pkg/security/vt.go`: ScanURL, ScanURLsInText, ExtractURLs, VTFileBlockedMsg, VTURLBlockedMsg, IsEnabled()
+- `pkg/channels/telegram.go`: scannt Voice, Audio, Document, Photo, Video, VideoNote + URLs in Text
+- `pkg/channels/discord.go`: scannt alle Anhänge (alle MIME-Typen) + URLs in Text; Download-Logik auf memory-first umgestellt
+- `pkg/channels/slack.go`: scannt file_share Events (Bot-Token Auth Download) + URLs in Text; slackFile-Struct hinzugefügt
+- `pkg/channels/matrix.go`: verarbeitet m.image/m.video/m.audio/m.file Events, lädt mxc:// URLs herunter + scannt; URL-Scan für Text
+- `pkg/channels/whatsapp.go`: Media-Download über Meta Graph API (2-Schritt), scannt Audio/Bild/Dokument/Video/Sticker + URLs in Text
+
+**Nächster Schritt:** Priorität 2 – HMAC Compendium (ausstehende Items prüfen)

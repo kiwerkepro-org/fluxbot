@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
 const (
@@ -202,7 +204,6 @@ func (w *WhatsAppChannel) handleIncoming(rw http.ResponseWriter, r *http.Request
 }
 
 func (w *WhatsAppChannel) processIncomingMessage(wmsg whatsAppMessage, contacts []whatsAppContact) {
-	// Absender-Name ermitteln
 	from := wmsg.From
 	for _, c := range contacts {
 		if c.WaID == from {
@@ -225,24 +226,167 @@ func (w *WhatsAppChannel) processIncomingMessage(wmsg whatsAppMessage, contacts 
 	msg.SenderID = from
 
 	switch wmsg.Type {
+
+	// ── Textnachrichten + URL-Scan ─────────────────────────────────────────
 	case "text":
+		text := strings.TrimSpace(wmsg.Text.Body)
+		if text == "" {
+			return
+		}
+
+		// URL-Scan
+		isSafe, badURL, err := security.ScanURLsInText(text)
+		if err != nil {
+			log.Printf("[WhatsApp/Security] URL-Scan Warnung: %v", err)
+		}
+		if !isSafe {
+			log.Printf("[WhatsApp/Security] 🚨 Bösartige URL von %s: %s", from, badURL)
+			w.Send(from, security.VTURLBlockedMsg)
+			return
+		}
+
 		msg.Type = MessageTypeText
-		msg.Text = wmsg.Text.Body
+		msg.Text = text
+
+	// ── Audio / Sprachnachrichten ─────────────────────────────────────────
 	case "audio", "voice":
+		data, blocked := w.downloadAndScanMedia(wmsg.Audio.ID, "Audio", from)
+		if blocked {
+			return
+		}
 		msg.Type = MessageTypeVoice
-		// Audio-Download wird über Media-API implementiert
-		log.Printf("[WhatsApp] Voice-Nachricht empfangen (Media-ID: %s) – Download noch nicht implementiert", wmsg.Audio.ID)
+		msg.VoiceData = data
+
+	// ── Bilder ─────────────────────────────────────────────────────────────
+	case "image":
+		_, blocked := w.downloadAndScanMedia(wmsg.Image.ID, "Bild", from)
+		if blocked {
+			return
+		}
+		// Bild-Caption als Text weiterleiten (falls vorhanden)
+		msg.Type = MessageTypeText
+		msg.Text = wmsg.Image.Caption
+
+	// ── Dokumente (PDF, Office, ZIP, etc.) ────────────────────────────────
+	case "document":
+		_, blocked := w.downloadAndScanMedia(wmsg.Document.ID, "Dokument", from)
+		if blocked {
+			return
+		}
+		msg.Type = MessageTypeText
+		msg.Text = wmsg.Document.Caption
+
+	// ── Videos ────────────────────────────────────────────────────────────
+	case "video":
+		_, blocked := w.downloadAndScanMedia(wmsg.Video.ID, "Video", from)
+		if blocked {
+			return
+		}
+		msg.Type = MessageTypeText
+		msg.Text = wmsg.Video.Caption
+
+	// ── Sticker ────────────────────────────────────────────────────────────
+	case "sticker":
+		_, blocked := w.downloadAndScanMedia(wmsg.Sticker.ID, "Sticker", from)
+		if blocked {
+			return
+		}
+		// Sticker haben keinen Text – Nachricht wird nicht weitergeleitet
 		return
+
 	default:
 		log.Printf("[WhatsApp] Unbekannter Nachrichtentyp: %s", wmsg.Type)
 		return
 	}
 
-	log.Printf("[WhatsApp] Nachricht von %s: %.50s", from, msg.Text)
+	log.Printf("[WhatsApp] Nachricht von %s (Typ: %s): %.50s", from, wmsg.Type, msg.Text)
 
 	if w.bus != nil {
 		w.bus <- msg
 	}
+}
+
+// downloadAndScanMedia lädt ein WhatsApp-Medium herunter und scannt es mit VT.
+// Gibt (data, false) zurück wenn sicher, (nil, true) wenn geblockt.
+func (w *WhatsAppChannel) downloadAndScanMedia(mediaID, mediaType, from string) ([]byte, bool) {
+	data, err := w.downloadMedia(mediaID)
+	if err != nil {
+		log.Printf("[WhatsApp] %s-Download Fehler (von %s): %v", mediaType, from, err)
+		return nil, false // Bei Download-Fehler: nicht blockieren
+	}
+
+	isSafe, err := security.ScanFile(data)
+	if err != nil {
+		log.Printf("[WhatsApp/Security] Scan-Warnung (%s): %v", mediaType, err)
+		// Bei VT-API-Fehler: nicht blockieren
+		return data, false
+	}
+
+	if !isSafe {
+		log.Printf("[WhatsApp/Security] 🚨 Blockiere bösartige Datei (%s) von %s", mediaType, from)
+		w.Send(from, security.VTFileBlockedMsg)
+		return nil, true
+	}
+
+	log.Printf("[WhatsApp/Security] ✅ %s sicher (von %s)", mediaType, from)
+	return data, false
+}
+
+// downloadMedia lädt eine WhatsApp-Mediendatei über die Meta Graph API herunter.
+// Schritt 1: Media-Metadaten abrufen (URL)
+// Schritt 2: Datei von der erhaltenen URL herunterladen
+func (w *WhatsAppChannel) downloadMedia(mediaID string) ([]byte, error) {
+	client := &http.Client{Timeout: 30 * time.Second}
+
+	// Schritt 1: Media-URL abrufen
+	metaEndpoint := fmt.Sprintf("%s/%s", whatsappGraphURL, mediaID)
+	req, err := http.NewRequest("GET", metaEndpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+w.cfg.APIKey)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("whatsapp: media-info fehlgeschlagen: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("whatsapp: media-info HTTP %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var mediaInfo struct {
+		URL      string `json:"url"`
+		MimeType string `json:"mime_type"`
+		FileSize int64  `json:"file_size"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&mediaInfo); err != nil {
+		return nil, fmt.Errorf("whatsapp: media-info ungültig: %w", err)
+	}
+	if mediaInfo.URL == "" {
+		return nil, fmt.Errorf("whatsapp: leere media-URL für ID %s", mediaID)
+	}
+
+	// Schritt 2: Datei herunterladen
+	req2, err := http.NewRequest("GET", mediaInfo.URL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req2.Header.Set("Authorization", "Bearer "+w.cfg.APIKey)
+
+	resp2, err := client.Do(req2)
+	if err != nil {
+		return nil, fmt.Errorf("whatsapp: media-download fehlgeschlagen: %w", err)
+	}
+	defer resp2.Body.Close()
+
+	if resp2.StatusCode >= 400 {
+		return nil, fmt.Errorf("whatsapp: media-download HTTP %d", resp2.StatusCode)
+	}
+
+	return io.ReadAll(resp2.Body)
 }
 
 // verifySignature prüft die HMAC-SHA256-Signatur von Meta
@@ -269,8 +413,8 @@ func normalizePhone(phone string) string {
 // ── Webhook-Payload-Strukturen ─────────────────────────────────────────────
 
 type whatsAppWebhookPayload struct {
-	Object string            `json:"object"`
-	Entry  []whatsAppEntry   `json:"entry"`
+	Object string          `json:"object"`
+	Entry  []whatsAppEntry `json:"entry"`
 }
 
 type whatsAppEntry struct {
@@ -284,26 +428,49 @@ type whatsAppChange struct {
 }
 
 type whatsAppValue struct {
-	MessagingProduct string           `json:"messaging_product"`
+	MessagingProduct string            `json:"messaging_product"`
 	Contacts         []whatsAppContact `json:"contacts"`
 	Messages         []whatsAppMessage `json:"messages"`
 }
 
 type whatsAppContact struct {
-	Profile struct{ Name string `json:"name"` } `json:"profile"`
-	WaID    string `json:"wa_id"`
+	Profile struct {
+		Name string `json:"name"`
+	} `json:"profile"`
+	WaID string `json:"wa_id"`
 }
 
 type whatsAppMessage struct {
-	From      string            `json:"from"`
-	ID        string            `json:"id"`
-	Timestamp string            `json:"timestamp"`
-	Type      string            `json:"type"`
-	Text      struct{ Body string `json:"body"` }   `json:"text"`
-	Audio     struct{ ID   string `json:"id"` }     `json:"audio"`
+	From      string `json:"from"`
+	ID        string `json:"id"`
+	Timestamp string `json:"timestamp"`
+	Type      string `json:"type"`
+	Text      struct {
+		Body string `json:"body"`
+	} `json:"text"`
+	Audio struct {
+		ID string `json:"id"`
+	} `json:"audio"`
+	Image struct {
+		ID      string `json:"id"`
+		Caption string `json:"caption"`
+	} `json:"image"`
+	Document struct {
+		ID       string `json:"id"`
+		Caption  string `json:"caption"`
+		Filename string `json:"filename"`
+	} `json:"document"`
+	Video struct {
+		ID      string `json:"id"`
+		Caption string `json:"caption"`
+	} `json:"video"`
+	Sticker struct {
+		ID string `json:"id"`
+	} `json:"sticker"`
 }
 
-// splitMessage teilt lange Nachrichten in Chunks auf
+// splitMessage teilt lange Nachrichten in Chunks auf.
+// Da alle Channel-Dateien im gleichen Package "channels" sind, reicht eine Definition für alle.
 func splitMessage(text string, maxLen int) []string {
 	if len(text) <= maxLen {
 		return []string{text}

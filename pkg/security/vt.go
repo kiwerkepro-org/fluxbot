@@ -2,6 +2,7 @@ package security
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"log"
 	"strings"
@@ -17,10 +18,20 @@ var (
 	// Cache für bereits gescannte Hashes
 	scanCache  = make(map[string]bool)
 	cacheMutex sync.RWMutex
-	// Rate-Limiting für Public API (max 4/min)
+	// Rate-Limiting für Public API (max 4/min → 15 Sekunden Abstand)
 	lastScan  time.Time
 	scanMutex sync.Mutex
 )
+
+// Einheitliche Benutzer-Warnmeldungen – alle Kanäle nutzen diese Konstanten.
+const (
+	VTFileBlockedMsg = "⚠️ Sicherheits-Warnung: Die gesendete Datei wurde als potenzielle Malware eingestuft und blockiert."
+	VTURLBlockedMsg  = "⚠️ Sicherheits-Warnung: Der gesendete Link wurde als gefährlich eingestuft und blockiert."
+)
+
+// maxScanSize: Dateien größer als 32 MB werden nicht in den Speicher geladen.
+// VirusTotal akzeptiert ohnehin nur Dateien bis 650 MB, für RAM-Schutz setzen wir 32 MB.
+const maxScanSize = 32 * 1024 * 1024
 
 // InitVT initialisiert den VirusTotal-Client
 func InitVT(apiKey string) error {
@@ -33,8 +44,14 @@ func InitVT(apiKey string) error {
 	return nil
 }
 
+// IsEnabled gibt zurück ob VT aktiv ist (für Dashboard-Status).
+func IsEnabled() bool {
+	return scanEnabled && vtClient != nil
+}
+
 // ScanFile ist die Hauptfunktion für Channel-Handler.
-// Sie berechnet den Hash und prüft ihn bei VirusTotal.
+// Sie berechnet den SHA-256 Hash und prüft ihn bei VirusTotal.
+// Gibt true zurück wenn die Datei sicher ist.
 func ScanFile(data []byte) (bool, error) {
 	if !scanEnabled || vtClient == nil {
 		return true, nil
@@ -43,18 +60,22 @@ func ScanFile(data []byte) (bool, error) {
 	return ScanFileHash(hash)
 }
 
-// ScanFileHash prüft einen SHA-256 Hash direkt
+// ScanFileHash prüft einen SHA-256 Hash direkt (ohne Datei herunterzuladen).
 func ScanFileHash(hash string) (bool, error) {
+	if !scanEnabled || vtClient == nil {
+		return true, nil
+	}
+
 	// 1. Cache-Check
 	cacheMutex.RLock()
 	isClean, found := scanCache[hash]
 	cacheMutex.RUnlock()
 	if found {
-		log.Printf("[Security-VT] Hash im Cache: %s (Clean: %v)", hash, isClean)
+		log.Printf("[Security-VT] Hash im Cache: %s (Clean: %v)", hash[:16]+"...", isClean)
 		return isClean, nil
 	}
 
-	// 2. Rate-Limit Schutz
+	// 2. Rate-Limit Schutz (Public API: max 4 Anfragen/Minute)
 	scanMutex.Lock()
 	elapsed := time.Since(lastScan)
 	if elapsed < 15*time.Second {
@@ -63,23 +84,121 @@ func ScanFileHash(hash string) (bool, error) {
 	lastScan = time.Now()
 	scanMutex.Unlock()
 
-	log.Printf("[Security-VT] Scan-Anfrage für Hash: %s", hash)
+	log.Printf("[Security-VT] Datei-Scan für Hash: %s...", hash[:16])
 
 	url := vt.URL("files/%s", hash)
 	obj, err := vtClient.GetObject(url)
 	if err != nil {
-		// Bulletproof Fehler-Check: Wandelt den Fehler inkl. dynamischer Inhalte in einen String um
 		errMsg := strings.ToLower(fmt.Sprintf("%v", err))
-
-		// Datei unbekannt -> als sicher einstufen (da kein Treffer in der Datenbank)
+		// Datei unbekannt → kein Eintrag in VT-Datenbank → als sicher einstufen
 		if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "notfounderror") {
 			log.Printf("[Security-VT] Datei unbekannt (keine Bedrohung gelistet).")
+			cacheMutex.Lock()
+			scanCache[hash] = true
+			cacheMutex.Unlock()
 			return true, nil
 		}
 		return false, fmt.Errorf("VT-API Fehler: %v", err)
 	}
 
-	// Analyse-Stats auslesen
+	isSafe, err := extractSafetyFromStats(obj)
+	if err != nil {
+		return false, err
+	}
+
+	// 3. Cache aktualisieren
+	cacheMutex.Lock()
+	scanCache[hash] = isSafe
+	cacheMutex.Unlock()
+
+	if !isSafe {
+		log.Printf("[Security-VT] 🚨 MALWARE ERKANNT! (Hash: %s...)", hash[:16])
+	}
+	return isSafe, nil
+}
+
+// ScanURL prüft eine URL bei VirusTotal auf Malware.
+// Gibt true zurück wenn die URL als sicher gilt (oder VT nicht aktiv ist).
+func ScanURL(rawURL string) (bool, error) {
+	if !scanEnabled || vtClient == nil {
+		return true, nil
+	}
+
+	// Rate-Limit Schutz (geteilt mit Datei-Scans)
+	scanMutex.Lock()
+	elapsed := time.Since(lastScan)
+	if elapsed < 15*time.Second {
+		time.Sleep(15*time.Second - elapsed)
+	}
+	lastScan = time.Now()
+	scanMutex.Unlock()
+
+	log.Printf("[Security-VT] URL-Scan: %s", rawURL)
+
+	urlPath := vt.URL("urls/%s", vtURLIdentifier(rawURL))
+	obj, err := vtClient.GetObject(urlPath)
+	if err != nil {
+		errMsg := strings.ToLower(fmt.Sprintf("%v", err))
+		if strings.Contains(errMsg, "not found") || strings.Contains(errMsg, "notfounderror") {
+			log.Printf("[Security-VT] URL unbekannt (keine Bedrohung gelistet): %s", rawURL)
+			return true, nil
+		}
+		return false, fmt.Errorf("VT URL-API Fehler: %v", err)
+	}
+
+	isSafe, err := extractSafetyFromStats(obj)
+	if err != nil {
+		return false, err
+	}
+
+	if !isSafe {
+		log.Printf("[Security-VT] 🚨 MALWARE-URL ERKANNT! URL: %s", rawURL)
+	}
+	return isSafe, nil
+}
+
+// ScanURLsInText extrahiert alle HTTP/HTTPS-URLs aus einem Text und scannt sie.
+// Gibt (true, "", nil) zurück wenn alle URLs sicher sind.
+// Gibt (false, badURL, nil) zurück wenn eine URL als gefährlich eingestuft wird.
+func ScanURLsInText(text string) (bool, string, error) {
+	urls := ExtractURLs(text)
+	for _, u := range urls {
+		isSafe, err := ScanURL(u)
+		if err != nil {
+			log.Printf("[Security-VT] URL-Scan Warnung für %s: %v", u, err)
+			continue // Bei API-Fehler nicht blockieren
+		}
+		if !isSafe {
+			return false, u, nil
+		}
+	}
+	return true, "", nil
+}
+
+// ExtractURLs extrahiert HTTP/HTTPS-URLs aus einem Text (nach Leerzeichen getrennt).
+func ExtractURLs(text string) []string {
+	words := strings.Fields(text)
+	var urls []string
+	for _, word := range words {
+		// Trailing-Interpunktion entfernen (z.B. "https://example.com," → "https://example.com")
+		word = strings.TrimRight(word, ".,;:!?)")
+		if strings.HasPrefix(word, "http://") || strings.HasPrefix(word, "https://") {
+			urls = append(urls, word)
+		}
+	}
+	return urls
+}
+
+// vtURLIdentifier berechnet den VirusTotal URL-Identifier.
+// Format: base64url(sha256(url)) ohne Padding – entspricht VT API v3.
+func vtURLIdentifier(rawURL string) string {
+	sum := sha256.Sum256([]byte(rawURL))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+// extractSafetyFromStats liest die last_analysis_stats aus einem VT-Objekt
+// und gibt true zurück wenn keine Bedrohung erkannt wurde.
+func extractSafetyFromStats(obj *vt.Object) (bool, error) {
 	statsInterface, err := obj.Get("last_analysis_stats")
 	if err != nil {
 		return false, fmt.Errorf("Stats-Format ungültig: %v", err)
@@ -98,15 +217,10 @@ func ScanFileHash(hash string) (bool, error) {
 		suspicious = v
 	}
 
+	// Schwellenwert: 0 malicious, max 2 suspicious (False-Positive-Schutz)
 	isSafe := malicious == 0 && suspicious <= 2
-
-	// 3. Cache aktualisieren
-	cacheMutex.Lock()
-	scanCache[hash] = isSafe
-	cacheMutex.Unlock()
-
 	if !isSafe {
-		log.Printf("[Security-VT] 🚨 MALWARE ERKANNT! (M:%v S:%v)", malicious, suspicious)
+		log.Printf("[Security-VT] Bedrohung erkannt (Malicious: %.0f, Suspicious: %.0f)", malicious, suspicious)
 	}
 	return isSafe, nil
 }
