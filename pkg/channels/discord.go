@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
 // DiscordConfig enthält die Konfiguration für den Discord-Kanal
@@ -26,12 +27,12 @@ type DiscordConfig struct {
 //  2. Unter "Privileged Gateway Intents": MESSAGE CONTENT INTENT aktivieren
 //  3. Bot einladen: OAuth2 → URL Generator → Scopes: bot → Permissions: Send Messages, Read Messages
 type DiscordChannel struct {
-	cfg      DiscordConfig
-	session  *discordgo.Session
-	bus      chan<- Message
-	allow    map[string]bool
-	stopCh   chan struct{}
-	client   *http.Client
+	cfg     DiscordConfig
+	session *discordgo.Session
+	bus     chan<- Message
+	allow   map[string]bool
+	stopCh  chan struct{}
+	client  *http.Client
 }
 
 // NewDiscordChannel erstellt einen neuen Discord-Kanal
@@ -108,13 +109,32 @@ func (d *DiscordChannel) onMessage(s *discordgo.Session, m *discordgo.MessageCre
 	chatID := m.ChannelID
 	senderID := m.Author.ID
 
-	// ── Sprachnachrichten / Audio-Anhänge ────────────────────────────────────
+	// ── Anhänge scannen (alle Typen: Audio, Bild, Dokument, Video, ...) ──────
 	for _, att := range m.Attachments {
+		data, err := d.downloadToMemory(att.URL)
+		if err != nil {
+			log.Printf("[Discord] Download-Fehler für '%s': %v", att.Filename, err)
+			continue
+		}
+
+		isSafe, err := security.ScanFile(data)
+		if err != nil {
+			log.Printf("[Discord/Security] Scan-Warnung für '%s': %v", att.Filename, err)
+			// Bei VT-API-Fehler: nicht blockieren
+		}
+		if !isSafe {
+			log.Printf("[Discord/Security] 🚨 Blockiere bösartige Datei von User %s: %s", senderID, att.Filename)
+			d.Send(chatID, security.VTFileBlockedMsg)
+			return
+		}
+
+		log.Printf("[Discord/Security] ✅ Datei sicher: %s", att.Filename)
+
+		// Audio-Anhänge als Voice-Nachricht weiterleiten
 		if isDiscordAudio(att) {
-			localPath, err := d.downloadFile(att.URL, ".ogg")
+			localPath, err := saveTempFileFromData(data, ".ogg")
 			if err != nil {
-				log.Printf("[Discord] Audio-Download fehlgeschlagen: %v", err)
-				localPath = ""
+				log.Printf("[Discord] Temp-Datei konnte nicht erstellt werden: %v", err)
 			}
 			d.bus <- Message{
 				ID:        m.ID,
@@ -126,10 +146,23 @@ func (d *DiscordChannel) onMessage(s *discordgo.Session, m *discordgo.MessageCre
 			}
 			return
 		}
+		// Andere Dateitypen: sicher befunden, Nachricht fließt als Text durch (s.u.)
 	}
 
-	// ── Textnachrichten ───────────────────────────────────────────────────────
+	// ── URL-Scan bei Textnachrichten ──────────────────────────────────────────
 	text := strings.TrimSpace(m.Content)
+	if text != "" {
+		isSafe, badURL, err := security.ScanURLsInText(text)
+		if err != nil {
+			log.Printf("[Discord/Security] URL-Scan Warnung: %v", err)
+		}
+		if !isSafe {
+			log.Printf("[Discord/Security] 🚨 Bösartige URL von User %s: %s", senderID, badURL)
+			d.Send(chatID, security.VTURLBlockedMsg)
+			return
+		}
+	}
+
 	if text == "" {
 		return
 	}
@@ -204,24 +237,31 @@ func (d *DiscordChannel) TypingIndicator(chatID string) {
 	}
 }
 
-// downloadFile lädt eine Datei von einer URL herunter und gibt den lokalen Pfad zurück.
-func (d *DiscordChannel) downloadFile(url, ext string) (string, error) {
+// downloadToMemory lädt eine Datei von einer URL in den RAM.
+func (d *DiscordChannel) downloadToMemory(url string) ([]byte, error) {
 	resp, err := d.client.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("download fehlgeschlagen: %w", err)
+		return nil, fmt.Errorf("download fehlgeschlagen: %w", err)
 	}
 	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
+}
 
-	tmpPath := fmt.Sprintf("/tmp/discord_voice_%d%s", time.Now().UnixNano(), ext)
-	out, err := os.Create(tmpPath)
+// downloadFile lädt eine Datei von einer URL herunter und gibt den lokalen Pfad zurück.
+// Wird noch für Abwärtskompatibilität behalten.
+func (d *DiscordChannel) downloadFile(url, ext string) (string, error) {
+	data, err := d.downloadToMemory(url)
 	if err != nil {
-		return "", fmt.Errorf("temp-datei konnte nicht erstellt werden: %w", err)
+		return "", err
 	}
-	defer out.Close()
+	return saveTempFileFromData(data, ext)
+}
 
-	if _, err := io.Copy(out, resp.Body); err != nil {
-		os.Remove(tmpPath)
-		return "", fmt.Errorf("fehler beim Speichern: %w", err)
+// saveTempFileFromData speichert Bytes in einer temporären Datei und gibt den Pfad zurück.
+func saveTempFileFromData(data []byte, ext string) (string, error) {
+	tmpPath := fmt.Sprintf("/tmp/discord_media_%d%s", time.Now().UnixNano(), ext)
+	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
+		return "", fmt.Errorf("temp-datei konnte nicht erstellt werden: %w", err)
 	}
 	return tmpPath, nil
 }

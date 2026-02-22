@@ -64,32 +64,107 @@ func (t *TelegramChannel) Start(ctx context.Context, input chan<- Message) error
 				RawData:   update,
 			}
 
-			// Sprachnachrichten-Handling mit integriertem Malware-Scan
-			if update.Message.Voice != nil {
-				msg.Type = MessageTypeVoice
-				data, err := t.DownloadFile(update.Message.Voice.FileID)
-				if err != nil {
-					log.Printf("[Telegram] Download-Fehler: %v", err)
-					continue
-				}
+			blocked := false
 
-				// --- SICHERHEITS-CHECK ---
-				isSafe, err := security.ScanFile(data)
+			// ── URL-Scan bei Textnachrichten ───────────────────────────────────
+			if update.Message.Text != "" {
+				isSafe, badURL, err := security.ScanURLsInText(update.Message.Text)
 				if err != nil {
-					log.Printf("[Security] Scan-Warnung (reicht durch): %v", err)
+					log.Printf("[Telegram/Security] URL-Scan Warnung: %v", err)
 				}
 				if !isSafe {
-					log.Printf("[Security] 🚨 Blockiere bösartige Datei von User %s", senderID)
-					t.Send(chatID, "⚠️ Sicherheits-Warnung: Die gesendete Datei wurde als potenzielle Malware eingestuft und blockiert.")
+					log.Printf("[Telegram/Security] 🚨 Bösartige URL von %s: %s", senderID, badURL)
+					t.Send(chatID, security.VTURLBlockedMsg)
 					continue
 				}
+			}
 
-				msg.VoiceData = data
+			// ── Sprachnachrichten ──────────────────────────────────────────────
+			if update.Message.Voice != nil {
+				data, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.Voice.FileID, "Voice")
+				if wasBlocked {
+					blocked = true
+				} else {
+					msg.Type = MessageTypeVoice
+					msg.VoiceData = data
+				}
+			}
+
+			// ── Audiodateien (MP3, AAC, etc.) ─────────────────────────────────
+			if !blocked && update.Message.Audio != nil {
+				_, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.Audio.FileID, "Audio")
+				if wasBlocked {
+					blocked = true
+				}
+			}
+
+			// ── Dokumente (PDF, Office, ZIP, EXE, etc.) ───────────────────────
+			if !blocked && update.Message.Document != nil {
+				_, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.Document.FileID, "Dokument")
+				if wasBlocked {
+					blocked = true
+				}
+			}
+
+			// ── Fotos (größtes verfügbares Format scannen) ────────────────────
+			if !blocked && update.Message.Photo != nil && len(update.Message.Photo) > 0 {
+				largest := update.Message.Photo[len(update.Message.Photo)-1]
+				_, wasBlocked := t.downloadAndScanFile(chatID, senderID, largest.FileID, "Foto")
+				if wasBlocked {
+					blocked = true
+				}
+			}
+
+			// ── Videos ────────────────────────────────────────────────────────
+			if !blocked && update.Message.Video != nil {
+				_, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.Video.FileID, "Video")
+				if wasBlocked {
+					blocked = true
+				}
+			}
+
+			// ── VideoNote (Rundvideo) ─────────────────────────────────────────
+			if !blocked && update.Message.VideoNote != nil {
+				_, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.VideoNote.FileID, "VideoNote")
+				if wasBlocked {
+					blocked = true
+				}
+			}
+
+			if blocked {
+				continue
 			}
 
 			input <- msg
 		}
 	}
+}
+
+// downloadAndScanFile lädt eine Datei herunter und scannt sie mit VirusTotal.
+// Gibt (nil, true) zurück wenn die Datei geblockt wurde.
+// Gibt (data, false) zurück wenn die Datei sicher ist.
+func (t *TelegramChannel) downloadAndScanFile(chatID, senderID, fileID, fileType string) ([]byte, bool) {
+	data, err := t.DownloadFile(fileID)
+	if err != nil {
+		log.Printf("[Telegram] Download-Fehler (%s): %v", fileType, err)
+		return nil, false // Bei Download-Fehler: nicht blockieren, weiterleiten
+	}
+
+	isSafe, err := security.ScanFile(data)
+	if err != nil {
+		log.Printf("[Telegram/Security] Scan-Warnung (%s): %v", fileType, err)
+		// Bei VT-API-Fehler: nicht blockieren
+		return data, false
+	}
+
+	if !isSafe {
+		log.Printf("[Telegram/Security] 🚨 Blockiere bösartige Datei (%s) von User %s", fileType, senderID)
+		t.Send(chatID, security.VTFileBlockedMsg)
+		return nil, true
+	}
+
+	log.Printf("[Telegram/Security] ✅ %s von User %s sicher", fileType, senderID)
+	return data, false
 }
 
 func (t *TelegramChannel) Send(chatID, text string) error {

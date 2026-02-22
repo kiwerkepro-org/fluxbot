@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
 const (
@@ -32,10 +34,10 @@ type SlackConfig struct {
 // SlackChannel implementiert den Slack-Kanal via Events API (HTTP Webhook)
 //
 // Setup in api.slack.com:
-//   1. App erstellen → Features → Event Subscriptions aktivieren
-//   2. Request URL: http://dein-server:3000/slack/events
-//   3. Subscribe to bot events: message.im, message.channels
-//   4. Bot Token Scopes: chat:write, im:history, channels:history
+//  1. App erstellen → Features → Event Subscriptions aktivieren
+//  2. Request URL: http://dein-server:3000/slack/events
+//  3. Subscribe to bot events: message.im, message.channels, message.files
+//  4. Bot Token Scopes: chat:write, im:history, channels:history, files:read
 type SlackChannel struct {
 	cfg    SlackConfig
 	bus    chan<- Message
@@ -183,10 +185,49 @@ func (s *SlackChannel) handleEvent(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if (e.Type == "message" || e.Type == "app_mention") && e.Text != "" {
-		// @-Mention des Bots aus dem Text entfernen
+	// ── File-Share: Dateien scannen ────────────────────────────────────────────
+	if e.SubType == "file_share" && len(e.Files) > 0 {
+		for _, f := range e.Files {
+			if f.URLPrivateDownload == "" {
+				log.Printf("[Slack] Datei '%s' hat keine Download-URL (möglicherweise noch nicht verfügbar)", f.Name)
+				continue
+			}
+
+			data, err := s.downloadSlackFile(f.URLPrivateDownload)
+			if err != nil {
+				log.Printf("[Slack] File-Download Fehler für '%s': %v", f.Name, err)
+				continue
+			}
+
+			isSafe, err := security.ScanFile(data)
+			if err != nil {
+				log.Printf("[Slack/Security] Scan-Warnung für '%s': %v", f.Name, err)
+				// Bei VT-API-Fehler: nicht blockieren
+			}
+			if !isSafe {
+				log.Printf("[Slack/Security] 🚨 Blockiere bösartige Datei von %s: %s", e.User, f.Name)
+				s.Send(e.Channel, security.VTFileBlockedMsg)
+				return
+			}
+			log.Printf("[Slack/Security] ✅ Datei sicher: %s", f.Name)
+		}
+	}
+
+	// ── Textnachrichten + URL-Scan ─────────────────────────────────────────────
+	if e.Type == "message" || e.Type == "app_mention" {
 		text := strings.TrimSpace(removeSlackMention(e.Text))
 		if text == "" {
+			return
+		}
+
+		// URL-Scan
+		isSafe, badURL, err := security.ScanURLsInText(text)
+		if err != nil {
+			log.Printf("[Slack/Security] URL-Scan Warnung: %v", err)
+		}
+		if !isSafe {
+			log.Printf("[Slack/Security] 🚨 Bösartige URL von %s: %s", e.User, badURL)
+			s.Send(e.Channel, security.VTURLBlockedMsg)
 			return
 		}
 
@@ -204,6 +245,29 @@ func (s *SlackChannel) handleEvent(rw http.ResponseWriter, r *http.Request) {
 			s.bus <- msg
 		}
 	}
+}
+
+// downloadSlackFile lädt eine private Slack-Datei mit dem Bot-Token herunter.
+// Slack-Dateien erfordern einen Authorization-Header (Bearer Token).
+func (s *SlackChannel) downloadSlackFile(fileURL string) ([]byte, error) {
+	req, err := http.NewRequest("GET", fileURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+s.cfg.BotToken)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("slack: file-download fehlgeschlagen: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("slack: file-download HTTP %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
 }
 
 func (s *SlackChannel) verifySlackSignature(r *http.Request, body []byte) bool {
@@ -238,13 +302,23 @@ type slackEventPayload struct {
 }
 
 type slackEvent struct {
-	Type    string `json:"type"`
-	SubType string `json:"subtype"`
-	Text    string `json:"text"`
-	User    string `json:"user"`
-	Channel string `json:"channel"`
-	TS      string `json:"ts"`
-	BotID   string `json:"bot_id"`
+	Type    string      `json:"type"`
+	SubType string      `json:"subtype"`
+	Text    string      `json:"text"`
+	User    string      `json:"user"`
+	Channel string      `json:"channel"`
+	TS      string      `json:"ts"`
+	BotID   string      `json:"bot_id"`
+	Files   []slackFile `json:"files"` // Für file_share Events
+}
+
+// slackFile repräsentiert eine in Slack hochgeladene Datei
+type slackFile struct {
+	ID                 string `json:"id"`
+	Name               string `json:"name"`
+	URLPrivateDownload string `json:"url_private_download"` // Download-URL (benötigt Auth)
+	Mimetype           string `json:"mimetype"`
+	Size               int64  `json:"size"`
 }
 
 // SendPhoto ist noch nicht implementiert für slack
