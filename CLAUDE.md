@@ -89,6 +89,7 @@ SKILL_SECRET, VIRUSTOTAL_API_KEY, DASHBOARD_PASSWORD
 HMAC_SECRET
 OLLAMA_BASE_URL  (optional, Default: http://localhost:11434)
 INTEG_{NAME}  z.B. INTEG_CALCOM_API_KEY, INTEG_CALCOM_BASE_URL
+GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN
 ```
 
 ### Dashboard API
@@ -492,4 +493,57 @@ Skill wurde in Sessions 11+13 geändert, `.sig` war noch die alte. → `verifySk
 - `cmd/fluxbot/main.go`: Startup-Pfad – `skillsLoader.Reload()` nach `skillsLoader.SetIntegrations()` ergänzt
 - `workspace/skills/calcom-termine.md.sig` – neu generiert mit aktuellem SKILL_SECRET
 
-**Nächster Schritt:** Docker-Rebuild + Im Dashboard → Integrationen → Cal.com: Dienst (Cal.com oder Cal.eu) wählen, API-Key + E-Mail eintragen + speichern → Test "Essen mit Anita, heute Abend 20:00"
+**Session 16 – Nächster Schritt (erledigt in Session 17):** Docker-Rebuild + Im Dashboard → Integrationen → Cal.com: Dienst (Cal.com oder Cal.eu) wählen, API-Key + E-Mail eintragen + speichern → Test "Essen mit Anita, heute Abend 20:00"
+
+**Erledigt Session 17 (Google Workspace Integration – Calendar, Docs, Sheets, Drive, Gmail):**
+
+### PRIORITÄT 8 – Google Workspace Integration ✅ ERLEDIGT
+```
+[x] pkg/google/google.go – OAuth2 Client (New, IsConfigured, GetAuthURL, ExchangeCode, getAccessToken, doRequest)
+[x] pkg/google/google.go – Google Calendar (CalendarCreate, CalendarList)
+[x] pkg/google/google.go – Google Docs (DocsCreate, DocsAppend, DocsRead)
+[x] pkg/google/google.go – Google Sheets (SheetsCreate, SheetsRead, SheetsWrite, SheetsAppend)
+[x] pkg/google/google.go – Google Drive (DriveList)
+[x] pkg/google/google.go – Gmail (GmailSend, GmailList)
+[x] pkg/agent/agent.go – googleClient Feld + GoogleClient Config + UpdateGoogleClient() Hot-Reload
+[x] pkg/agent/agent.go – 12 Marker-Handler: __GOOGLE_CAL_CREATE/LIST__, __GOOGLE_DOCS_CREATE/APPEND/READ__, __GOOGLE_SHEETS_CREATE/READ/WRITE__, __GOOGLE_DRIVE_LIST__, __GMAIL_SEND/LIST__
+[x] pkg/agent/agent.go – buildSystemPrompt() erweitert mit Google-Anweisungen (wenn konfiguriert)
+[x] pkg/agent/agent.go – parseGoogleMarker() Hilfsfunktion
+[x] cmd/fluxbot/main.go – buildGoogleClient() aus Vault (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN)
+[x] cmd/fluxbot/main.go – onReload() UpdateGoogleClient()
+[x] pkg/dashboard/api.go – handleGoogleAuthURL() + handleGoogleOAuthCallback() (OAuth2-Code-Exchange → Vault)
+[x] pkg/dashboard/server.go – GET /api/google/auth-url + GET /api/google/oauth-callback Routen
+[x] pkg/dashboard/dashboard.html – Google Workspace Panel (Client ID, Client Secret, Refresh Token, OAuth-Button, Badge)
+[x] pkg/dashboard/dashboard.html – updateGoogleBadge() + googleStartOAuth() JS-Funktionen
+[x] pkg/dashboard/dashboard.html – loadConfig() + saveConfig() für Google-Felder
+[x] workspace/skills/google-calendar.md + .sig – Skills mit Markern
+[x] workspace/skills/google-docs.md + .sig – Skills für Docs, Sheets, Drive
+[x] workspace/skills/gmail.md + .sig – Gmail-Skill
+```
+
+**Vault-Keys Google:**
+```
+GOOGLE_CLIENT_ID       – aus Google Cloud Console → Credentials → OAuth 2.0 Client ID
+GOOGLE_CLIENT_SECRET   – aus Google Cloud Console → Credentials → OAuth 2.0 Client ID
+GOOGLE_REFRESH_TOKEN   – wird automatisch via OAuth-Callback befüllt
+```
+
+**OAuth2-Setup (einmalig):**
+1. Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client ID erstellen (Typ: Web-Anwendung)
+2. Redirect URI: `http://localhost:9090/api/google/oauth-callback`
+3. APIs aktivieren: Calendar API, Docs API, Sheets API, Drive API, Gmail API
+4. Dashboard → Integrationen → Google: Client ID + Secret eintragen → Speichern
+5. „Google-Konto verbinden" klicken → Browser-Fenster öffnet sich → Konto auswählen → Bestätigen
+6. Refresh Token wird automatisch im Vault gespeichert + Hot-Reload
+
+**Marker-Übersicht:**
+- `__GOOGLE_CAL_LIST__` / `__GOOGLE_CAL_CREATE__` + `__GOOGLE_CAL_CREATE_END__`
+- `__GOOGLE_DOCS_CREATE__` + `_END__` / `__GOOGLE_DOCS_APPEND__` + `_END__` / `__GOOGLE_DOCS_READ__` + `_END__`
+- `__GOOGLE_SHEETS_CREATE__` + `_END__` / `__GOOGLE_SHEETS_READ__` + `_END__` / `__GOOGLE_SHEETS_WRITE__` + `_END__`
+- `__GOOGLE_DRIVE_LIST__` + `_END__`
+- `__GMAIL_SEND__` + `_END__` / `__GMAIL_LIST__` + `_END__`
+
+**Nächster Schritt:**
+1. Docker-Rebuild: `docker compose down; docker compose up -d --build`
+2. Dashboard → Integrationen → Google: Client ID + Secret eintragen → Speichern → „Google-Konto verbinden"
+3. Test: „Zeig mir meine Google-Termine" / „Erstelle ein Google Doc: Besprechungsprotokoll"

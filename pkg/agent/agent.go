@@ -15,6 +15,7 @@ import (
 
 	"github.com/ki-werke/fluxbot/pkg/channels"
 	"github.com/ki-werke/fluxbot/pkg/email"
+	googleapi "github.com/ki-werke/fluxbot/pkg/google"
 	"github.com/ki-werke/fluxbot/pkg/imagegen"
 	"github.com/ki-werke/fluxbot/pkg/provider"
 	"github.com/ki-werke/fluxbot/pkg/security"
@@ -40,6 +41,7 @@ type Agent struct {
 	calcomAPIKey      string // Cal.com API-Key
 	calcomOwnerEmail  string // Standard-E-Mail für Buchungen
 	calcomEventTypeID int    // Optional: fixe Event Type ID (0 = auto-fetch)
+	googleClient     *googleapi.Client // nil = Google deaktiviert
 	soul              string // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
 	systemPromptFn   func(session *Session, rules string) string
 }
@@ -62,6 +64,7 @@ type Config struct {
 	CalcomAPIKey      string // Optional – Cal.com API-Key
 	CalcomOwnerEmail  string // Optional – Standard-E-Mail für Buchungen
 	CalcomEventTypeID int    // Optional – fixe Event Type ID (0 = auto-fetch)
+	GoogleClient     *googleapi.Client // Optional – nil = Google deaktiviert
 	Soul              string // Inhalt von SOUL.md + IDENTITY.md (leer = nur Basis-Prompt)
 }
 
@@ -88,6 +91,7 @@ func New(cfg Config) *Agent {
 		calcomAPIKey:      cfg.CalcomAPIKey,
 		calcomOwnerEmail:  cfg.CalcomOwnerEmail,
 		calcomEventTypeID: cfg.CalcomEventTypeID,
+		googleClient:     cfg.GoogleClient,
 		soul:             cfg.Soul,
 	}
 	a.systemPromptFn = a.buildSystemPrompt
@@ -135,6 +139,16 @@ func (a *Agent) UpdateCalcomConfig(baseURL, apiKey, ownerEmail string, eventType
 		} else {
 			log.Printf("[Agent] 🔄 Cal.com aktiv (%s | EventTypeID: auto)", baseURL)
 		}
+	}
+}
+
+// UpdateGoogleClient ersetzt den Google API-Client zur Laufzeit (Hot-Reload).
+func (a *Agent) UpdateGoogleClient(client *googleapi.Client) {
+	a.googleClient = client
+	if client == nil || !client.IsConfigured() {
+		log.Println("[Agent] 🔄 Google API deaktiviert (keine Zugangsdaten).")
+	} else {
+		log.Println("[Agent] 🔄 Google API aktiviert (Calendar, Docs, Sheets, Drive, Gmail).")
 	}
 }
 
@@ -610,6 +624,53 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 		return a.handleCalcomList()
 	}
 
+	// ── Google API Marker ─────────────────────────────────────────────────────
+
+	// Google Calendar – Termin erstellen
+	if strings.Contains(response, "__GOOGLE_CAL_CREATE__") && strings.Contains(response, "__GOOGLE_CAL_CREATE_END__") {
+		return a.handleGoogleCalCreate(response)
+	}
+	// Google Calendar – Termine auflisten
+	if strings.Contains(response, "__GOOGLE_CAL_LIST__") {
+		return a.handleGoogleCalList()
+	}
+	// Google Docs – neues Dokument erstellen
+	if strings.Contains(response, "__GOOGLE_DOCS_CREATE__") && strings.Contains(response, "__GOOGLE_DOCS_CREATE_END__") {
+		return a.handleGoogleDocsCreate(response)
+	}
+	// Google Docs – Text an Dokument anhängen
+	if strings.Contains(response, "__GOOGLE_DOCS_APPEND__") && strings.Contains(response, "__GOOGLE_DOCS_APPEND_END__") {
+		return a.handleGoogleDocsAppend(response)
+	}
+	// Google Docs – Dokument lesen
+	if strings.Contains(response, "__GOOGLE_DOCS_READ__") && strings.Contains(response, "__GOOGLE_DOCS_READ_END__") {
+		return a.handleGoogleDocsRead(response)
+	}
+	// Google Sheets – Tabelle erstellen
+	if strings.Contains(response, "__GOOGLE_SHEETS_CREATE__") && strings.Contains(response, "__GOOGLE_SHEETS_CREATE_END__") {
+		return a.handleGoogleSheetsCreate(response)
+	}
+	// Google Sheets – Werte lesen
+	if strings.Contains(response, "__GOOGLE_SHEETS_READ__") && strings.Contains(response, "__GOOGLE_SHEETS_READ_END__") {
+		return a.handleGoogleSheetsRead(response)
+	}
+	// Google Sheets – Werte schreiben
+	if strings.Contains(response, "__GOOGLE_SHEETS_WRITE__") && strings.Contains(response, "__GOOGLE_SHEETS_WRITE_END__") {
+		return a.handleGoogleSheetsWrite(response)
+	}
+	// Google Drive – Dateien auflisten/suchen
+	if strings.Contains(response, "__GOOGLE_DRIVE_LIST__") && strings.Contains(response, "__GOOGLE_DRIVE_LIST_END__") {
+		return a.handleGoogleDriveList(response)
+	}
+	// Gmail – E-Mail senden
+	if strings.Contains(response, "__GMAIL_SEND__") && strings.Contains(response, "__GMAIL_SEND_END__") {
+		return a.handleGmailSend(response)
+	}
+	// Gmail – E-Mails auflisten
+	if strings.Contains(response, "__GMAIL_LIST__") && strings.Contains(response, "__GMAIL_LIST_END__") {
+		return a.handleGmailList(response)
+	}
+
 	return response
 }
 
@@ -1041,6 +1102,348 @@ func (a *Agent) handleCalcomList() string {
 	return strings.TrimRight(sb.String(), "\n")
 }
 
+// ── GOOGLE API HANDLER ─────────────────────────────────────────────────────
+
+// googleNotConfigured gibt eine einheitliche Fehlermeldung zurück.
+func (a *Agent) googleNotConfigured() string {
+	return "❌ Google API ist nicht konfiguriert.\n\n" +
+		"Bitte trage im Dashboard → Integrationen → Google deine OAuth2-Zugangsdaten ein " +
+		"(Client ID, Client Secret, Refresh Token)."
+}
+
+// parseGoogleMarker extrahiert den JSON-Block zwischen start- und end-Marker.
+func parseGoogleMarker(response, startMarker, endMarker string) ([]byte, error) {
+	s := strings.Index(response, startMarker)
+	e := strings.Index(response, endMarker)
+	if s < 0 || e < 0 {
+		return nil, fmt.Errorf("marker nicht gefunden")
+	}
+	block := strings.TrimSpace(response[s+len(startMarker) : e])
+	// Markdown-Codeblock entfernen falls vorhanden
+	block = strings.TrimPrefix(block, "```json")
+	block = strings.TrimPrefix(block, "```")
+	block = strings.TrimSuffix(block, "```")
+	return []byte(strings.TrimSpace(block)), nil
+}
+
+// handleGoogleCalCreate erstellt einen Google Calendar-Termin.
+// Marker-Format: __GOOGLE_CAL_CREATE__\n{"title":"...","start":"...","end":"...","description":"...","location":"...","calendarId":"primary"}\n__GOOGLE_CAL_CREATE_END__
+func (a *Agent) handleGoogleCalCreate(response string) string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	data, err := parseGoogleMarker(response, "__GOOGLE_CAL_CREATE__", "__GOOGLE_CAL_CREATE_END__")
+	if err != nil {
+		return "❌ Google Calendar: Ungültiger Marker-Block."
+	}
+	var ev googleapi.CalendarEvent
+	if err := json.Unmarshal(data, &ev); err != nil {
+		return fmt.Sprintf("❌ Google Calendar: JSON-Fehler: %v", err)
+	}
+	result, err := a.googleClient.CalendarCreate(ev)
+	if err != nil {
+		log.Printf("[Agent] ❌ Google Calendar Fehler: %v", err)
+		return fmt.Sprintf("❌ Google Calendar Fehler: %v", err)
+	}
+	log.Printf("[Agent] 📅 Google Calendar Termin erstellt: %s", result.Title)
+	return fmt.Sprintf("✅ Termin *%s* wurde in Google Calendar eingetragen!\n🔗 %s", result.Title, result.HtmlURL)
+}
+
+// handleGoogleCalList listet bevorstehende Google Calendar-Termine auf.
+// Marker-Format: __GOOGLE_CAL_LIST__
+func (a *Agent) handleGoogleCalList() string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	events, err := a.googleClient.CalendarList("primary", 10)
+	if err != nil {
+		log.Printf("[Agent] ❌ Google Calendar List Fehler: %v", err)
+		return fmt.Sprintf("❌ Google Calendar Fehler: %v", err)
+	}
+	if len(events) == 0 {
+		return "📅 Keine bevorstehenden Termine in Google Calendar."
+	}
+	var sb strings.Builder
+	sb.WriteString("📅 *Deine nächsten Google Calendar Termine:*\n\n")
+	for _, e := range events {
+		sb.WriteString(fmt.Sprintf("• *%s* – %s\n", e.Title, e.Start))
+		if e.Location != "" {
+			sb.WriteString(fmt.Sprintf("  📍 %s\n", e.Location))
+		}
+	}
+	return strings.TrimRight(sb.String(), "\n")
+}
+
+// handleGoogleDocsCreate erstellt ein neues Google Docs-Dokument.
+// Marker-Format: __GOOGLE_DOCS_CREATE__\n{"title":"...","content":"..."}\n__GOOGLE_DOCS_CREATE_END__
+func (a *Agent) handleGoogleDocsCreate(response string) string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	data, err := parseGoogleMarker(response, "__GOOGLE_DOCS_CREATE__", "__GOOGLE_DOCS_CREATE_END__")
+	if err != nil {
+		return "❌ Google Docs: Ungültiger Marker-Block."
+	}
+	var payload struct {
+		Title   string `json:"title"`
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Sprintf("❌ Google Docs: JSON-Fehler: %v", err)
+	}
+	result, err := a.googleClient.DocsCreate(payload.Title, payload.Content)
+	if err != nil {
+		log.Printf("[Agent] ❌ Google Docs Fehler: %v", err)
+		return fmt.Sprintf("❌ Google Docs Fehler: %v", err)
+	}
+	log.Printf("[Agent] 📄 Google Docs Dokument erstellt: %s (%s)", result.Title, result.DocID)
+	return fmt.Sprintf("✅ Dokument *%s* wurde in Google Docs erstellt!\n🔗 %s", result.Title, result.URL)
+}
+
+// handleGoogleDocsAppend fügt Text an ein bestehendes Google Docs-Dokument an.
+// Marker-Format: __GOOGLE_DOCS_APPEND__\n{"docId":"...","content":"..."}\n__GOOGLE_DOCS_APPEND_END__
+func (a *Agent) handleGoogleDocsAppend(response string) string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	data, err := parseGoogleMarker(response, "__GOOGLE_DOCS_APPEND__", "__GOOGLE_DOCS_APPEND_END__")
+	if err != nil {
+		return "❌ Google Docs: Ungültiger Marker-Block."
+	}
+	var payload struct {
+		DocID   string `json:"docId"`
+		Content string `json:"content"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Sprintf("❌ Google Docs: JSON-Fehler: %v", err)
+	}
+	if err := a.googleClient.DocsAppend(payload.DocID, payload.Content); err != nil {
+		log.Printf("[Agent] ❌ Google Docs Append Fehler: %v", err)
+		return fmt.Sprintf("❌ Google Docs Fehler: %v", err)
+	}
+	log.Printf("[Agent] 📄 Google Docs Text angehängt an: %s", payload.DocID)
+	return fmt.Sprintf("✅ Text wurde an das Google Docs-Dokument angehängt.\n🔗 https://docs.google.com/document/d/%s/edit", payload.DocID)
+}
+
+// handleGoogleDocsRead liest den Inhalt eines Google Docs-Dokuments.
+// Marker-Format: __GOOGLE_DOCS_READ__\n{"docId":"..."}\n__GOOGLE_DOCS_READ_END__
+func (a *Agent) handleGoogleDocsRead(response string) string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	data, err := parseGoogleMarker(response, "__GOOGLE_DOCS_READ__", "__GOOGLE_DOCS_READ_END__")
+	if err != nil {
+		return "❌ Google Docs: Ungültiger Marker-Block."
+	}
+	var payload struct {
+		DocID string `json:"docId"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Sprintf("❌ Google Docs: JSON-Fehler: %v", err)
+	}
+	title, content, err := a.googleClient.DocsRead(payload.DocID)
+	if err != nil {
+		log.Printf("[Agent] ❌ Google Docs Read Fehler: %v", err)
+		return fmt.Sprintf("❌ Google Docs Fehler: %v", err)
+	}
+	// Inhalt auf sinnvolle Länge kürzen
+	if len(content) > 2000 {
+		content = content[:2000] + "\n\n[... Dokument zu lang, nur Anfang angezeigt]"
+	}
+	return fmt.Sprintf("📄 *%s*\n\n%s", title, content)
+}
+
+// handleGoogleSheetsCreate erstellt eine neue Google Sheets-Tabelle.
+// Marker-Format: __GOOGLE_SHEETS_CREATE__\n{"title":"..."}\n__GOOGLE_SHEETS_CREATE_END__
+func (a *Agent) handleGoogleSheetsCreate(response string) string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	data, err := parseGoogleMarker(response, "__GOOGLE_SHEETS_CREATE__", "__GOOGLE_SHEETS_CREATE_END__")
+	if err != nil {
+		return "❌ Google Sheets: Ungültiger Marker-Block."
+	}
+	var payload struct {
+		Title string `json:"title"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Sprintf("❌ Google Sheets: JSON-Fehler: %v", err)
+	}
+	result, err := a.googleClient.SheetsCreate(payload.Title)
+	if err != nil {
+		log.Printf("[Agent] ❌ Google Sheets Fehler: %v", err)
+		return fmt.Sprintf("❌ Google Sheets Fehler: %v", err)
+	}
+	log.Printf("[Agent] 📊 Google Sheets erstellt: %s (%s)", result.Title, result.SheetID)
+	return fmt.Sprintf("✅ Tabelle *%s* wurde in Google Sheets erstellt!\n🔗 %s", result.Title, result.URL)
+}
+
+// handleGoogleSheetsRead liest Werte aus einer Google Sheets-Tabelle.
+// Marker-Format: __GOOGLE_SHEETS_READ__\n{"sheetId":"...","range":"A1:Z100"}\n__GOOGLE_SHEETS_READ_END__
+func (a *Agent) handleGoogleSheetsRead(response string) string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	data, err := parseGoogleMarker(response, "__GOOGLE_SHEETS_READ__", "__GOOGLE_SHEETS_READ_END__")
+	if err != nil {
+		return "❌ Google Sheets: Ungültiger Marker-Block."
+	}
+	var payload struct {
+		SheetID string `json:"sheetId"`
+		Range   string `json:"range"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Sprintf("❌ Google Sheets: JSON-Fehler: %v", err)
+	}
+	rows, err := a.googleClient.SheetsRead(payload.SheetID, payload.Range)
+	if err != nil {
+		log.Printf("[Agent] ❌ Google Sheets Read Fehler: %v", err)
+		return fmt.Sprintf("❌ Google Sheets Fehler: %v", err)
+	}
+	if len(rows) == 0 {
+		return "📊 Die Tabelle ist leer (oder der angegebene Bereich enthält keine Daten)."
+	}
+	var sb strings.Builder
+	sb.WriteString("📊 *Google Sheets Inhalt:*\n\n```\n")
+	maxRows := 30
+	if len(rows) < maxRows {
+		maxRows = len(rows)
+	}
+	for _, row := range rows[:maxRows] {
+		sb.WriteString(strings.Join(row, " | "))
+		sb.WriteString("\n")
+	}
+	if len(rows) > 30 {
+		sb.WriteString(fmt.Sprintf("... (%d weitere Zeilen nicht angezeigt)\n", len(rows)-30))
+	}
+	sb.WriteString("```")
+	return sb.String()
+}
+
+// handleGoogleSheetsWrite schreibt Werte in eine Google Sheets-Tabelle.
+// Marker-Format: __GOOGLE_SHEETS_WRITE__\n{"sheetId":"...","range":"A1","values":[["Name","Wert"],["Test","123"]]}\n__GOOGLE_SHEETS_WRITE_END__
+func (a *Agent) handleGoogleSheetsWrite(response string) string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	data, err := parseGoogleMarker(response, "__GOOGLE_SHEETS_WRITE__", "__GOOGLE_SHEETS_WRITE_END__")
+	if err != nil {
+		return "❌ Google Sheets: Ungültiger Marker-Block."
+	}
+	var payload struct {
+		SheetID string          `json:"sheetId"`
+		Range   string          `json:"range"`
+		Values  [][]interface{} `json:"values"`
+		Append  bool            `json:"append"` // true = anhängen statt überschreiben
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Sprintf("❌ Google Sheets: JSON-Fehler: %v", err)
+	}
+	var writeErr error
+	if payload.Append {
+		writeErr = a.googleClient.SheetsAppend(payload.SheetID, payload.Range, payload.Values)
+	} else {
+		writeErr = a.googleClient.SheetsWrite(payload.SheetID, payload.Range, payload.Values)
+	}
+	if writeErr != nil {
+		log.Printf("[Agent] ❌ Google Sheets Write Fehler: %v", writeErr)
+		return fmt.Sprintf("❌ Google Sheets Fehler: %v", writeErr)
+	}
+	action := "geschrieben"
+	if payload.Append {
+		action = "angehängt"
+	}
+	log.Printf("[Agent] 📊 Google Sheets Daten %s (Sheet: %s, Range: %s)", action, payload.SheetID, payload.Range)
+	return fmt.Sprintf("✅ Daten wurden in Google Sheets %s.\n🔗 https://docs.google.com/spreadsheets/d/%s/edit", action, payload.SheetID)
+}
+
+// handleGoogleDriveList listet Dateien in Google Drive auf.
+// Marker-Format: __GOOGLE_DRIVE_LIST__\n{"query":"name contains 'Report'","maxResults":10}\n__GOOGLE_DRIVE_LIST_END__
+func (a *Agent) handleGoogleDriveList(response string) string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	data, err := parseGoogleMarker(response, "__GOOGLE_DRIVE_LIST__", "__GOOGLE_DRIVE_LIST_END__")
+	if err != nil {
+		return "❌ Google Drive: Ungültiger Marker-Block."
+	}
+	var payload struct {
+		Query      string `json:"query"`
+		MaxResults int    `json:"maxResults"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Sprintf("❌ Google Drive: JSON-Fehler: %v", err)
+	}
+	files, err := a.googleClient.DriveList(payload.Query, payload.MaxResults)
+	if err != nil {
+		log.Printf("[Agent] ❌ Google Drive Fehler: %v", err)
+		return fmt.Sprintf("❌ Google Drive Fehler: %v", err)
+	}
+	if len(files) == 0 {
+		return "📁 Keine Dateien in Google Drive gefunden."
+	}
+	var sb strings.Builder
+	sb.WriteString("📁 *Google Drive Dateien:*\n\n")
+	for _, f := range files {
+		sb.WriteString(fmt.Sprintf("• *%s*\n  🔗 %s\n", f.Name, f.URL))
+	}
+	return strings.TrimRight(sb.String(), "\n")
+}
+
+// handleGmailSend sendet eine E-Mail über Gmail.
+// Marker-Format: __GMAIL_SEND__\n{"to":"...","subject":"...","body":"..."}\n__GMAIL_SEND_END__
+func (a *Agent) handleGmailSend(response string) string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	data, err := parseGoogleMarker(response, "__GMAIL_SEND__", "__GMAIL_SEND_END__")
+	if err != nil {
+		return "❌ Gmail: Ungültiger Marker-Block."
+	}
+	var msg googleapi.GmailMessage
+	if err := json.Unmarshal(data, &msg); err != nil {
+		return fmt.Sprintf("❌ Gmail: JSON-Fehler: %v", err)
+	}
+	if err := a.googleClient.GmailSend(msg); err != nil {
+		log.Printf("[Agent] ❌ Gmail Send Fehler: %v", err)
+		return fmt.Sprintf("❌ Gmail Fehler: %v", err)
+	}
+	return fmt.Sprintf("✅ E-Mail an *%s* wurde über Gmail gesendet!\n📧 Betreff: %s", msg.To, msg.Subject)
+}
+
+// handleGmailList listet E-Mails aus Gmail auf.
+// Marker-Format: __GMAIL_LIST__\n{"query":"is:unread","maxResults":10}\n__GMAIL_LIST_END__
+func (a *Agent) handleGmailList(response string) string {
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+	data, err := parseGoogleMarker(response, "__GMAIL_LIST__", "__GMAIL_LIST_END__")
+	if err != nil {
+		return "❌ Gmail: Ungültiger Marker-Block."
+	}
+	var payload struct {
+		Query      string `json:"query"`
+		MaxResults int    `json:"maxResults"`
+	}
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return fmt.Sprintf("❌ Gmail: JSON-Fehler: %v", err)
+	}
+	messages, err := a.googleClient.GmailList(payload.Query, payload.MaxResults)
+	if err != nil {
+		log.Printf("[Agent] ❌ Gmail List Fehler: %v", err)
+		return fmt.Sprintf("❌ Gmail Fehler: %v", err)
+	}
+	if len(messages) == 0 {
+		return "📧 Keine E-Mails gefunden."
+	}
+	var sb strings.Builder
+	sb.WriteString("📧 *Gmail:*\n\n")
+	for _, m := range messages {
+		sb.WriteString(fmt.Sprintf("• *%s*\n  Von: %s | %s\n  %s\n\n", m.Subject, m.From, m.Date, m.Snippet))
+	}
+	return strings.TrimRight(sb.String(), "\n")
+}
+
 func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 	facts := session.FactsSummary()
 
@@ -1080,6 +1483,30 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 			"Wichtig: Der E-Mail-Text im BODY darf mehrere Zeilen haben. Kein Text vor oder nach den Markern.\n"
 	}
 
+	googleInstruction := ""
+	if a.googleClient != nil && a.googleClient.IsConfigured() {
+		googleInstruction = "\nGOOGLE WORKSPACE – HÖCHSTE PRIORITÄT:\n" +
+			"Du hast Zugriff auf Google Calendar, Docs, Sheets, Drive und Gmail.\n" +
+			"Verwende AUSSCHLIESSLICH die folgenden Marker wenn der Nutzer Google-Dienste nutzen möchte:\n\n" +
+			"GOOGLE CALENDAR:\n" +
+			"Termin erstellen:\n__GOOGLE_CAL_CREATE__\n{\"title\":\"<Titel>\",\"start\":\"<RFC3339+01:00>\",\"end\":\"<RFC3339+01:00>\",\"description\":\"<optional>\",\"location\":\"<optional>\"}\n__GOOGLE_CAL_CREATE_END__\n" +
+			"Termine auflisten: antworte NUR mit: __GOOGLE_CAL_LIST__\n\n" +
+			"GOOGLE DOCS:\n" +
+			"Dokument erstellen:\n__GOOGLE_DOCS_CREATE__\n{\"title\":\"<Titel>\",\"content\":\"<Inhalt>\"}\n__GOOGLE_DOCS_CREATE_END__\n" +
+			"Text anhängen:\n__GOOGLE_DOCS_APPEND__\n{\"docId\":\"<ID>\",\"content\":\"<Text>\"}\n__GOOGLE_DOCS_APPEND_END__\n" +
+			"Dokument lesen:\n__GOOGLE_DOCS_READ__\n{\"docId\":\"<ID>\"}\n__GOOGLE_DOCS_READ_END__\n\n" +
+			"GOOGLE SHEETS:\n" +
+			"Tabelle erstellen:\n__GOOGLE_SHEETS_CREATE__\n{\"title\":\"<Titel>\"}\n__GOOGLE_SHEETS_CREATE_END__\n" +
+			"Werte lesen:\n__GOOGLE_SHEETS_READ__\n{\"sheetId\":\"<ID>\",\"range\":\"A1:Z100\"}\n__GOOGLE_SHEETS_READ_END__\n" +
+			"Werte schreiben:\n__GOOGLE_SHEETS_WRITE__\n{\"sheetId\":\"<ID>\",\"range\":\"A1\",\"values\":[[\"Spalte1\",\"Spalte2\"],[\"Wert1\",\"Wert2\"]],\"append\":false}\n__GOOGLE_SHEETS_WRITE_END__\n\n" +
+			"GOOGLE DRIVE:\n" +
+			"Dateien suchen:\n__GOOGLE_DRIVE_LIST__\n{\"query\":\"name contains '<Suchbegriff>'\",\"maxResults\":10}\n__GOOGLE_DRIVE_LIST_END__\n\n" +
+			"GMAIL:\n" +
+			"E-Mail senden:\n__GMAIL_SEND__\n{\"to\":\"<email>\",\"subject\":\"<Betreff>\",\"body\":\"<Text>\"}\n__GMAIL_SEND_END__\n" +
+			"E-Mails auflisten:\n__GMAIL_LIST__\n{\"query\":\"is:unread\",\"maxResults\":10}\n__GMAIL_LIST_END__\n" +
+			"Zeitzone für Kalender: Europe/Vienna. RFC3339-Format: 2026-02-25T10:00:00+01:00\n"
+	}
+
 	prompt += "ANTWORTREGELN – STRIKTE PFLICHT:\n" +
 		"- Beantworte NUR was gefragt wurde. Nichts mehr.\n" +
 		"- Maximal 2-3 Sätze, außer der Nutzer fragt EXPLIZIT nach einer ausführlichen Antwort.\n" +
@@ -1088,6 +1515,7 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 		"- Bei einfachen Bestätigungen oder Statusmeldungen: eine Zeile reicht.\n" +
 		calcomInstruction +
 		emailInstruction +
+		googleInstruction +
 		"\nVIDEO-ERKENNUNG – HÖCHSTE PRIORITÄT:\n" +
 		"Wenn der Nutzer in irgendeiner Form ein Video erstellen, generieren, produzieren, drehen, animieren oder rendern lassen möchte – egal wie er es formuliert, in welcher Sprache oder mit welchen Worten – antworte ausschließlich mit dem exakten Text: __VIDEO_REQUEST__\n" +
 		"Kein weiterer Text, keine Erklärung, nur: __VIDEO_REQUEST__\n" +

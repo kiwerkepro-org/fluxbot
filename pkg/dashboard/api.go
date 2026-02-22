@@ -283,6 +283,107 @@ func (s *Server) handleVTClear(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"status": "ok", "message": "VT-History und Statistiken zurückgesetzt."})
 }
 
+// ── /api/google/auth-url ──────────────────────────────────────────────────────
+
+// handleGoogleAuthURL gibt die OAuth2-Autorisierungs-URL zurück.
+func (s *Server) handleGoogleAuthURL(w http.ResponseWriter, r *http.Request) {
+	clientID, err := s.vault.Get("GOOGLE_CLIENT_ID")
+	if err != nil || clientID == "" {
+		writeJSON(w, map[string]string{"error": "GOOGLE_CLIENT_ID nicht im Vault."})
+		return
+	}
+	redirectURI := "http://localhost:" + fmt.Sprintf("%d", s.port) + "/api/google/oauth-callback"
+	scopes := strings.Join([]string{
+		"https://www.googleapis.com/auth/calendar",
+		"https://www.googleapis.com/auth/documents",
+		"https://www.googleapis.com/auth/spreadsheets",
+		"https://www.googleapis.com/auth/drive",
+		"https://www.googleapis.com/auth/gmail.send",
+		"https://www.googleapis.com/auth/gmail.readonly",
+	}, " ")
+	params := "client_id=" + clientID +
+		"&redirect_uri=" + http.CanonicalHeaderKey(redirectURI) +
+		"&response_type=code" +
+		"&scope=" + strings.ReplaceAll(scopes, " ", "%20") +
+		"&access_type=offline&prompt=consent"
+	writeJSON(w, map[string]string{"url": "https://accounts.google.com/o/oauth2/v2/auth?" + params})
+}
+
+// ── /api/google/oauth-callback ────────────────────────────────────────────────
+
+// handleGoogleOAuthCallback tauscht den Authorization-Code gegen Tokens.
+func (s *Server) handleGoogleOAuthCallback(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		errMsg := r.URL.Query().Get("error")
+		http.Error(w, "Kein Code empfangen. Google-Fehler: "+errMsg, http.StatusBadRequest)
+		return
+	}
+
+	clientID, _ := s.vault.Get("GOOGLE_CLIENT_ID")
+	clientSecret, _ := s.vault.Get("GOOGLE_CLIENT_SECRET")
+	if clientID == "" || clientSecret == "" {
+		http.Error(w, "GOOGLE_CLIENT_ID oder GOOGLE_CLIENT_SECRET fehlen im Vault.", http.StatusInternalServerError)
+		return
+	}
+
+	redirectURI := "http://localhost:" + fmt.Sprintf("%d", s.port) + "/api/google/oauth-callback"
+
+	// Token-Austausch via net/http
+	data := "code=" + code +
+		"&client_id=" + clientID +
+		"&client_secret=" + clientSecret +
+		"&redirect_uri=" + redirectURI +
+		"&grant_type=authorization_code"
+
+	resp, err := http.Post("https://oauth2.googleapis.com/token",
+		"application/x-www-form-urlencoded",
+		strings.NewReader(data))
+	if err != nil {
+		http.Error(w, "Token-Austausch fehlgeschlagen: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	var tok struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		Error        string `json:"error"`
+		ErrorDesc    string `json:"error_description"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tok); err != nil {
+		http.Error(w, "Token-Decode fehlgeschlagen: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if tok.Error != "" {
+		http.Error(w, "Google OAuth Fehler: "+tok.Error+" – "+tok.ErrorDesc, http.StatusBadRequest)
+		return
+	}
+	if tok.RefreshToken == "" {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprintf(w, "<html><body style='font-family:sans-serif;padding:30px;background:#1a1a2e;color:#fff'><h2>⚠️ Kein Refresh Token erhalten</h2><p>Bitte widerrufe den App-Zugriff in deinen Google-Account-Einstellungen und versuche es erneut: <a href='https://myaccount.google.com/permissions' style='color:#5b8dee' target='_blank'>myaccount.google.com/permissions</a></p></body></html>")
+		return
+	}
+
+	// Refresh Token im Vault speichern
+	if err := s.vault.Set("GOOGLE_REFRESH_TOKEN", tok.RefreshToken); err != nil {
+		http.Error(w, "Vault-Speichern fehlgeschlagen: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Hot-Reload auslösen
+	if s.onReload != nil {
+		s.onReload()
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, `<html><body style="font-family:sans-serif;padding:30px;background:#1a1a2e;color:#fff">
+<h2>✅ Google erfolgreich verbunden!</h2>
+<p>Refresh Token wurde sicher im Vault gespeichert.</p>
+<p>Du kannst dieses Fenster schließen und das Dashboard neu laden.</p>
+<script>setTimeout(()=>{window.close()},3000)</script>
+</body></html>`)
+}
+
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
 func writeJSON(w http.ResponseWriter, v interface{}) {

@@ -18,6 +18,7 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/config"
 	"github.com/ki-werke/fluxbot/pkg/dashboard"
 	"github.com/ki-werke/fluxbot/pkg/email"
+	googleapi "github.com/ki-werke/fluxbot/pkg/google"
 	"github.com/ki-werke/fluxbot/pkg/imagegen"
 	"github.com/ki-werke/fluxbot/pkg/provider"
 	"github.com/ki-werke/fluxbot/pkg/security"
@@ -287,6 +288,8 @@ func runBot(ctx context.Context, configPath string) {
 	sessionManager := agent.NewSessionManager(cfg.Workspace.Path)
 	activeModels := getProviderModels(cfg)
 
+	googleClient := buildGoogleClient(cfg, vault)
+
 	fluxAgent := agent.New(agent.Config{
 		Provider:         aiProvider,
 		Manager:          manager,
@@ -304,6 +307,7 @@ func runBot(ctx context.Context, configPath string) {
 		CalcomAPIKey:     getIntegration(cfg, "CALCOM_API_KEY"),
 		CalcomOwnerEmail:  getIntegration(cfg, "CALCOM_OWNER_EMAIL"),
 		CalcomEventTypeID: parseIntegrationInt(cfg, "CALCOM_EVENT_TYPE_ID"),
+		GoogleClient:     googleClient,
 		Soul:             soul,
 	})
 
@@ -331,6 +335,7 @@ func runBot(ctx context.Context, configPath string) {
 				getIntegration(newCfg, "CALCOM_OWNER_EMAIL"),
 				parseIntegrationInt(newCfg, "CALCOM_EVENT_TYPE_ID"),
 			)
+			fluxAgent.UpdateGoogleClient(buildGoogleClient(newCfg, vault))
 
 			// Dashboard Hot-Reload: Passwort + HMAC-Secret
 			if dash != nil {
@@ -763,6 +768,19 @@ func init() {
 	} else {
 		log.Printf("[Security] ✅ FLUXBOT_HMAC_SECRET geladen (%d Zeichen) – Dashboard-API-Requests werden signiert.", len(hmacSecret))
 	}
+}
+
+// buildGoogleClient erstellt einen Google API-Client aus Vault-Secrets.
+func buildGoogleClient(cfg *config.Config, vault *security.VaultProvider) *googleapi.Client {
+	clientID, _ := vault.Get("GOOGLE_CLIENT_ID")
+	clientSecret, _ := vault.Get("GOOGLE_CLIENT_SECRET")
+	refreshToken, _ := vault.Get("GOOGLE_REFRESH_TOKEN")
+	if clientID == "" || clientSecret == "" || refreshToken == "" {
+		return nil
+	}
+	client := googleapi.New(clientID, clientSecret, refreshToken)
+	log.Println("[Main] ✅ Google API aktiviert (Calendar, Docs, Sheets, Drive, Gmail).")
+	return client
 }
 
 // getIntegration sucht einen Integrations-Wert in der Config nach Name.
