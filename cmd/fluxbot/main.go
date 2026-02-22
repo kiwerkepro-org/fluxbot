@@ -287,19 +287,22 @@ func runBot(ctx context.Context, configPath string) {
 	activeModels := getProviderModels(cfg)
 
 	fluxAgent := agent.New(agent.Config{
-		Provider:        aiProvider,
-		Manager:         manager,
-		Sessions:        sessionManager,
-		SkillsLoader:    skillsLoader,
-		Models:          activeModels,
-		Transcriber:     transcriber,
-		VoiceLang:       cfg.Voice.Language,
-		Guard:           guard,
-		ImageGenerators: imageGenerators,
-		ImageSize:       cfg.ImageGen.Size,
-		VideoDefault:    cfg.VideoGen.Default,
-		EmailSender:     emailSender,
-		Soul:            soul,
+		Provider:         aiProvider,
+		Manager:          manager,
+		Sessions:         sessionManager,
+		SkillsLoader:     skillsLoader,
+		Models:           activeModels,
+		Transcriber:      transcriber,
+		VoiceLang:        cfg.Voice.Language,
+		Guard:            guard,
+		ImageGenerators:  imageGenerators,
+		ImageSize:        cfg.ImageGen.Size,
+		VideoDefault:     cfg.VideoGen.Default,
+		EmailSender:      emailSender,
+		CalcomBaseURL:    getIntegration(cfg, "CALCOM_BASE_URL"),
+		CalcomAPIKey:     getIntegration(cfg, "CALCOM_API_KEY"),
+		CalcomOwnerEmail: getIntegration(cfg, "CALCOM_OWNER_EMAIL"),
+		Soul:             soul,
 	})
 
 	if cfg.Dashboard.Enabled {
@@ -320,6 +323,11 @@ func runBot(ctx context.Context, configPath string) {
 
 			fluxAgent.UpdateImageGenerators(buildImageGenerators(newCfg))
 			fluxAgent.UpdateEmailSender(buildEmailSender(newCfg))
+			fluxAgent.UpdateCalcomConfig(
+				getIntegration(newCfg, "CALCOM_BASE_URL"),
+				getIntegration(newCfg, "CALCOM_API_KEY"),
+				getIntegration(newCfg, "CALCOM_OWNER_EMAIL"),
+			)
 
 			// Dashboard Hot-Reload: Passwort + HMAC-Secret
 			if dash != nil {
@@ -752,4 +760,14 @@ func init() {
 	} else {
 		log.Printf("[Security] ✅ FLUXBOT_HMAC_SECRET geladen (%d Zeichen) – Dashboard-API-Requests werden signiert.", len(hmacSecret))
 	}
+}
+
+// getIntegration sucht einen Integrations-Wert in der Config nach Name.
+func getIntegration(cfg *config.Config, name string) string {
+	for _, integ := range cfg.Integrations {
+		if integ.Name == name {
+			return integ.Value
+		}
+	}
+	return ""
 }

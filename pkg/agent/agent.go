@@ -1,12 +1,17 @@
 package agent
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ki-werke/fluxbot/pkg/channels"
 	"github.com/ki-werke/fluxbot/pkg/email"
@@ -28,11 +33,14 @@ type Agent struct {
 	voiceLang       string
 	guard           *security.Guard
 	imageGenerators []imagegen.Generator // Alle verfügbaren Bildgeneratoren (in Auswahl-Reihenfolge)
-	imageSize       string
-	videoDefault    string        // "disabled" oder Provider-Name – steuert Video-Meldung
-	emailSender     *email.Sender // nil = E-Mail deaktiviert
-	soul            string        // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
-	systemPromptFn  func(session *Session, rules string) string
+	imageSize        string
+	videoDefault     string        // "disabled" oder Provider-Name – steuert Video-Meldung
+	emailSender      *email.Sender // nil = E-Mail deaktiviert
+	calcomBaseURL    string        // Cal.com / Cal.eu API-Basis-URL
+	calcomAPIKey     string        // Cal.com API-Key
+	calcomOwnerEmail string        // Standard-E-Mail für Buchungen
+	soul             string        // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
+	systemPromptFn   func(session *Session, rules string) string
 }
 
 // Config enthält die Konfiguration für den Agent
@@ -47,9 +55,12 @@ type Config struct {
 	Guard           *security.Guard      // Optional – nil = kein Security-Check
 	ImageGenerators []imagegen.Generator // Optional – leer = keine Bildgenerierung
 	ImageSize       string
-	VideoDefault    string        // "disabled" oder Provider-Name – steuert Video-Meldung
-	EmailSender     *email.Sender // Optional – nil = E-Mail deaktiviert
-	Soul            string        // Inhalt von SOUL.md + IDENTITY.md (leer = nur Basis-Prompt)
+	VideoDefault     string        // "disabled" oder Provider-Name – steuert Video-Meldung
+	EmailSender      *email.Sender // Optional – nil = E-Mail deaktiviert
+	CalcomBaseURL    string        // Optional – Cal.com / Cal.eu API-Basis-URL
+	CalcomAPIKey     string        // Optional – Cal.com API-Key
+	CalcomOwnerEmail string        // Optional – Standard-E-Mail für Buchungen
+	Soul             string        // Inhalt von SOUL.md + IDENTITY.md (leer = nur Basis-Prompt)
 }
 
 // New erstellt einen neuen Agent
@@ -70,8 +81,11 @@ func New(cfg Config) *Agent {
 		imageGenerators: cfg.ImageGenerators,
 		imageSize:       cfg.ImageSize,
 		videoDefault:    cfg.VideoDefault,
-		emailSender:     cfg.EmailSender,
-		soul:            cfg.Soul,
+		emailSender:      cfg.EmailSender,
+		calcomBaseURL:    cfg.CalcomBaseURL,
+		calcomAPIKey:     cfg.CalcomAPIKey,
+		calcomOwnerEmail: cfg.CalcomOwnerEmail,
+		soul:             cfg.Soul,
 	}
 	a.systemPromptFn = a.buildSystemPrompt
 	return a
@@ -100,6 +114,19 @@ func (a *Agent) UpdateEmailSender(sender *email.Sender) {
 		log.Println("[Agent] 🔄 E-Mail-Versand deaktiviert (keine SMTP-Credentials).")
 	} else {
 		log.Printf("[Agent] 🔄 E-Mail-Sender aktiv (Von: %s)", sender.From())
+	}
+}
+
+// UpdateCalcomConfig aktualisiert die Cal.com-Konfiguration zur Laufzeit.
+// Wird aufgerufen wenn die Config im Dashboard geändert wird (Hot-Reload).
+func (a *Agent) UpdateCalcomConfig(baseURL, apiKey, ownerEmail string) {
+	a.calcomBaseURL = baseURL
+	a.calcomAPIKey = apiKey
+	a.calcomOwnerEmail = ownerEmail
+	if baseURL == "" || apiKey == "" {
+		log.Println("[Agent] 🔄 Cal.com deaktiviert (keine Zugangsdaten).")
+	} else {
+		log.Printf("[Agent] 🔄 Cal.com aktiv (%s)", baseURL)
 	}
 }
 
@@ -565,6 +592,16 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 		return a.handleEmailRequest(session, response)
 	}
 
+	// KI hat Cal.com-Buchungsanfrage erkannt → echten HTTP-Call ausführen
+	if strings.Contains(response, "__CALCOM_BOOK__") && strings.Contains(response, "__CALCOM_BOOK_END__") {
+		return a.handleCalcomBooking(response)
+	}
+
+	// KI hat Cal.com-Listenabfrage erkannt → echte Buchungen laden
+	if strings.Contains(response, "__CALCOM_LIST__") {
+		return a.handleCalcomList()
+	}
+
 	return response
 }
 
@@ -702,6 +739,198 @@ func (a *Agent) handleEmailConfirmation(ctx context.Context, msg channels.Messag
 	return "❓ Bitte antworte mit *ja* (senden) oder *nein* (abbrechen)."
 }
 
+// ── CAL.COM INTEGRATION ──────────────────────────────────────────────────────
+
+// calcomBookingPayload beschreibt die Buchungsdaten aus dem KI-Marker.
+type calcomBookingPayload struct {
+	Title         string `json:"title"`
+	Start         string `json:"start"`
+	End           string `json:"end"`
+	AttendeeName  string `json:"attendeeName"`
+	AttendeeEmail string `json:"attendeeEmail"`
+	TimeZone      string `json:"timeZone"`
+}
+
+// handleCalcomBooking parst den __CALCOM_BOOK__-Marker und erstellt einen echten Termin via Cal.com API.
+func (a *Agent) handleCalcomBooking(response string) string {
+	if a.calcomBaseURL == "" || a.calcomAPIKey == "" {
+		return "❌ Cal.com ist nicht konfiguriert.\n\n" +
+			"Trage im Dashboard → Integrationen → Cal.com die API-Adresse und den API-Key ein."
+	}
+
+	start := strings.Index(response, "__CALCOM_BOOK__")
+	end := strings.Index(response, "__CALCOM_BOOK_END__")
+	if start < 0 || end < 0 || end <= start {
+		return "❌ Cal.com Buchungs-Format fehlerhaft. Bitte nochmal versuchen."
+	}
+
+	jsonStr := strings.TrimSpace(response[start+len("__CALCOM_BOOK__") : end])
+
+	var booking calcomBookingPayload
+	if err := json.Unmarshal([]byte(jsonStr), &booking); err != nil {
+		log.Printf("[Agent] ❌ Cal.com JSON ungültig: %v | Input: %s", err, jsonStr)
+		return fmt.Sprintf("❌ Cal.com Buchungs-Format ungültig: %v", err)
+	}
+
+	// Defaults setzen
+	if booking.AttendeeName == "" {
+		booking.AttendeeName = "JJ"
+	}
+	if booking.AttendeeEmail == "" {
+		booking.AttendeeEmail = a.calcomOwnerEmail
+	}
+	if booking.TimeZone == "" {
+		booking.TimeZone = "Europe/Vienna"
+	}
+	// End-Zeit: wenn nicht angegeben, start + 60 Minuten
+	if booking.End == "" && booking.Start != "" {
+		if t, err := time.Parse(time.RFC3339, booking.Start); err == nil {
+			booking.End = t.Add(60 * time.Minute).Format(time.RFC3339)
+		} else {
+			booking.End = booking.Start // Fallback
+		}
+	}
+
+	// Event Type ID auto-ermitteln
+	eventTypeID, err := a.fetchCalcomEventTypeID()
+	if err != nil {
+		log.Printf("[Agent] ❌ Cal.com Event Types: %v", err)
+		return fmt.Sprintf("❌ Cal.com Event Types konnten nicht geladen werden:\n_%v_\n\n"+
+			"Prüfe API-Adresse und API-Key im Dashboard → Integrationen → Cal.com.", err)
+	}
+
+	// Buchungs-Payload zusammenstellen
+	payload := map[string]interface{}{
+		"eventTypeId": eventTypeID,
+		"start":       booking.Start,
+		"end":         booking.End,
+		"responses": map[string]string{
+			"name":  booking.AttendeeName,
+			"email": booking.AttendeeEmail,
+		},
+		"timeZone": booking.TimeZone,
+		"metadata": map[string]interface{}{},
+	}
+	if booking.Title != "" {
+		payload["title"] = booking.Title
+	}
+
+	body, _ := json.Marshal(payload)
+	apiURL := strings.TrimRight(a.calcomBaseURL, "/") + "/bookings?apiKey=" + a.calcomAPIKey
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Sprintf("❌ HTTP-Request konnte nicht erstellt werden: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("[Agent] ❌ Cal.com POST /bookings: %v", err)
+		return fmt.Sprintf("❌ Cal.com Buchung fehlgeschlagen:\n_%v_", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		log.Printf("[Agent] ✅ Cal.com Termin erstellt: %s (Start: %s)", booking.Title, booking.Start)
+		return fmt.Sprintf("✅ Termin *%s* wurde erfolgreich eingetragen!\n\n📅 *Start:* %s",
+			booking.Title, booking.Start)
+	}
+
+	log.Printf("[Agent] ❌ Cal.com API Fehler %d: %s", resp.StatusCode, string(respBody))
+	return fmt.Sprintf("❌ Cal.com API Fehler (%d):\n_%s_", resp.StatusCode, string(respBody))
+}
+
+// fetchCalcomEventTypeID holt die erste verfügbare Event Type ID via GET /event-types.
+func (a *Agent) fetchCalcomEventTypeID() (int, error) {
+	apiURL := strings.TrimRight(a.calcomBaseURL, "/") + "/event-types?apiKey=" + a.calcomAPIKey
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("API Fehler %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Cal.com V1 gibt { "event_types": [...] } zurück
+	var result struct {
+		EventTypes []struct {
+			ID int `json:"id"`
+		} `json:"event_types"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, fmt.Errorf("Antwort konnte nicht geparst werden: %w", err)
+	}
+	if len(result.EventTypes) == 0 {
+		return 0, fmt.Errorf("keine Event Types in Cal.com gefunden – erstelle zuerst einen Event Type in deinem Cal.com Dashboard")
+	}
+	return result.EventTypes[0].ID, nil
+}
+
+// handleCalcomList lädt die nächsten anstehenden Termine via GET /bookings.
+func (a *Agent) handleCalcomList() string {
+	if a.calcomBaseURL == "" || a.calcomAPIKey == "" {
+		return "❌ Cal.com ist nicht konfiguriert.\n\n" +
+			"Trage im Dashboard → Integrationen → Cal.com die API-Adresse und den API-Key ein."
+	}
+
+	apiURL := strings.TrimRight(a.calcomBaseURL, "/") + "/bookings?apiKey=" + a.calcomAPIKey
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	resp, err := client.Get(apiURL)
+	if err != nil {
+		return fmt.Sprintf("❌ Termine konnten nicht geladen werden:\n_%v_", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Sprintf("❌ Cal.com API Fehler (%d):\n_%s_", resp.StatusCode, string(body))
+	}
+
+	// Cal.com V1: { "bookings": [ { "id": 1, "title": "...", "startTime": "...", "endTime": "..." } ] }
+	var result struct {
+		Bookings []struct {
+			ID        int    `json:"id"`
+			Title     string `json:"title"`
+			StartTime string `json:"startTime"`
+			EndTime   string `json:"endTime"`
+			Status    string `json:"status"`
+		} `json:"bookings"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Sprintf("❌ Termine konnten nicht geparst werden: %v", err)
+	}
+
+	if len(result.Bookings) == 0 {
+		return "📅 Keine bevorstehenden Termine in Cal.com gefunden."
+	}
+
+	var sb strings.Builder
+	sb.WriteString("📅 *Deine nächsten Termine:*\n\n")
+	limit := 10
+	if len(result.Bookings) < limit {
+		limit = len(result.Bookings)
+	}
+	for _, b := range result.Bookings[:limit] {
+		status := ""
+		if b.Status == "CANCELLED" {
+			status = " ~~abgesagt~~"
+		}
+		sb.WriteString(fmt.Sprintf("• *%s* – %s%s\n", b.Title, b.StartTime, status))
+	}
+	log.Printf("[Agent] 📅 Cal.com Terminliste: %d Einträge geladen", len(result.Bookings))
+	return strings.TrimRight(sb.String(), "\n")
+}
+
 func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 	facts := session.FactsSummary()
 
@@ -712,6 +941,20 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 	} else {
 		// Fallback: Basis-Identität
 		prompt = "Du bist Fluxy, ein KI-Assistent von KI-WERKE.\n\n"
+	}
+
+	calcomInstruction := ""
+	if a.calcomBaseURL != "" && a.calcomAPIKey != "" {
+		ownerEmail := a.calcomOwnerEmail
+		calcomInstruction = "\nCAL.COM TERMINBUCHUNG – HÖCHSTE PRIORITÄT:\n" +
+			"Wenn der Nutzer einen Termin erstellen, buchen oder eintragen möchte – egal wie formuliert – " +
+			"antworte EXAKT mit folgendem Format (kein weiterer Text außer dem Marker-Block):\n" +
+			"__CALCOM_BOOK__\n" +
+			"{\"title\":\"<Titel>\",\"start\":\"<ISO8601 UTC z.B. 2026-02-22T19:00:00Z>\",\"end\":\"<ISO8601 UTC>\",\"attendeeName\":\"JJ\",\"attendeeEmail\":\"" + ownerEmail + "\",\"timeZone\":\"Europe/Vienna\"}\n" +
+			"__CALCOM_BOOK_END__\n" +
+			"Zeitumrechnung Wien→UTC: UTC+1 im Winter (Feb–März), UTC+2 im Sommer.\n" +
+			"Wenn der Nutzer Termine auflisten oder anzeigen möchte – antworte NUR mit: __CALCOM_LIST__\n" +
+			"Niemals eventTypeId, E-Mail oder API-Key beim Nutzer erfragen – alles ist konfiguriert.\n"
 	}
 
 	emailInstruction := ""
@@ -733,6 +976,7 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 		"- KEINE ungebetenen Zusatzinfos, Tipps, Links, Vorschläge oder Erklärungen.\n" +
 		"- KEINE Einleitungsphrasen wie \"Natürlich!\", \"Gerne!\", \"Sicher!\", \"Selbstverständlich!\".\n" +
 		"- Bei einfachen Bestätigungen oder Statusmeldungen: eine Zeile reicht.\n" +
+		calcomInstruction +
 		emailInstruction +
 		"\nVIDEO-ERKENNUNG – HÖCHSTE PRIORITÄT:\n" +
 		"Wenn der Nutzer in irgendeiner Form ein Video erstellen, generieren, produzieren, drehen, animieren oder rendern lassen möchte – egal wie er es formuliert, in welcher Sprache oder mit welchen Worten – antworte ausschließlich mit dem exakten Text: __VIDEO_REQUEST__\n" +
