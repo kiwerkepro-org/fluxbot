@@ -277,6 +277,9 @@ func runBot(ctx context.Context, configPath string) {
 			integMap[integ.Name] = integ.Value
 		}
 		skillsLoader.SetIntegrations(integMap)
+		// Reload nötig: NewLoader() lädt Skills bevor SetIntegrations gesetzt ist.
+		// Ohne Reload bleiben alle {{PLATZHALTER}} unsubstituiert bis zum ersten Dashboard-Save.
+		skillsLoader.Reload()
 		log.Printf("[Main] Integrationen: %d konfiguriert", len(cfg.Integrations))
 	}
 
@@ -328,7 +331,20 @@ func runBot(ctx context.Context, configPath string) {
 					dash.UpdateHMACSecret(newSecret)
 				}
 			}
-			log.Printf("[Main] ✅ Config + Secrets neu geladen.")
+
+			// Integrationen + Skills neu laden (damit {{PLATZHALTER}} frisch substituiert werden)
+			if len(newCfg.Integrations) > 0 {
+				integMap := make(map[string]string, len(newCfg.Integrations))
+				for _, integ := range newCfg.Integrations {
+					if integ.Value != "" {
+						integMap[integ.Name] = integ.Value
+					}
+				}
+				skillsLoader.SetIntegrations(integMap)
+			}
+			skillsLoader.Reload()
+
+			log.Printf("[Main] ✅ Config + Secrets + Skills neu geladen.")
 		}
 
 		dash = dashboard.New(
@@ -546,10 +562,30 @@ func applySecrets(cfg *config.Config, vault *security.VaultProvider) {
 	if v := get("DASHBOARD_PASSWORD"); v != "" {
 		cfg.Dashboard.Password = v
 	}
-	// Integrationen: Vault-Werte in die Liste einfügen
+	// Integrationen: Vault-Werte in die Liste einfügen (INTEG_* Prefix-Konvention)
 	for i, integ := range cfg.Integrations {
 		if v := get("INTEG_" + integ.Name); v != "" {
 			cfg.Integrations[i].Value = v
+		}
+	}
+
+	// Cal.com-Schlüssel: im Vault direkt ohne INTEG_-Prefix gespeichert (eigenes Dashboard-Panel).
+	// Müssen in cfg.Integrations eingefügt werden damit {{CALCOM_...}} im Skill substituiert wird.
+	for _, key := range []string{"CALCOM_BASE_URL", "CALCOM_API_KEY", "CALCOM_OWNER_EMAIL", "CALCOM_EVENT_TYPE_ID"} {
+		v := get(key)
+		if v == "" {
+			continue
+		}
+		found := false
+		for i, integ := range cfg.Integrations {
+			if integ.Name == key {
+				cfg.Integrations[i].Value = v
+				found = true
+				break
+			}
+		}
+		if !found {
+			cfg.Integrations = append(cfg.Integrations, config.Integration{Name: key, Value: v})
 		}
 	}
 }

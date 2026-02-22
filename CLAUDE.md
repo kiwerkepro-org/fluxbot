@@ -3,6 +3,12 @@
 > Dieses File ist das persistente Gedächtnis für Claude-Sessions.
 > Am Anfang jeder neuen Session: "Lies CLAUDE.md und mach weiter."
 
+## Wichtige Dateipfade
+
+| Datei | Pfad | Hinweis |
+|-------|------|---------|
+| INBOX.md | `C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT\INBOX.md` | Nur lesen wenn JJ explizit darum bittet |
+
 ---
 
 ## Projekt-Überblick
@@ -410,4 +416,80 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 - `cmd/fluxbot/main.go`: Expliziter `"ollama"` Case im Provider-Switch; OLLAMA_BASE_URL direkt aus Vault; PROVIDER_OLLAMA in extractSecrets/applySecrets; "ollama" in getProviderModels()
 - `pkg/dashboard/dashboard.html`: `#dash-ollama-row` mit Endpoint-URL + Modell-Name; `onDashProviderChange()` blendet Ollama-Row + API-Key-Feld ein/aus; `loadConfig()` liest OLLAMA_BASE_URL aus Vault; `saveConfig()` schreibt OLLAMA_BASE_URL + Modell
 
-**Nächster Schritt:** Priorität 4 – Tests (Vault-Persistenz, Hot-Reload, Cal.com Integration)
+**Erledigt Session 9 (Bugfixes aus INBOX):**
+- `README.md`: `ki-werke.de` → `kiwerkepro.com` (alle 2 Vorkommen); Install-URLs auf `fluxbot.kiwerke.com` gesetzt
+- `pkg/agent/agent.go`: `isForgetCommand()` – erweitert um `entferne`, `entfernen`, `delete`, `remove`
+- `pkg/agent/agent.go`: `extractForgetKeyword()` – Präfixe korrekt nach Länge sortiert (längste zuerst), damit „lösche 1" nicht als „e 1" geparst wird; neue Kurzformen `lösche`, `entferne`, `delete`, `remove` ergänzt
+- `pkg/skills/loader.go`: `parseSkillFile()` – strippt äußeren ` ```markdown ``` `-Wrapper vor dem Frontmatter-Parsing; dadurch werden Tags (inkl. „kalender") und Name aus dem Frontmatter korrekt gelesen
+- **Root Cause Kalender:** `calcom-termine.md` war in ` ```markdown ``` ` gewickelt → Frontmatter wurde nie geparst → Tags-Fallback war nur `[calcom, termine]` → Skill matchte nicht auf „Kalender/kalendereinträge" → KI antwortete aus Training heraus negativ. Fix behebt das ohne Skill-Datei anzufassen (Signatur bleibt gültig).
+
+**Erledigt Session 10 (Kalender Hot-Reload-Bug):**
+- **Root Cause:** `CALCOM_BASE_URL` fehlte in `workspace/config.json` → `applySecrets()` holte nur Einträge die bereits in `cfg.Integrations` standen → Platzhalter blieb unersetzt → AI las `{{CALCOM_BASE_URL}}` als Literal und meldete "nicht konfiguriert"
+- **Root Cause 2:** `onReload()` in `main.go` rief nie `skillsLoader.SetIntegrations()` + `Reload()` auf → nach Dashboard-Speichern blieben alte Skills (mit unresolvierten Platzhaltern) aktiv
+- `workspace/config.json`: `CALCOM_BASE_URL` als Integration hinzugefügt (neben `CALCOM_API_KEY`)
+- `pkg/skills/loader.go`: `Reload()` Methode hinzugefügt (setzt `l.skills` zurück + ruft `loadAll()` neu auf)
+- `cmd/fluxbot/main.go`: `onReload()` erweitert – nach Config-Reload werden Integrationen neu gebaut, `skillsLoader.SetIntegrations()` + `skillsLoader.Reload()` aufgerufen
+- `INBOX.md` geleert
+
+**Erledigt Session 11 (Cal.com Skill – Defaults + natürliche Sprache):**
+- `workspace/skills/calcom-termine.md`: Skill komplett überarbeitet – `eventTypeId`, `email`, `name`, `timeZone` werden NIEMALS beim Nutzer erfragt, kommen als Platzhalter-Defaults
+- Neue Platzhalter: `{{CALCOM_EVENT_TYPE_ID}}`, `{{CALCOM_OWNER_EMAIL}}`
+- Tags erweitert: `kalendereintrag`, `appointment` ergänzt
+- `.sig` entfernt (Skill wurde geändert → läuft ohne Signatur mit Log-Warnung bis zur Neusignierung)
+- `workspace/config.json`: `CALCOM_BASE_URL`, `CALCOM_EVENT_TYPE_ID`, `CALCOM_OWNER_EMAIL` als Integrationen ergänzt
+
+**Was JJ noch im Dashboard → Integrationen eintragen muss:**
+- `CALCOM_EVENT_TYPE_ID` = Event Type ID aus cal.com → Event Types (Zahl, z.B. 123456)
+- `CALCOM_OWNER_EMAIL` = eigene E-Mail (z.B. kiwerkepro@gmail.com)
+- Danach: Dashboard → Speichern → Hot-Reload lädt Skill sofort neu (kein Docker-Rebuild nötig)
+
+**Erledigt Session 12 (Dashboard-Fixes aus Fehlerbildern):**
+- `pkg/dashboard/dashboard.html`: Placeholder `sk-…` in generischen Integrationsfeldern → `dein Wert` (weniger verwirrend)
+- `pkg/dashboard/dashboard.html`: Label `Key / Token` → `Wert` (neutraler)
+- `pkg/dashboard/dashboard.html`: `showIntegrationHelp()` – springt jetzt direkt ins Hilfe-Panel + öffnet Platzhalter-Accordion (statt Modal)
+- `pkg/dashboard/dashboard.html`: Hilfe-Panel „Platzhalter-System" komplett neu geschrieben – 5-Schritte-Anleitung + Beispiel-Tabelle mit realen Werten (CALCOM_EVENT_TYPE_ID, CALCOM_OWNER_EMAIL etc.), kein technischer Vault-Schlüssel mehr sichtbar
+
+**Nächster Schritt:**
+1. Im Dashboard → Integrationen: `CALCOM_EVENT_TYPE_ID` und `CALCOM_OWNER_EMAIL` eintragen + speichern
+2. Test: "Essen mit Anita, heute Abend 20:00"
+3. Nach erfolgreichem Test: Skill neu signieren mit `python3 -c "..."` (SKILL_SECRET aus Vault)
+
+**Erledigt Session 13 (Dashboard UX-Überarbeitung aus Fehlerbildern):**
+- `pkg/dashboard/dashboard.html`: Accordion-Bug gefixt – `showIntegrationHelp()` nutzt jetzt `classList.add('open')` statt `style.display='block'` → kein permanentes Offenbleiben mehr
+- `pkg/dashboard/dashboard.html`: Dedizierter **Cal.com-Panel** im Integrationen-Tab (wie VirusTotal-Panel) mit freundlichen deutschen Labels: API-Adresse, API-Key, E-Mail-Adresse, Event Type ID (optional mit Erklärung)
+- `pkg/dashboard/dashboard.html`: `loadConfig()` + `saveConfig()` + `updateCalcomBadge()` für Cal.com-Felder (direkt in Vault: `CALCOM_BASE_URL`, `CALCOM_API_KEY`, `CALCOM_OWNER_EMAIL`, `CALCOM_EVENT_TYPE_ID`)
+- `pkg/dashboard/dashboard.html`: Generische Integrationen-Panel-Beschriftung vereinfacht (kein `{{PLATZHALTER_NAME}}` mehr sichtbar)
+- `pkg/dashboard/dashboard.html`: Hilfe-Panel „Platzhalter-System" → „Weitere Integrationen" umbenannt und komplett neu geschrieben (Cal.com-spezifisches raus, generische Beispiele rein, kein Skill-Suchen nötig)
+- `workspace/skills/calcom-termine.md`: Event Type ID wird automatisch via `GET /event-types` ermittelt wenn nicht konfiguriert – Nutzer muss sie nicht kennen
+- `workspace/config.json`: CALCOM_*-Einträge aus generischen Integrationen entfernt (werden jetzt direkt im Cal.com-Panel gespeichert)
+
+**Erledigt Session 14 (Dashboard-Fixes aus Fehlerbild 20260222_150607):**
+- `pkg/dashboard/dashboard.html`: Globale CSS-Regel `a { color: var(--accent); }` + `a:hover { color: #8bb4f8; }` – alle Links im Dashboard jetzt einheitlich hellblau
+- `pkg/dashboard/dashboard.html`: `input[type="email"]` bekommt explizit `background: var(--input-bg) !important` – kein weißer Browser-Default-Hintergrund mehr beim E-Mail-Feld
+- `pkg/dashboard/dashboard.html`: Cal.eu-Link ergänzt neben Cal.com-Link (API-Key erstellen)
+- `pkg/dashboard/dashboard.html`: Event Type ID ist kein `<input>` mehr, sondern ein nicht-klickbares Info-Display (`cursor:default; user-select:none`) – „✓ Wird automatisch von FluxBot ermittelt"
+- `pkg/dashboard/dashboard.html`: `loadConfig()` + `saveConfig()` – `CALCOM_EVENT_TYPE_ID` vollständig entfernt (kein Vault-Key mehr, keine UI)
+
+**Erledigt Session 15 (Dashboard-Fixes aus Fehlerbildern 154412 + 154655):**
+- `pkg/dashboard/dashboard.html`: Sidebar-Footer `v1.0` → `v1.1.1`
+- `pkg/dashboard/api.go`: `Version: "1.0.0"` → `"1.1.1"`
+- `pkg/dashboard/dashboard.html`: API-Adresse (Cal.com) ist jetzt ein `<select>`-Dropdown – „Cal.com" oder „Cal.eu" wählbar; kein Freitext mehr
+- `pkg/dashboard/dashboard.html`: Platzhalter-Name in „Weitere Integrationen" – Beispiel `CAL_API_KEY` → generisches `MEIN_SERVICE`; Beschreibungs-Label → „Bezeichnung (optional)"; Placeholder → `z.B. Mein Dienst – API Key`
+
+**Erledigt Session 16 (Cal.com Integration Bugfix – 3 Root Causes):**
+
+**Root Cause 1 – applySecrets() ignorierte CALCOM_*:**
+Das Cal.com-Dashboard-Panel (Session 13) speichert Werte im Vault als `CALCOM_BASE_URL`, `CALCOM_API_KEY`, `CALCOM_OWNER_EMAIL` (kein `INTEG_`-Prefix). `applySecrets()` kannte diese Keys nicht → sie landeten NIE in `cfg.Integrations` → Skills Loader substituierte `{{CALCOM_BASE_URL}}` nie.
+
+**Root Cause 2 – Startup: skillsLoader.Reload() fehlte:**
+`NewLoader()` lädt alle Skills mit leeren Integrations (weil `SetIntegrations()` erst danach aufgerufen wird). Ohne `Reload()` nach `SetIntegrations()` bleiben alle `{{PLATZHALTER}}` unsubstituiert bis zum ersten Dashboard-Save. Betrifft ALLE Integrationen, nicht nur Cal.com.
+
+**Root Cause 3 – veraltete .sig blockierte Skill:**
+Skill wurde in Sessions 11+13 geändert, `.sig` war noch die alte. → `verifySkill()` hat Skill als "manipuliert" geblockt → Skill wurde gar nicht geladen.
+
+**Fixes:**
+- `cmd/fluxbot/main.go`: `applySecrets()` – nach `INTEG_*`-Loop: CALCOM_* aus Vault in `cfg.Integrations` injizieren (add/update)
+- `cmd/fluxbot/main.go`: Startup-Pfad – `skillsLoader.Reload()` nach `skillsLoader.SetIntegrations()` ergänzt
+- `workspace/skills/calcom-termine.md.sig` – neu generiert mit aktuellem SKILL_SECRET
+
+**Nächster Schritt:** Docker-Rebuild + Im Dashboard → Integrationen → Cal.com: Dienst (Cal.com oder Cal.eu) wählen, API-Key + E-Mail eintragen + speichern → Test "Essen mit Anita, heute Abend 20:00"

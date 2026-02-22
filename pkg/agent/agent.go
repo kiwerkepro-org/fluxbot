@@ -321,6 +321,10 @@ func (a *Agent) isForgetCommand(text string) bool {
 		strings.Contains(lower, "vergessen") ||
 		strings.Contains(lower, "lösch") ||
 		strings.Contains(lower, "streiche") ||
+		strings.Contains(lower, "entferne") ||
+		strings.Contains(lower, "entfernen") ||
+		strings.Contains(lower, "delete") ||
+		strings.Contains(lower, "remove") ||
 		strings.Contains(lower, "aus deinem gedächtnis")
 }
 
@@ -347,8 +351,24 @@ func (a *Agent) isNewConversationCommand(text string) bool {
 func (a *Agent) extractForgetKeyword(text string) string {
 	lower := strings.ToLower(text)
 	prefixes := []string{
-		"vergiss das mit", "vergiss", "lösche aus deinem gedächtnis",
-		"lösch aus deinem gedächtnis", "streiche", "lösch", "lösche",
+		// Längere Phrasen zuerst – damit "lösche aus deinem gedächtnis"
+		// nicht als "lösche" + Rest geparst wird
+		"vergiss das mit",
+		"vergiss alles über",
+		"vergiss",
+		"lösche aus deinem gedächtnis",
+		"lösch aus deinem gedächtnis",
+		"entferne aus deinem gedächtnis",
+		"delete aus deinem gedächtnis",
+		"remove aus deinem gedächtnis",
+		"streiche",
+		// Kurze Varianten ganz am Ende
+		"lösche",
+		"lösch",
+		"entferne",
+		"entfernen",
+		"delete",
+		"remove",
 	}
 	for _, prefix := range prefixes {
 		if idx := strings.Index(lower, prefix); idx >= 0 {

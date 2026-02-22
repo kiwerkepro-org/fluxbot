@@ -6,6 +6,9 @@
 <title>FluxBot Dashboard</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: #8bb4f8; }
+  input[type="email"] { background: var(--input-bg) !important; color: var(--text) !important; }
   :root {
     --bg: #0f1117; --sidebar: #161b27; --card: #1e2535; --border: #2a3347;
     --accent: #5b8dee; --accent2: #7c5cbf; --green: #3ecf8e;
@@ -264,7 +267,7 @@
   <div class="nav-item" onclick="showSection('help', this)">
     <span class="nav-icon">❓</span> Hilfe
   </div>
-  <div class="sidebar-footer">KI-WERKE · FluxBot v1.0</div>
+  <div class="sidebar-footer">KI-WERKE · FluxBot v1.1.1</div>
 </div>
 
 <!-- ── Main ── -->
@@ -787,11 +790,50 @@
             </div>
           </div>
 
+          <!-- Cal.com Panel -->
+          <div class="panel" style="margin-bottom:0" id="calcom-integ-panel">
+            <div class="panel-title" style="justify-content:space-between">
+              <span>📅 Cal.com – Kalender & Termine</span>
+              <span id="calcom-integ-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Nicht konfiguriert</span>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+              Damit FluxBot Kalendereinträge für dich erstellen kann, trage hier deine Zugangsdaten ein.<br>
+              <a href="https://app.cal.com/settings/developer/api-keys" target="_blank" style="font-size:12px">→ API-Key in Cal.com erstellen (Einstellungen → Developer → API Keys)</a><br>
+              <a href="https://app.cal.eu/settings/developer/api-keys" target="_blank" style="font-size:12px">→ API-Key in Cal.eu erstellen (Einstellungen → Developer → API Keys)</a>
+            </p>
+            <div class="field">
+              <label>Dienst auswählen</label>
+              <select id="calcom-base-url" style="background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;width:100%;outline:none;cursor:pointer">
+                <option value="https://api.cal.com/v1">Cal.com &nbsp;— https://api.cal.com/v1</option>
+                <option value="https://api.cal.eu/v1">Cal.eu &nbsp;— https://api.cal.eu/v1</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>API-Key</label>
+              <div class="input-wrap">
+                <input id="calcom-api-key" type="password" placeholder="cal_live_… (aus Cal.com → Einstellungen → API Keys)" autocomplete="off">
+                <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Deine E-Mail-Adresse</label>
+              <input id="calcom-owner-email" type="email" placeholder="name@beispiel.com" autocomplete="off">
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">Wird automatisch als Teilnehmer beim Termin eingetragen – du wirst nie danach gefragt.</div>
+            </div>
+            <div class="field">
+              <label>Event Type ID</label>
+              <div style="background:var(--input-bg);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--muted);user-select:none;cursor:default">
+                ✓ Wird automatisch von FluxBot ermittelt
+              </div>
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">FluxBot erkennt deinen Event-Typ automatisch – du musst nichts eintragen.</div>
+            </div>
+          </div>
+
           <!-- Generische API-Keys Panel -->
           <div class="panel" style="margin-bottom:0">
-            <div class="panel-title">🔌 Weitere Integrationen – API-Keys</div>
+            <div class="panel-title">🔌 Weitere Integrationen</div>
             <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">
-              Skills können diese Keys als <code style="background:rgba(255,255,255,0.08);padding:2px 6px;border-radius:4px">{{PLATZHALTER_NAME}}</code> verwenden – kein Key landet im Klartext in der Skill-Datei.
+              Für Skills die eigene Zugangsdaten benötigen. Name und Wert eintragen – FluxBot verbindet beides automatisch mit dem passenden Skill.
             </p>
             <div id="integrations-list"></div>
             <button class="btn btn-secondary" style="margin-top:12px" onclick="addIntegration()">＋ Weitere Integration hinzufügen</button>
@@ -1115,28 +1157,31 @@
         </div>
       </div>
 
-      <!-- 3. Platzhalter-System -->
-      <div class="help-item" data-keywords="platzhalter integration skill name calcom api key integ vault substitution">
+      <!-- 3. Weitere Integrationen -->
+      <div class="help-item" data-keywords="integration skill weitere api key wert verbinden eigener service">
         <div class="help-item-header" onclick="helpToggle(this.parentElement)">
-          <span class="help-item-title">&#123;&#123;&#125;&#125; Platzhalter-System – wie Skills auf API-Keys zugreifen</span>
+          <span class="help-item-title">🔌 Weitere Integrationen – eigene Services verbinden</span>
           <span class="help-item-arrow">▼</span>
         </div>
         <div class="help-item-body">
-          <p>Skills enthalten keine echten API-Keys. Stattdessen verwenden sie <strong style="color:var(--accent)">Platzhalter</strong> in doppelten geschwungenen Klammern:</p>
-          <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px 16px;font-family:monospace;font-size:13px;color:#a8d8a8;margin:12px 0">
-            Die Basis-URL lautet: {{CALCOM_BASE_URL}}<br>
-            Dein API-Key: {{CALCOM_API_KEY}}
-          </div>
-          <p>Im Dashboard (<em>Konfiguration → Integrationen → Weitere Integrationen</em>) trägst du den <strong>Platzhalter-Namen</strong> und den echten Wert ein. FluxBot speichert den Wert im Vault unter <code class="help-code">INTEG_CALCOM_BASE_URL</code> und ersetzt ihn beim Ausführen des Skills.</p>
-          <table class="help-table" style="margin-top:12px">
-            <thead><tr><th>Skill schreibt</th><th>Du trägst ein</th><th>Vault-Schlüssel</th></tr></thead>
+          <p>Bekannte Services wie Cal.com oder VirusTotal haben eigene Bereiche im Integrationen-Tab – einfach die Felder ausfüllen und speichern.</p>
+          <p style="margin-top:10px">Für <strong>andere Services</strong> (z.B. Stripe, eigene APIs) gibt es den Bereich „Weitere Integrationen". Dort trägst du einen <strong>Namen</strong> und den <strong>Wert</strong> ein – FluxBot verbindet beides automatisch mit dem passenden Skill.</p>
+
+          <p style="margin-top:14px;font-weight:600;color:var(--text)">Wie der Name aussehen soll:</p>
+          <p style="color:var(--muted);font-size:13px">Der Name ist frei wählbar – er muss nur mit dem übereinstimmen, was der Skill erwartet. Meist steht das in der Skill-Beschreibung. Großbuchstaben und Unterstriche, z.B. <code class="help-code">STRIPE_SECRET</code> oder <code class="help-code">MEIN_API_KEY</code>.</p>
+
+          <p style="margin-top:14px;font-weight:600;color:var(--text)">Beispiele:</p>
+          <table class="help-table" style="margin-top:8px">
+            <thead><tr><th>Name</th><th>Wert (Beispiel)</th><th>Wofür</th></tr></thead>
             <tbody>
-              <tr><td><code class="help-code">{{CALCOM_API_KEY}}</code></td><td>Name: <strong>CALCOM_API_KEY</strong></td><td><code class="help-code">INTEG_CALCOM_API_KEY</code></td></tr>
-              <tr><td><code class="help-code">{{CALCOM_BASE_URL}}</code></td><td>Name: <strong>CALCOM_BASE_URL</strong></td><td><code class="help-code">INTEG_CALCOM_BASE_URL</code></td></tr>
-              <tr><td><code class="help-code">{{STRIPE_SECRET}}</code></td><td>Name: <strong>STRIPE_SECRET</strong></td><td><code class="help-code">INTEG_STRIPE_SECRET</code></td></tr>
+              <tr><td><code class="help-code">STRIPE_SECRET</code></td><td><code class="help-code">sk_live_abc123</code></td><td>Stripe-Zahlungen</td></tr>
+              <tr><td><code class="help-code">WEATHER_API_KEY</code></td><td><code class="help-code">a1b2c3d4e5</code></td><td>Wetter-Skill</td></tr>
+              <tr><td><code class="help-code">MY_SHOP_URL</code></td><td><code class="help-code">https://meinshop.at/api</code></td><td>Eigener Shop-Skill</td></tr>
             </tbody>
           </table>
-          <p style="margin-top:12px"><strong style="color:var(--text)">Groß-/Kleinschreibung:</strong> Der Name wird automatisch in Großbuchstaben umgewandelt. <code class="help-code">calcom_api_key</code> → <code class="help-code">CALCOM_API_KEY</code></p>
+          <p style="margin-top:12px;color:var(--muted);font-size:13px">
+            🔒 Alle Werte werden verschlüsselt gespeichert – kein Klartext in Dateien.
+          </p>
         </div>
       </div>
 
@@ -1601,6 +1646,12 @@ async function loadConfig() {
   setVal('vt-apikey', vtKey);
   updateVTIntegBadge(vtKey);
 
+  // ── Cal.com (Werte direkt aus Vault) ─────────────────────────────────────
+  setVal('calcom-base-url',    secretsData['CALCOM_BASE_URL']    || '');
+  setVal('calcom-api-key',     secretsData['CALCOM_API_KEY']     || '');
+  setVal('calcom-owner-email', secretsData['CALCOM_OWNER_EMAIL'] || '');
+  updateCalcomBadge();
+
   // Integrationen laden (Werte kommen aus Vault)
   renderIntegrations(configData.integrations || []);
 }
@@ -1746,6 +1797,11 @@ async function saveConfig() {
     // ── VirusTotal API-Key → Vault ────────────────────────────────────────
     secretsPatch['VIRUSTOTAL_API_KEY'] = getVal('vt-apikey');
 
+    // ── Cal.com → Vault ───────────────────────────────────────────────────
+    secretsPatch['CALCOM_BASE_URL']    = getVal('calcom-base-url');
+    secretsPatch['CALCOM_API_KEY']     = getVal('calcom-api-key');
+    secretsPatch['CALCOM_OWNER_EMAIL'] = getVal('calcom-owner-email');
+
     // ── Integrationen (Values → Vault, Name+Desc → config.json) ──────────
     const { configList, secretsMap } = collectIntegrations();
     newConfig.integrations = configList;
@@ -1764,8 +1820,9 @@ async function saveConfig() {
 
   configData = newConfig;
   secretsData = Object.assign({}, secretsData, secretsPatch);
-  // VT-Badge im Integrationen-Panel aktualisieren
+  // Badges im Integrationen-Panel aktualisieren
   updateVTIntegBadge(secretsData['VIRUSTOTAL_API_KEY'] || '');
+  updateCalcomBadge();
   const n = document.getElementById('config-notice');
   n.style.display = 'block';
   setTimeout(() => { n.style.display = 'none'; }, 4000);
@@ -2146,38 +2203,20 @@ function detectSmtpProvider(host) {
 }
 
 function showIntegrationHelp() {
-  const existing = document.getElementById('integration-help-modal');
-  if (existing) { existing.remove(); return; }
-  const modal = document.createElement('div');
-  modal.id = 'integration-help-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
-  modal.innerHTML = `
-    <div style="background:var(--card);border:1px solid rgba(255,255,255,0.12);border-radius:14px;padding:28px 32px;max-width:520px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.6)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-        <span style="font-size:16px;font-weight:700;color:var(--accent)">ⓘ Was ist der Platzhalter-Name?</span>
-        <button onclick="document.getElementById('integration-help-modal').remove()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:20px;padding:0">✕</button>
-      </div>
-      <p style="color:var(--text);font-size:14px;line-height:1.6;margin:0 0 14px">
-        Der <strong style="color:var(--accent)">Platzhalter-Name</strong> ist der Schlüssel, mit dem ein Skill deinen eingetragenen Wert abruft.
-        In der Skill-Datei steht er in doppelten geschwungenen Klammern:
-      </p>
-      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px 16px;font-family:monospace;font-size:13px;color:#a8d8a8;margin-bottom:16px">
-        {{CALCOM_API_KEY}} → dein eingetragener API-Key<br>
-        {{CALCOM_BASE_URL}} → https://api.cal.eu/v1
-      </div>
-      <p style="color:var(--text);font-size:14px;line-height:1.6;margin:0 0 14px">
-        Der Name muss <strong>exakt</strong> mit dem Platzhalter im Skill übereinstimmen (Groß-/Kleinschreibung egal – wird automatisch in Großbuchstaben umgewandelt).
-      </p>
-      <p style="color:var(--muted);font-size:13px;line-height:1.6;margin:0">
-        <strong style="color:var(--text)">Tipp:</strong> Schau im Skill nach welche <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px">{{PLATZHALTER}}</code> verwendet werden – diese trägst du hier ein.<br>
-        Beispiel Cal.com/Cal.eu: zwei Einträge anlegen –
-        <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px">CALCOM_BASE_URL</code> und
-        <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px">CALCOM_API_KEY</code>
-      </p>
-    </div>
-  `;
-  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-  document.body.appendChild(modal);
+  // Direkt zur Hilfe-Sektion navigieren und Platzhalter-Accordion öffnen
+  showSection('help', document.querySelector('.nav-item[onclick*="help"]'));
+  // Platzhalter-Accordion öffnen (3. Panel, Index 2) – via classList wie helpToggle()
+  const accordion = document.getElementById('help-accordion');
+  if (accordion) {
+    const items = accordion.querySelectorAll('.help-item');
+    if (items.length >= 3) {
+      const platzhalterItem = items[2]; // 3. Accordion = Platzhalter-System
+      if (!platzhalterItem.classList.contains('open')) {
+        platzhalterItem.classList.add('open');
+      }
+      setTimeout(() => platzhalterItem.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    }
+  }
 }
 
 function addIntegration(name = '', description = '', value = '') {
@@ -2190,16 +2229,16 @@ function addIntegration(name = '', description = '', value = '') {
       <label style="font-size:11px;margin-bottom:4px">Platzhalter-Name
         <button type="button" onclick="showIntegrationHelp()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;padding:0 0 0 4px;vertical-align:middle;line-height:1" title="Was ist der Platzhalter-Name?">ⓘ</button>
       </label>
-      <input type="text" class="int-name" value="${escHtml(name)}" placeholder="CAL_API_KEY" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9_]/g,'')">
+      <input type="text" class="int-name" value="${escHtml(name)}" placeholder="MEIN_SERVICE" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9_]/g,'')">
     </div>
     <div class="field" style="margin:0">
-      <label style="font-size:11px;margin-bottom:4px">Beschreibung</label>
-      <input type="text" class="int-desc" value="${escHtml(description)}" placeholder="z.B. Cal.com API Key">
+      <label style="font-size:11px;margin-bottom:4px">Bezeichnung (optional)</label>
+      <input type="text" class="int-desc" value="${escHtml(description)}" placeholder="z.B. Mein Dienst – API Key">
     </div>
     <div class="field" style="margin:0">
-      <label style="font-size:11px;margin-bottom:4px">Key / Token</label>
+      <label style="font-size:11px;margin-bottom:4px">Wert</label>
       <div class="input-wrap">
-        <input type="password" class="int-value" value="${escHtml(value)}" placeholder="sk-…" autocomplete="off">
+        <input type="password" class="int-value" value="${escHtml(value)}" placeholder="dein Wert" autocomplete="off">
         <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
       </div>
     </div>
@@ -2314,6 +2353,25 @@ function updateVTIntegBadge(key) {
     badge.style.borderColor = 'rgba(62,207,142,0.3)';
   } else {
     badge.textContent = '⚠️ Inaktiv';
+    badge.style.background = 'rgba(245,166,35,0.12)';
+    badge.style.color = 'var(--yellow)';
+    badge.style.borderColor = 'rgba(245,166,35,0.3)';
+  }
+}
+
+function updateCalcomBadge() {
+  const badge = document.getElementById('calcom-integ-badge');
+  if (!badge) return;
+  const url   = (document.getElementById('calcom-base-url')?.value    || '').trim();
+  const key   = (document.getElementById('calcom-api-key')?.value     || '').trim();
+  const email = (document.getElementById('calcom-owner-email')?.value || '').trim();
+  if (url && key && email) {
+    badge.textContent = '✅ Konfiguriert';
+    badge.style.background = 'rgba(62,207,142,0.12)';
+    badge.style.color = 'var(--green)';
+    badge.style.borderColor = 'rgba(62,207,142,0.3)';
+  } else {
+    badge.textContent = '⚠️ Nicht konfiguriert';
     badge.style.background = 'rgba(245,166,35,0.12)';
     badge.style.color = 'var(--yellow)';
     badge.style.borderColor = 'rgba(245,166,35,0.3)';

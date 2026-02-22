@@ -37,6 +37,14 @@ func (l *Loader) SetIntegrations(integrations map[string]string) {
 	l.integrations = integrations
 }
 
+// Reload lädt alle Skills neu und wendet die aktuellen Integrationen an.
+// Muss nach SetIntegrations aufgerufen werden damit Platzhalter ersetzt werden.
+func (l *Loader) Reload() {
+	l.skills = make(map[string]*Skill)
+	l.loadAll()
+	log.Printf("[Skills] 🔄 Skills neu geladen (%d Skills aktiv)", len(l.skills))
+}
+
 // SaveAndSign speichert einen Skill als .md-Datei, signiert ihn und lädt ihn sofort.
 func (l *Loader) SaveAndSign(name, content string) error {
 	skillsDir := filepath.Join(l.workspacePath, "skills")
@@ -190,8 +198,22 @@ func (l *Loader) parseSkillFile(path string) (*Skill, error) {
 		Name: strings.TrimSuffix(filepath.Base(path), ".md"),
 	}
 
+	// Äußeren Code-Block-Wrapper entfernen (z.B. ```markdown ... ```)
+	// Skill-Dateien werden manchmal mit diesem Wrapper gespeichert.
+	if strings.HasPrefix(strings.TrimSpace(content), "```") {
+		// Erste Zeile (```markdown o.ä.) entfernen
+		if nl := strings.Index(content, "\n"); nl >= 0 {
+			content = content[nl+1:]
+		}
+		// Schließendes ``` am Ende entfernen
+		if idx := strings.LastIndex(content, "```"); idx >= 0 {
+			content = strings.TrimSpace(content[:idx])
+		}
+	}
+
 	// Frontmatter parsen wenn vorhanden
-	if strings.HasPrefix(content, "---") {
+	if strings.HasPrefix(strings.TrimSpace(content), "---") {
+		content = strings.TrimSpace(content)
 		parts := strings.SplitN(content, "---", 3)
 		if len(parts) >= 3 {
 			l.parseFrontmatter(skill, parts[1])
