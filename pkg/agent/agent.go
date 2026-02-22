@@ -841,8 +841,8 @@ func (a *Agent) handleCalcomBooking(response string) string {
 		log.Printf("[Agent] ❌ Cal.com Event Type ID: %v", err)
 		return fmt.Sprintf("❌ Cal.com Event Type ID konnte nicht ermittelt werden:\n_%v_\n\n"+
 			"Lösung: Cal.com/Cal.eu öffnen → Event Types → Termin-Typ anklicken → "+
-			"Zahl aus der URL kopieren (z.B. /event-types/**123456**) → "+
-			"Dashboard → Integrationen → Cal.com → Feld „Event Type ID" eintragen → Speichern.", err)
+			"Zahl aus der URL kopieren (z.B. /event-types/123456) → "+
+			"Dashboard → Integrationen → Cal.com → Feld 'Event Type ID' eintragen → Speichern.", err)
 	}
 
 	// Payload je nach API-Version aufbauen
