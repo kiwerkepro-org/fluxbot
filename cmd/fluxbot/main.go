@@ -170,7 +170,12 @@ func runBot(ctx context.Context, configPath string) {
 		"lepton":     "https://api.lepton.ai/api/v1/chat/completions",
 		"anyscale":   "https://api.endpoints.anyscale.com/v1/chat/completions",
 		"replicate":  "https://openai-compat.replicate.com/v1/chat/completions",
-		"ollama":     "http://localhost:11434/v1/chat/completions",
+	}
+
+	// ── Ollama Base-URL aus Vault laden (Default: localhost:11434) ────────────
+	ollamaBaseURL := provider.OllamaDefaultBaseURL
+	if v, err := vault.Get("OLLAMA_BASE_URL"); err == nil && v != "" {
+		ollamaBaseURL = v
 	}
 
 	var aiProvider provider.Provider
@@ -181,6 +186,15 @@ func runBot(ctx context.Context, configPath string) {
 		aiProvider = provider.NewOpenRouter(cfg.Providers.OpenRouter.APIKey)
 	case "anthropic":
 		aiProvider = provider.NewAnthropic(cfg.Providers.Anthropic.APIKey)
+	case "ollama":
+		// Ping-Check: Warnung wenn Ollama nicht erreichbar – kein Absturz
+		if err := provider.PingOllama(ollamaBaseURL); err != nil {
+			log.Printf("[Main] ⚠️  Ollama-Warnung: %v", err)
+			log.Printf("[Main]     FluxBot startet trotzdem – Anfragen schlagen fehl bis Ollama läuft.")
+		} else {
+			log.Printf("[Main] ✅  Ollama erreichbar unter %s", ollamaBaseURL)
+		}
+		aiProvider = provider.NewOllama(ollamaBaseURL, cfg.Providers.Ollama.APIKey)
 	case "custom":
 		aiProvider = provider.NewOpenAICompat(
 			cfg.Providers.Custom.Name,
@@ -289,6 +303,9 @@ func runBot(ctx context.Context, configPath string) {
 		logPath := filepath.Join(cfg.Workspace.Path, "logs", "fluxbot.log")
 		var dash *dashboard.Server
 
+		// HMAC-Secret für Dashboard-API-Request-Signierung (aus Umgebungsvariable)
+		dashHMACSecret := os.Getenv("FLUXBOT_HMAC_SECRET")
+
 		onReload := func() {
 			newCfg, err := config.Load(configPath)
 			if err != nil {
@@ -301,10 +318,14 @@ func runBot(ctx context.Context, configPath string) {
 			fluxAgent.UpdateImageGenerators(buildImageGenerators(newCfg))
 			fluxAgent.UpdateEmailSender(buildEmailSender(newCfg))
 
-			// Dashboard-Passwort Hot-Reload
+			// Dashboard Hot-Reload: Passwort + HMAC-Secret
 			if dash != nil {
 				if pass, err := vault.Get("DASHBOARD_PASSWORD"); err == nil && pass != "" {
 					dash.UpdatePassword(pass)
+				}
+				// HMAC-Secret bei Hot-Reload aktualisieren (falls Env-Variable geändert)
+				if newSecret := os.Getenv("FLUXBOT_HMAC_SECRET"); newSecret != "" {
+					dash.UpdateHMACSecret(newSecret)
 				}
 			}
 			log.Printf("[Main] ✅ Config + Secrets neu geladen.")
@@ -319,6 +340,7 @@ func runBot(ctx context.Context, configPath string) {
 			logPath,
 			vault,
 			onReload,
+			dashHMACSecret,
 		)
 		go dash.Start(ctx)
 	}
@@ -360,6 +382,7 @@ func extractSecrets(cfg *config.Config) map[string]string {
 	m["PROVIDER_PERPLEXITY"] = cfg.Providers.Perplexity.APIKey
 	m["PROVIDER_COHERE"] = cfg.Providers.Cohere.APIKey
 	m["PROVIDER_FIREWORKS"] = cfg.Providers.Fireworks.APIKey
+	m["PROVIDER_OLLAMA"] = cfg.Providers.Ollama.APIKey // optional Bearer-Token (leer = kein Auth)
 	m["PROVIDER_CUSTOM"] = cfg.Providers.Custom.APIKey
 	// Voice
 	m["VOICE_API_KEY"] = cfg.Voice.APIKey
@@ -461,6 +484,9 @@ func applySecrets(cfg *config.Config, vault *security.VaultProvider) {
 	}
 	if v := get("PROVIDER_FIREWORKS"); v != "" {
 		cfg.Providers.Fireworks.APIKey = v
+	}
+	if v := get("PROVIDER_OLLAMA"); v != "" {
+		cfg.Providers.Ollama.APIKey = v // optional Bearer-Token
 	}
 	if v := get("PROVIDER_CUSTOM"); v != "" {
 		cfg.Providers.Custom.APIKey = v
@@ -631,6 +657,8 @@ func getProviderModels(cfg *config.Config) map[string]string {
 		models = cfg.Providers.Cohere.Models
 	case "fireworks":
 		models = cfg.Providers.Fireworks.Models
+	case "ollama":
+		models = cfg.Providers.Ollama.Models
 	case "custom":
 		models = cfg.Providers.Custom.Models
 	}
@@ -684,8 +712,8 @@ func loadSoul(workspacePath string) string {
 func init() {
 	hmacSecret := os.Getenv("FLUXBOT_HMAC_SECRET")
 	if hmacSecret == "" {
-		log.Println("[Security] HINWEIS: FLUXBOT_HMAC_SECRET nicht gesetzt.")
+		log.Println("[Security] HINWEIS: FLUXBOT_HMAC_SECRET nicht gesetzt – Dashboard-API läuft ohne Request-Signierung.")
 	} else {
-		log.Println("[Security] ✅ FLUXBOT_HMAC_SECRET geladen.")
+		log.Printf("[Security] ✅ FLUXBOT_HMAC_SECRET geladen (%d Zeichen) – Dashboard-API-Requests werden signiert.", len(hmacSecret))
 	}
 }

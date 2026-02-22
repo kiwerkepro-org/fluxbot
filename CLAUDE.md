@@ -164,23 +164,32 @@ WhatsApp: Media-Download über Meta Graph API vollständig implementiert (2-Schr
 ```
 **Stand:** In-Memory History (max 100 Einträge, FIFO, neueste zuerst). Statistiken zählen: Dateien, URLs, Geblockte, Cache-Hits. Badge-System: ✅ Sicher / 🚨 Blockiert / 💾 Cache. History-Reset per Button (HMAC-geschützt). Inaktiv-Banner wenn kein API-Key.
 
-### PRIORITÄT 7 – Ollama Integration (lokaler AI-Betrieb, kostenfrei)
+### PRIORITÄT 7 – Ollama Integration (lokaler AI-Betrieb, kostenfrei) ✅ ERLEDIGT
 ```
-[ ] pkg/provider/ollama.go – neuer Provider-Typ (OpenAI-kompatibler Client, Base-URL konfigurierbar)
-[ ] config/config.go – OllamaConfig Struct (BaseURL, Model, kein Pflicht-API-Key)
-[ ] Vault: OLLAMA_BASE_URL (Default: http://localhost:11434, optional Bearer-Token)
-[ ] Dashboard: "Ollama (lokal)" als wählbarer Provider im Provider-Tab
-[ ] Dashboard: Eingabefelder → Endpoint-URL + Modell-Name (z.B. llama3.1:8b, mistral, etc.)
-[ ] Dashboard: Hinweis wenn Ollama gewählt: Hardware-Anforderung (GPU empfohlen)
-[ ] Jeder User kann im Dashboard selbst zwischen Ollama und Cloud-Providern wählen
-[ ] Fallback-Logik: wenn Ollama nicht erreichbar → Warnung, kein Absturz
+[x] pkg/provider/ollama.go – OllamaProvider Struct (eigene Implementierung, kein OpenAICompat-Wrapper)
+[x] pkg/provider/ollama.go – PingOllama() – Erreichbarkeits-Check via /api/tags (5s Timeout)
+[x] pkg/provider/ollama.go – OllamaDefaultBaseURL Konstante ("http://localhost:11434")
+[x] pkg/provider/ollama.go – Authorization-Header nur wenn Bearer-Token gesetzt (Ollama braucht keinen)
+[x] pkg/provider/ollama.go – Timeout 300s (lokale Modelle brauchen länger)
+[x] config/config.go – Ollama-Modell-Defaults (llama3.2, llama3.2-vision für OCR)
+[x] Vault: OLLAMA_BASE_URL (Default: http://localhost:11434, aus Vault überschreibbar)
+[x] Vault: PROVIDER_OLLAMA (optional Bearer-Token falls Ollama hinter Auth-Proxy)
+[x] main.go – "ollama" expliziter Case im Provider-Switch (PingOllama + NewOllama)
+[x] main.go – OLLAMA_BASE_URL direkt aus Vault lesen (vault.Get, nach applySecrets)
+[x] main.go – extractSecrets() + applySecrets() für PROVIDER_OLLAMA ergänzt
+[x] main.go – getProviderModels() für "ollama" Case ergänzt
+[x] Dashboard: Ollama-Row mit Endpoint-URL + Modell-Name (ein-/ausgeblendet bei Auswahl)
+[x] Dashboard: API-Key-Feld ausgeblendet wenn Ollama aktiv (kein Key nötig)
+[x] Dashboard: Hardware-Warnhinweis (RAM/VRAM, ollama pull)
+[x] Dashboard: OLLAMA_BASE_URL wird beim Laden aus Vault angezeigt
+[x] Dashboard: OLLAMA_BASE_URL + Modell beim Speichern in Vault/config.json gesichert
+[x] Fallback: Startup-Warnung im Log wenn Ollama nicht erreichbar – kein Absturz
 ```
+**Stand:** Vollständig implementiert. Eigener `OllamaProvider` (nicht OpenAICompat-Wrapper). OLLAMA_BASE_URL + optionaler Bearer-Token aus Vault. PingOllama gibt Warnung aber keinen Fatal-Error.
 **Designentscheidungen:**
-- Ollama nutzt dieselbe OpenAI-kompatible API (`/v1/chat/completions`) → minimaler neuer Code
-- Kein API-Key nötig (optional: Bearer-Token falls Ollama hinter Auth läuft)
-- Sinnvoll bei: einfachen Use-Cases, hohem Volumen, Datenschutz-Anforderungen
-- Nicht empfohlen bei: komplexen Reasoning-Aufgaben, schwacher Hardware
-- `.env` wird NICHT verwendet – Endpoint kommt aus Vault oder Dashboard-Config
+- Eigener Struct statt Wrapper → Authorization-Header nur wenn Token gesetzt (sauber)
+- OLLAMA_BASE_URL geht in Vault (nicht config.json) – konsistent mit Secret-Strategie
+- `.env` wird NICHT verwendet – Endpoint kommt ausschließlich aus Vault/Dashboard
 
 ### PRIORITÄT 4 – Tests
 ```
@@ -388,4 +397,10 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 - `pkg/dashboard/dashboard.html`: `tipShow(btn, text)` + `tipHide()` – viewport-bewusstes Tooltip-Positioning
 - `pkg/dashboard/dashboard.html`: `helpToggle(item)` + `helpSearch(query)` – Accordion + Echtzeit-Suche mit data-keywords
 
-**Nächster Schritt:** Priorität 4 – Tests (Vault-Persistenz, Hot-Reload, Cal.com Integration) oder Priorität 7 – Ollama Integration
+**Erledigt Session 8 (Priorität 7 – Ollama Integration):**
+- `pkg/provider/ollama.go`: `OllamaProvider` Struct mit `Complete()`, `Name()`, `PingOllama()`; `OllamaDefaultBaseURL` Konstante
+- `pkg/config/config.go`: Ollama-Modell-Defaults in `Load()` (llama3.2 / llama3.2-vision)
+- `cmd/fluxbot/main.go`: Expliziter `"ollama"` Case im Provider-Switch; OLLAMA_BASE_URL direkt aus Vault; PROVIDER_OLLAMA in extractSecrets/applySecrets; "ollama" in getProviderModels()
+- `pkg/dashboard/dashboard.html`: `#dash-ollama-row` mit Endpoint-URL + Modell-Name; `onDashProviderChange()` blendet Ollama-Row + API-Key-Feld ein/aus; `loadConfig()` liest OLLAMA_BASE_URL aus Vault; `saveConfig()` schreibt OLLAMA_BASE_URL + Modell
+
+**Nächster Schritt:** Priorität 4 – Tests (Vault-Persistenz, Hot-Reload, Cal.com Integration)
