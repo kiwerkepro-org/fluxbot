@@ -75,3 +75,5 @@ Thumbs.db
 auth_token.txt
 credentials.json
 /logs/
+# Lokale Session-Notizen
+INBOX.md
