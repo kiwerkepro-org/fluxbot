@@ -433,6 +433,21 @@
             <div class="field"><label>Anbieter-Name</label><input type="text" id="ai-custom-name" placeholder="z.B. MeinLLM"></div>
             <div class="field"><label>Standard-Modell</label><input type="text" id="ai-custom-model" placeholder="z.B. gpt-4o"></div>
           </div>
+          <div id="dash-ollama-row" style="display:none">
+            <div class="field">
+              <label>Ollama Endpoint-URL</label>
+              <input type="text" id="ai-ollama-url" placeholder="http://localhost:11434">
+              <div class="provider-hint">Standard: localhost. Docker-Setup: <code>http://ollama:11434</code>. Entfernt via Tailscale möglich.</div>
+            </div>
+            <div class="field">
+              <label>Modell-Name</label>
+              <input type="text" id="ai-ollama-model" placeholder="llama3.2, mistral, phi4, qwen2.5 ...">
+              <div class="provider-hint">Exakter Name wie in <code>ollama list</code>. Muss zuvor mit <code>ollama pull &lt;modell&gt;</code> geladen werden.</div>
+            </div>
+            <div style="margin-top:10px;padding:10px 14px;background:#fffbea;border:1px solid #fbbf24;border-radius:6px;font-size:12px;color:#92400e">
+              ⚠️ <strong>Hardware-Anforderung:</strong> Ollama benötigt ausreichend RAM/VRAM. Empfehlung: mind. 8 GB RAM für 7B-Modelle, GPU für beste Performance.
+            </div>
+          </div>
         </div>
         <div>
           <div class="info-card">
@@ -1360,6 +1375,9 @@ function onDashProviderChange() {
   document.getElementById('dash-provider-hint').innerHTML =
     m.hint + (m.link ? ' → <a href="' + m.link + '" target="_blank">' + m.linkText + '</a>' : '');
   document.getElementById('dash-custom-url-row').style.display = (p === 'custom') ? 'block' : 'none';
+  document.getElementById('dash-ollama-row').style.display  = (p === 'ollama') ? 'block' : 'none';
+  // Ollama braucht keinen API-Key → Eingabefeld ausblenden
+  document.getElementById('ai-apikey').closest('.field').style.display = (p === 'ollama') ? 'none' : '';
 }
 
 function getDashProviderKey(p, name) {
@@ -1540,6 +1558,9 @@ async function loadConfig() {
   setVal('ai-custom-url',   p.custom?.baseUrl         || '');
   setVal('ai-custom-name',  p.custom?.name            || '');
   setVal('ai-custom-model', p.custom?.models?.default || '');
+  // Ollama-spezifische Felder (URL aus Vault, Modell aus config.json)
+  setVal('ai-ollama-url',   secretsData['OLLAMA_BASE_URL'] || 'http://localhost:11434');
+  setVal('ai-ollama-model', p.ollama?.models?.default || '');
   onDashProviderChange();
 
   // ── Bild-Generierung (Keys aus Vault) ────────────────────────────────────
@@ -1661,6 +1682,14 @@ async function saveConfig() {
       const m = getVal('ai-custom-model');
       if (m) newConfig.providers.custom.models = { default: m, opus: m };
       newConfig.providers.custom.apiKey = '';  // im Vault
+    }
+    if (selProvider === 'ollama') {
+      // Ollama Endpoint-URL → Vault (kein Klartext in config.json)
+      secretsPatch['OLLAMA_BASE_URL'] = getVal('ai-ollama-url') || 'http://localhost:11434';
+      newConfig.providers.ollama = newConfig.providers.ollama || {};
+      newConfig.providers.ollama.apiKey = '';  // Bearer-Token aus Vault (PROVIDER_OLLAMA)
+      const om = getVal('ai-ollama-model');
+      if (om) newConfig.providers.ollama.models = { default: om, opus: om, image: om, search: om, ocr: om };
     }
 
     // Hilfsfunktion: kommagetrennte Eingabe → Array

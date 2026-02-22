@@ -259,6 +259,18 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
+	// Ollama Standard-Modelle (lokal, kein API-Key nötig)
+	// Nutzer kann im Dashboard überschreiben – hier nur Sinnvoll-Defaults
+	if len(cfg.Providers.Ollama.Models) == 0 {
+		cfg.Providers.Ollama.Models = map[string]string{
+			"default": "llama3.2",
+			"opus":    "llama3.2:latest",
+			"image":   "llama3.2",
+			"search":  "llama3.2",
+			"ocr":     "llama3.2-vision:latest",
+		}
+	}
+
 	if cfg.Workspace.Path == "" {
 		cfg.Workspace.Path = "./workspace"
 	}
