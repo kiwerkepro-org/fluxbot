@@ -179,6 +179,39 @@
   .cache-hint strong { color: var(--yellow); }
   kbd { background: var(--border); padding: 2px 7px; border-radius: 4px; font-size: 12px; color: var(--text); font-family: 'Courier New', monospace; }
 
+  /* ── Info-Tooltip (ⓘ) ── */
+  .info-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 0 0 0 5px; vertical-align: middle; line-height: 1; transition: color 0.15s; }
+  .info-btn:hover { color: var(--accent); }
+  #info-tooltip { position: fixed; z-index: 9000; max-width: 280px; background: #1a2235; border: 1px solid rgba(91,141,238,0.35); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text); line-height: 1.55; box-shadow: 0 8px 28px rgba(0,0,0,0.45); pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+  #info-tooltip.show { opacity: 1; }
+
+  /* ── Hilfe Section ── */
+  .help-search { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 10px 16px; font-size: 14px; outline: none; margin-bottom: 24px; transition: border-color 0.15s; }
+  .help-search:focus { border-color: var(--accent); }
+  .help-search::placeholder { color: var(--muted); }
+  .help-accordion { display: flex; flex-direction: column; gap: 10px; }
+  .help-item { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color 0.15s; }
+  .help-item.hidden { display: none; }
+  .help-item-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; user-select: none; gap: 12px; }
+  .help-item-header:hover { background: rgba(255,255,255,0.03); }
+  .help-item-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .help-item-arrow { color: var(--muted); font-size: 12px; flex-shrink: 0; transition: transform 0.2s; }
+  .help-item.open .help-item-arrow { transform: rotate(180deg); }
+  .help-item-body { display: none; padding: 0 20px 20px; font-size: 13px; color: var(--muted); line-height: 1.7; border-top: 1px solid var(--border); }
+  .help-item.open .help-item-body { display: block; }
+  .help-item-body p { margin-top: 14px; }
+  .help-item-body p:first-child { margin-top: 14px; }
+  .help-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+  .help-table th { text-align: left; padding: 7px 10px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .help-table td { padding: 7px 10px; border-bottom: 1px solid rgba(42,51,71,0.5); vertical-align: top; }
+  .help-table tr:last-child td { border-bottom: none; }
+  .help-table td:first-child { color: var(--text); font-weight: 500; white-space: nowrap; }
+  .help-code { background: rgba(0,0,0,0.3); border-radius: 5px; padding: 2px 7px; font-family: 'Courier New', monospace; font-size: 12px; color: #a8d8a8; }
+  .help-tag { display: inline-block; background: rgba(91,141,238,0.12); color: var(--accent); border: 1px solid rgba(91,141,238,0.25); border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: 600; margin: 1px; }
+  .help-tag.red { background: rgba(226,93,93,0.12); color: var(--red); border-color: rgba(226,93,93,0.25); }
+  .help-tag.green { background: rgba(62,207,142,0.12); color: var(--green); border-color: rgba(62,207,142,0.25); }
+  .help-no-result { text-align: center; padding: 60px 0; color: var(--muted); font-size: 14px; display: none; }
+
   /* ── VirusTotal Section ── */
   .vt-status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; }
   .vt-status-badge.active  { background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); }
@@ -206,21 +239,30 @@
   </div>
   <div class="nav-item active" onclick="showSection('status', this)">
     <span class="nav-icon">📊</span> Status
+    <button class="info-btn" onmouseenter="tipShow(this,'Laufzeit, Uptime und aktive Kanäle auf einen Blick.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('config', this)">
     <span class="nav-icon">⚙️</span> Konfiguration
+    <button class="info-btn" onmouseenter="tipShow(this,'API-Keys, Kanäle, AI-Provider, Bild-/Videogenerierung, Voice und Integrationen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('soul', this)">
     <span class="nav-icon">🎭</span> Persönlichkeit
+    <button class="info-btn" onmouseenter="tipShow(this,'Definiert wie FluxBot antwortet. Änderungen erfordern einen Neustart.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('logs', this)">
     <span class="nav-icon">📋</span> Logs
+    <button class="info-btn" onmouseenter="tipShow(this,'Terminal-Ausgabe und Audit-Logs. Audit-Logs enthalten alle Benutzer-Interaktionen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('system', this)">
     <span class="nav-icon">🔧</span> System
+    <button class="info-btn" onmouseenter="tipShow(this,'Befehle für Neustart und Neu-Bauen – angepasst an dein Betriebssystem.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('virustotal', this)">
     <span class="nav-icon">🛡️</span> VirusTotal
+    <button class="info-btn" onmouseenter="tipShow(this,'Malware-Scan-History und Statistiken. Erfordert API-Key unter Integrationen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  </div>
+  <div class="nav-item" onclick="showSection('help', this)">
+    <span class="nav-icon">❓</span> Hilfe
   </div>
   <div class="sidebar-footer">KI-WERKE · FluxBot v1.0</div>
 </div>
@@ -1003,7 +1045,182 @@
     </div>
   </div>
 
+  <!-- HILFE -->
+  <div class="section" id="section-help">
+    <h2>❓ Hilfe & Dokumentation</h2>
+    <p class="subtitle">Schnellreferenz für alle Dashboard-Bereiche, Konzepte und häufige Fehler</p>
+
+    <input class="help-search" type="text" placeholder="🔍 Hilfe durchsuchen…" oninput="helpSearch(this.value)" id="help-search-input">
+
+    <div class="help-accordion" id="help-accordion">
+
+      <!-- 1. Dashboard-Überblick -->
+      <div class="help-item" data-keywords="dashboard status konfiguration logs system virustotal persönlichkeit übersicht bereiche">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">📊 Dashboard-Überblick – alle Bereiche auf einen Blick</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <table class="help-table">
+            <thead><tr><th>Bereich</th><th>Was macht er?</th></tr></thead>
+            <tbody>
+              <tr><td>📊 Status</td><td>Zeigt ob FluxBot läuft, Uptime und welche Kanäle aktiv sind.</td></tr>
+              <tr><td>⚙️ Konfiguration</td><td>Alle Einstellungen: Kanäle, AI-Provider, Bild-/Videogenerierung, Voice, Integrationen und JSON-Direktzugriff.</td></tr>
+              <tr><td>🎭 Persönlichkeit</td><td>Bearbeite <code class="help-code">SOUL.md</code> – legt Charakter, Ton und Verhalten von FluxBot fest. Neustart nötig nach Änderung.</td></tr>
+              <tr><td>📋 Logs</td><td>Terminal-Ausgabe (fluxbot.log) und Audit-Logs (Gesprächs-Protokolle je Kanal). Letzte 100–200 Zeilen.</td></tr>
+              <tr><td>🔧 System</td><td>Copy-paste-fertige Befehle zum Neustarten oder Neu-Bauen, angepasst an Windows / Mac / Linux / Docker.</td></tr>
+              <tr><td>🛡️ VirusTotal</td><td>Echtzeit-Statistiken und Scan-History aller geprüften Dateien und Links (max. 100 Einträge im RAM).</td></tr>
+              <tr><td>❓ Hilfe</td><td>Diese Seite – Konzepte, Token-Namen und häufige Fehler.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. Vault & Sicherheit -->
+      <div class="help-item" data-keywords="vault sicherheit aes verschlüsselung secret key passwort hot reload">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">🔒 Vault & Sicherheit – wie Secrets gespeichert werden</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <p>FluxBot speichert alle sensiblen Werte (API-Keys, Tokens, Passwörter) in einem <strong style="color:var(--text)">AES-256-GCM verschlüsselten Vault</strong> – nie im Klartext in <code class="help-code">config.json</code>.</p>
+          <table class="help-table" style="margin-top:14px">
+            <thead><tr><th>Konzept</th><th>Erklärung</th></tr></thead>
+            <tbody>
+              <tr><td>🗝️ Vault-Schlüssel</td><td>Liegt in <code class="help-code">.vaultkey</code> (chmod 600). Alternativ als Env-Variable <code class="help-code">FLUXBOT_VAULT_KEY</code>.</td></tr>
+              <tr><td>📁 Vault-Datei</td><td><code class="help-code">workspace/.secrets.vault</code> – AES-256-GCM verschlüsselt, binär.</td></tr>
+              <tr><td>⚡ Hot-Reload</td><td>Secrets werden nach dem Speichern im Dashboard sofort aktiv – kein Neustart nötig.</td></tr>
+              <tr><td>🐳 Docker</td><td>Vault + Schlüssel liegen im <code class="help-code">workspace/</code>-Volume → bleiben beim Neustart erhalten.</td></tr>
+              <tr><td>🔑 Keyring</td><td>Lokal (ohne Docker): Vault-Schlüssel wird im System-Keyring gespeichert (Windows Credential Manager / macOS Keychain).</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:14px;color:var(--muted)">
+            <strong style="color:var(--text)">Tipp:</strong> Das Dashboard-Passwort und alle API-Keys werden über <em>Konfiguration → Integrationen</em> bzw. die jeweiligen Tabs gesetzt – nicht direkt in Dateien.
+          </p>
+        </div>
+      </div>
+
+      <!-- 3. Platzhalter-System -->
+      <div class="help-item" data-keywords="platzhalter integration skill name calcom api key integ vault substitution">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">&#123;&#123;&#125;&#125; Platzhalter-System – wie Skills auf API-Keys zugreifen</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <p>Skills enthalten keine echten API-Keys. Stattdessen verwenden sie <strong style="color:var(--accent)">Platzhalter</strong> in doppelten geschwungenen Klammern:</p>
+          <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:12px 16px;font-family:monospace;font-size:13px;color:#a8d8a8;margin:12px 0">
+            Die Basis-URL lautet: {{CALCOM_BASE_URL}}<br>
+            Dein API-Key: {{CALCOM_API_KEY}}
+          </div>
+          <p>Im Dashboard (<em>Konfiguration → Integrationen → Weitere Integrationen</em>) trägst du den <strong>Platzhalter-Namen</strong> und den echten Wert ein. FluxBot speichert den Wert im Vault unter <code class="help-code">INTEG_CALCOM_BASE_URL</code> und ersetzt ihn beim Ausführen des Skills.</p>
+          <table class="help-table" style="margin-top:12px">
+            <thead><tr><th>Skill schreibt</th><th>Du trägst ein</th><th>Vault-Schlüssel</th></tr></thead>
+            <tbody>
+              <tr><td><code class="help-code">{{CALCOM_API_KEY}}</code></td><td>Name: <strong>CALCOM_API_KEY</strong></td><td><code class="help-code">INTEG_CALCOM_API_KEY</code></td></tr>
+              <tr><td><code class="help-code">{{CALCOM_BASE_URL}}</code></td><td>Name: <strong>CALCOM_BASE_URL</strong></td><td><code class="help-code">INTEG_CALCOM_BASE_URL</code></td></tr>
+              <tr><td><code class="help-code">{{STRIPE_SECRET}}</code></td><td>Name: <strong>STRIPE_SECRET</strong></td><td><code class="help-code">INTEG_STRIPE_SECRET</code></td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:12px"><strong style="color:var(--text)">Groß-/Kleinschreibung:</strong> Der Name wird automatisch in Großbuchstaben umgewandelt. <code class="help-code">calcom_api_key</code> → <code class="help-code">CALCOM_API_KEY</code></p>
+        </div>
+      </div>
+
+      <!-- 4. Skill-Signatur-Workflow -->
+      <div class="help-item" data-keywords="skill signatur hmac sha256 neu signieren sig datei sicherheit">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">📝 Skill-Signatur-Workflow – wann und wie neu signieren</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <p>Jede Skill-Datei (<code class="help-code">workspace/skills/*.md</code>) hat eine zugehörige Signatur-Datei (<code class="help-code">*.sig</code>). FluxBot prüft beim Laden ob die Signatur mit dem <code class="help-code">SKILL_SECRET</code> übereinstimmt – manipulierte Skill-Dateien werden abgelehnt.</p>
+          <p><strong style="color:var(--text)">Wann musst du neu signieren?</strong> Immer wenn du den Inhalt einer Skill-Datei bearbeitest.</p>
+          <p><strong style="color:var(--text)">So signierst du neu</strong> (ersetze die Platzhalter):</p>
+          <div style="background:#080c14;border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-family:monospace;font-size:12px;color:#a8c0d6;margin:10px 0;line-height:1.8">
+            python3 -c "<br>
+            &nbsp;import hmac, hashlib<br>
+            &nbsp;secret = 'SKILL_SECRET_AUS_VAULT'<br>
+            &nbsp;path = 'workspace/skills/DEIN_SKILL.md'<br>
+            &nbsp;with open(path, 'rb') as f: data = f.read()<br>
+            &nbsp;sig = hmac.new(secret.encode(), data, hashlib.sha256).hexdigest()<br>
+            &nbsp;with open(path + '.sig', 'w') as f: f.write(sig)<br>
+            "
+          </div>
+          <p>Das <code class="help-code">SKILL_SECRET</code> findest du im Vault (Dashboard → Konfiguration → JSON oder per API). Es wird beim ersten Start automatisch generiert.</p>
+        </div>
+      </div>
+
+      <!-- 5. Kanäle & Token-Namen -->
+      <div class="help-item" data-keywords="telegram discord slack matrix whatsapp token kanal vault key name">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">📡 Kanäle & Vault-Schlüssel – welcher Token wohin gehört</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <p>Alle Kanal-Tokens werden im Vault gespeichert, nie in <code class="help-code">config.json</code>. Hier die Schlüsselnamen je Kanal:</p>
+          <table class="help-table" style="margin-top:12px">
+            <thead><tr><th>Kanal</th><th>Vault-Schlüssel</th><th>Woher bekommst du ihn?</th></tr></thead>
+            <tbody>
+              <tr><td>🔵 Telegram</td><td><code class="help-code">TELEGRAM_TOKEN</code></td><td><a href="https://t.me/BotFather" target="_blank" style="color:var(--accent)">@BotFather</a> auf Telegram</td></tr>
+              <tr><td>🟣 Discord</td><td><code class="help-code">DISCORD_TOKEN</code></td><td><a href="https://discord.com/developers/applications" target="_blank" style="color:var(--accent)">discord.com/developers</a> → Bot → Token</td></tr>
+              <tr><td>🟢 Slack</td><td><code class="help-code">SLACK_BOT_TOKEN</code><br><code class="help-code">SLACK_SIGNING_SECRET</code></td><td><a href="https://api.slack.com/apps" target="_blank" style="color:var(--accent)">api.slack.com/apps</a> → deine App</td></tr>
+              <tr><td>🔷 Matrix</td><td><code class="help-code">MATRIX_TOKEN</code></td><td>Login-Token aus Matrix-Server (Element → Einstellungen → Hilfe)</td></tr>
+              <tr><td>🟩 WhatsApp</td><td><code class="help-code">WHATSAPP_API_KEY</code></td><td><a href="https://developers.facebook.com/" target="_blank" style="color:var(--accent)">Meta for Developers</a> → WhatsApp Business API</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:14px">Diese Keys werden im Dashboard unter <em>Konfiguration → Kanäle</em> eingetragen und automatisch im Vault gespeichert.</p>
+        </div>
+      </div>
+
+      <!-- 6. Häufige Fehler -->
+      <div class="help-item" data-keywords="fehler error hmac crlf hook virustotal api key neustart rebuild problem lösung">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">🚨 Häufige Fehler & Lösungen</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <table class="help-table">
+            <thead><tr><th>Fehlerbild</th><th>Ursache & Lösung</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Dashboard zeigt<br>„Ungültige Signatur"</td>
+                <td><code class="help-code">HMAC_SECRET</code> fehlt oder stimmt nicht überein. Trage es im Vault ein (Vault-Key: <code class="help-code">HMAC_SECRET</code>) oder als Env-Variable <code class="help-code">FLUXBOT_HMAC_SECRET</code>. Danach Hot-Reload auslösen.</td>
+              </tr>
+              <tr>
+                <td>Pre-Commit Hook schlägt fehl<br>„bad interpreter"</td>
+                <td>Windows-Zeilenenden (CRLF) im Hook. Fix:<br><code class="help-code">sed -i 's/\r//' .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit</code></td>
+              </tr>
+              <tr>
+                <td>VirusTotal scannt nichts,<br>kein Fehler</td>
+                <td>API-Key fehlt. Trage <code class="help-code">VIRUSTOTAL_API_KEY</code> im Vault ein (<em>Konfiguration → Integrationen</em>). Kostenloser Key auf <a href="https://www.virustotal.com/gui/join-us" target="_blank" style="color:var(--accent)">virustotal.com</a>.</td>
+              </tr>
+              <tr>
+                <td>Bot antwortet nicht<br>nach Config-Änderung</td>
+                <td>Manche Änderungen erfordern einen Neustart (z.B. neue Kanäle aktivieren). Nutze <em>System → Neustart</em>. Secrets hingegen werden per Hot-Reload sofort aktiv.</td>
+              </tr>
+              <tr>
+                <td>Dashboard zeigt altes<br>Layout nach Rebuild</td>
+                <td>Browser-Cache leeren: <kbd>Strg+Shift+R</kbd> (Windows/Linux) oder <kbd>Cmd+Shift+R</kbd> (Mac).</td>
+              </tr>
+              <tr>
+                <td>Skill wird abgelehnt<br>„Signatur ungültig"</td>
+                <td>Skill-Datei wurde bearbeitet ohne neue Signatur. Signatur neu generieren (siehe <em>Skill-Signatur-Workflow</em> oben).</td>
+              </tr>
+              <tr>
+                <td><code class="help-code">git push</code> schlägt fehl</td>
+                <td>Token in Remote-URL prüfen: <code class="help-code">git remote -v</code> – URL muss das Token enthalten. Ggf. neu setzen: <code class="help-code">git remote set-url origin https://TOKEN@github.com/org/repo.git</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /help-accordion -->
+    <div class="help-no-result" id="help-no-result">Keine Treffer für deine Suche.</div>
+  </div>
+
 </div><!-- /main -->
+
+<div id="info-tooltip"></div>
 
 <!-- ── Confirmation Modal ── -->
 <div class="modal-overlay" id="edit-modal" style="display:none" onclick="closeModalBg(event)">
@@ -1046,6 +1263,10 @@ function showSection(name, el) {
   if (name === 'logs')       loadCurrentLogs();
   if (name === 'system')     updateSystemCmds();
   if (name === 'virustotal') loadVTData();
+  if (name === 'help') {
+    document.getElementById('help-search-input').value = '';
+    helpSearch('');
+  }
 }
 
 function showTab(name, el) {
@@ -1996,6 +2217,61 @@ function collectIntegrations() {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Info-Tooltip (ⓘ) ──────────────────────────────────────────────────────
+const _tip = () => document.getElementById('info-tooltip');
+
+function tipShow(btn, text) {
+  const el = _tip();
+  el.textContent = text;
+  el.classList.add('show');
+  // Positionierung: rechts vom Button, vertikal zentriert, ggf. nach links spiegeln
+  const r = btn.getBoundingClientRect();
+  let left = r.right + 10;
+  let top  = r.top + r.height / 2;
+  el.style.left = left + 'px';
+  el.style.top  = top + 'px';
+  el.style.transform = 'translateY(-50%)';
+  // Prüfen ob Tooltip rechts aus dem Viewport läuft
+  requestAnimationFrame(() => {
+    const tw = el.offsetWidth;
+    if (left + tw > window.innerWidth - 12) {
+      el.style.left = (r.left - tw - 10) + 'px';
+    }
+  });
+}
+
+function tipHide() {
+  _tip().classList.remove('show');
+}
+
+// ── HILFE: Accordion & Suche ───────────────────────────────────────────────
+function helpToggle(item) {
+  item.classList.toggle('open');
+}
+
+function helpSearch(query) {
+  const q = query.trim().toLowerCase();
+  const items = document.querySelectorAll('.help-item');
+  let anyVisible = false;
+  items.forEach(item => {
+    if (!q) {
+      item.classList.remove('hidden');
+      anyVisible = true;
+      return;
+    }
+    const kw  = (item.dataset.keywords || '').toLowerCase();
+    const txt = item.textContent.toLowerCase();
+    const match = kw.includes(q) || txt.includes(q);
+    item.classList.toggle('hidden', !match);
+    if (match) {
+      anyVisible = true;
+      item.classList.add('open'); // gefundene Elemente aufklappen
+    }
+  });
+  const noResult = document.getElementById('help-no-result');
+  noResult.style.display = (!anyVisible && q) ? 'block' : 'none';
 }
 
 // ── VIRUSTOTAL Integration Badge ───────────────────────────────────────────

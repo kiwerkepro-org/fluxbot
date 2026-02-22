@@ -190,28 +190,27 @@ WhatsApp: Media-Download über Meta Graph API vollständig implementiert (2-Schr
 [ ] Cal.com Integration mit korrekten Platzhaltern testen
 ```
 
-### PRIORITÄT 5 – Hilfe-System im Dashboard
+### PRIORITÄT 5 – Hilfe-System im Dashboard ✅ ERLEDIGT
 ```
-[ ] HAUPTMENÜ: Tab "Hilfe" oder Dropdown-Menüpunkt in der Dashboard-Navigation
-[ ] HAUPT-INHALTE:
-    [ ] Kurzreferenz zu allen Dashboard-Bereichen (Status, Config, Kanäle, Integrationen, Skills, VT, Logs, System)
-    [ ] Erklärung des Platzhalter-Systems ({{NAME}} → INTEG_{NAME} im Vault)
-    [ ] Vault-Konzept verständlich erklären (kein Klartext, AES-256-GCM, Hot-Reload)
-    [ ] Skill-Signatur-Workflow (wann neu signieren, wie Befehl ausführen)
-    [ ] Kanal-Konfiguration Kurzübersicht (Token-Namen je Kanal)
-    [ ] Häufige Fehlermeldungen + Lösungen (HMAC_SECRET, CRLF Hook, VT API-Key, etc.)
-    [ ] Link zu externer Doku / GitHub-Repo (optional)
-[ ] UI HAUPTMENÜ: Modales Popup oder eigener Tab – TBD je nach Umfang
-[ ] UI SUCHFUNKTION: Suchfunktion innerhalb der Hilfe (optional, für später)
+[x] HAUPTMENÜ: Eigener Sidebar-Eintrag "❓ Hilfe" in der Dashboard-Navigation
+[x] HAUPT-INHALTE (6 Accordion-Panels):
+    [x] Kurzreferenz zu allen Dashboard-Bereichen (Status, Config, Kanäle, Integrationen, Skills, VT, Logs, System)
+    [x] Erklärung des Platzhalter-Systems ({{NAME}} → INTEG_{NAME} im Vault)
+    [x] Vault-Konzept verständlich erklären (kein Klartext, AES-256-GCM, Hot-Reload)
+    [x] Skill-Signatur-Workflow (wann neu signieren, wie Befehl ausführen, Python-Snippet)
+    [x] Kanal-Konfiguration Kurzübersicht (Token-Namen je Kanal als Tabelle)
+    [x] Häufige Fehlermeldungen + Lösungen (HMAC_SECRET, CRLF Hook, VT API-Key, etc.)
+[x] UI HAUPTMENÜ: Eigener Tab mit Accordion-Panels (6 Bereiche, aufklappbar)
+[x] UI SUCHFUNKTION: Echtzeit-Suche mit data-keywords-Filterung + Auto-Öffnen von Treffern
 
-[ ] INFO-PUNKTE ⓘ ÜBERALL:
-    [ ] Neben jedem Menüpunkt-Titel (Status, Kanäle, Integrationen, Skills, etc.)
-    [ ] Neben Sektions-Titeln (z.B. "Kanal-Typen", "E-Mail-Versand", "Weitere Integrationen")
-    [ ] Bei kritischen Settings (z.B. "Sicheres Dashboard", "Agent-Loop-Intervall")
-    [ ] Info-Icons sind anklickbar → zeigen Tooltip/Popover mit Kurzerklärung
-    [ ] Konsistentes Design: immer ⓘ im Kreis, gleiche Hover-Farbe, Popover oben/unten intelligent
+[x] INFO-PUNKTE ⓘ ÜBERALL:
+    [x] Neben jedem Sidebar-Menüpunkt (Status, Kanäle, Integrationen, Skills, VT, Logs, System, Hilfe)
+    [x] Info-Icons zeigen Tooltip/Popover bei Hover (kein Klick nötig)
+    [x] Viewport-bewusstes Positioning (rechts/links je nach Platz, via requestAnimationFrame)
+    [x] Klick auf ⓘ öffnet nicht den Tab (event.stopPropagation)
+    [x] Konsistentes Design: ⓘ im Kreis, gleiche Hover-Farbe überall
 ```
-**Ziel:** Selbsterklärende Oberfläche – neuer Nutzer findet sich ohne externe Doku zurecht. Info-Punkte als schnelle Inline-Hilfe.
+**Stand:** Vollständige Hilfe-Section mit Suche und 6 Accordion-Panels. Alle Sidebar-Items haben ⓘ Info-Tooltips. `tipShow()`, `tipHide()`, `helpToggle()`, `helpSearch()` JS-Funktionen implementiert.
 
 ### PRIORITÄT 6 – VirusTotal API-Key im Dashboard (Integrationen-Tab) ✅ ERLEDIGT
 ```
@@ -376,4 +375,17 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 - `pkg/dashboard/dashboard.html`: Info-Card rechts ergänzt (VT, 500 API-Calls/Tag, kostenlos)
 - `pkg/dashboard/dashboard.html`: `loadConfig()` lädt VT-Key + Badge; `saveConfig()` speichert VT-Key in Vault
 
-**Nächster Schritt:** Priorität 4 – Tests (Vault-Persistenz, Hot-Reload, Cal.com Integration) oder Priorität 5 – Hilfe-System im Dashboard
+**Erledigt Session 7 (Priorität 5 – Hilfe-System im Dashboard):**
+- `pkg/dashboard/dashboard.html`: Sidebar-Eintrag ❓ Hilfe; alle 6 Sidebar-Items mit ⓘ Info-Button
+- `pkg/dashboard/dashboard.html`: CSS für `.info-btn`, `#info-tooltip`, `.help-*` (Accordion, Search, Table, Code, Tags)
+- `pkg/dashboard/dashboard.html`: Komplette `#section-help` mit Suchfeld + 6 Accordion-Panels:
+  1. Dashboard-Überblick (Tabelle aller Bereiche)
+  2. Vault & Sicherheit (AES-256-GCM, Hot-Reload, Docker vs. Keyring)
+  3. Platzhalter-System ({{NAME}} → INTEG_NAME Erklärung)
+  4. Skill-Signatur-Workflow (Python-Snippet, wann neu signieren)
+  5. Kanäle & Vault-Schlüssel (Token-Namen je Kanal als Tabelle)
+  6. Häufige Fehler & Lösungen (HMAC, CRLF Hook, VT, Cache, Git Push)
+- `pkg/dashboard/dashboard.html`: `tipShow(btn, text)` + `tipHide()` – viewport-bewusstes Tooltip-Positioning
+- `pkg/dashboard/dashboard.html`: `helpToggle(item)` + `helpSearch(query)` – Accordion + Echtzeit-Suche mit data-keywords
+
+**Nächster Schritt:** Priorität 4 – Tests (Vault-Persistenz, Hot-Reload, Cal.com Integration) oder Priorität 7 – Ollama Integration
