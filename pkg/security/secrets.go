@@ -23,13 +23,20 @@ const (
 )
 
 // SecretProvider ist die Schnittstelle für sichere Secret-Speicherung.
-// Implementierungen: VaultProvider (AES-256-GCM Datei).
+// Implementierungen: VaultProvider (AES-256-GCM Datei), KeyringProvider (OS-Keyring),
+// ChainedProvider (Keyring → Vault Fallback).
 type SecretProvider interface {
 	Get(key string) (string, error)
 	Set(key string, value string) error
 	Delete(key string) error
 	GetAll() (map[string]string, error)
 	SetBatch(updates map[string]string) error
+	// MigrateFromConfig migriert Secrets aus einer Map in den Provider.
+	// Schreibt nur Werte die noch nicht vorhanden sind (kein Überschreiben).
+	// Gibt die Anzahl migrierter Einträge zurück.
+	MigrateFromConfig(secrets map[string]string) (int, error)
+	// Backend gibt den Anzeigenamen des aktiven Backends zurück.
+	// Wird im Dashboard-Status angezeigt.
 	Backend() string
 }
 

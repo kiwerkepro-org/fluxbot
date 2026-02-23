@@ -145,6 +145,22 @@ func (s *Server) handleSecrets(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ── /api/secrets/backend ──────────────────────────────────────────────────────
+
+// handleSecretBackend gibt den aktiven Secret-Backend-Namen zurück.
+// Wird vom Dashboard-Status-Tab angezeigt.
+func (s *Server) handleSecretBackend(w http.ResponseWriter, r *http.Request) {
+	backendName := "unbekannt"
+	if s.vault != nil {
+		backendName = s.vault.Backend()
+	}
+	isDocker := security.IsDockerEnvironment()
+	writeJSON(w, map[string]interface{}{
+		"backend":   backendName,
+		"isDocker":  isDocker,
+	})
+}
+
 // ── /api/soul ─────────────────────────────────────────────────────────────────
 
 func (s *Server) handleSoul(w http.ResponseWriter, r *http.Request) {
