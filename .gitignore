@@ -77,3 +77,6 @@ credentials.json
 /logs/
 # Lokale Session-Notizen
 INBOX.md
+
+# Agent-Gedächtnis
+memory-md/

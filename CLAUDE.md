@@ -3,11 +3,24 @@
 > Dieses File ist das persistente Gedächtnis für Claude-Sessions.
 > Am Anfang jeder neuen Session: "Lies CLAUDE.md und mach weiter."
 
+---
+
 ## Wichtige Dateipfade
 
 | Datei | Pfad | Hinweis |
 |-------|------|---------|
 | INBOX.md | `C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT\INBOX.md` | Nur lesen wenn JJ explizit darum bittet |
+
+---
+
+## Detaillierte Dokumentation (memory-md/)
+
+| Datei | Inhalt |
+|-------|--------|
+| `memory-md/01-features.md` | Alle implementierten Features (P1–P8) + offene Punkte |
+| `memory-md/02-architektur.md` | Architektur-Entscheidungen + Secret-Strategie + Keyring |
+| `memory-md/03-session-log.md` | Chronologisches Session-Protokoll (Sessions 1–21) |
+| `memory-md/04-redesign-spec.md` | Dashboard Redesign Spezifikation (Session 20, noch offen) |
 
 ---
 
@@ -32,13 +45,14 @@
 ## Architektur
 
 ```
-cmd/fluxbot/main.go          ← Einstiegspunkt, Vault-Init, Provider-Setup
+cmd/fluxbot/main.go          ← Einstiegspunkt, NewSecretProvider(), Provider-Setup
 pkg/
   agent/        ← FluxAgent, Session-Management, Agent-Loop
   channels/     ← Telegram, Discord, Slack, Matrix, WhatsApp
   config/       ← Config-Struct, Validation, Load/Save
   dashboard/    ← HTTP-Server (port 9090), API-Handler, dashboard.html
-  security/     ← HMAC Guard, VirusTotal (vt.go), Vault (secrets.go)
+  security/     ← HMAC Guard, VirusTotal (vt.go), Vault (secrets.go),
+                   Keyring-Abstraktionsschicht (keyring.go, keyring_windows.go, keyring_other.go)
   skills/       ← Skill-Loader, HMAC-Signatur, Platzhalter-Substitution
   provider/     ← AI-Provider (OpenRouter, Anthropic, OpenAI, Groq, Ollama, etc.)
   voice/        ← Sprach-Input/Output (Groq)
@@ -49,33 +63,14 @@ workspace/
   .secrets.vault← AES-256-GCM verschlüsselte Secrets
   .vaultkey     ← Vault-Schlüssel (hex, chmod 600)
   skills/       ← Skill-Dateien (.md + .sig)
-  memory/       ← Agent-Gedächtnis
+  memory-md/    ← Agent-Gedächtnis
   logs/         ← fluxbot.log
 ```
 
 ---
 
-## Was ist implementiert ✅
+## Vault Secret-Keys (Naming Convention – Quick Reference)
 
-### Security
-| Feature | Status | Datei |
-|---------|--------|-------|
-| AES-256-GCM Vault | ✅ fertig | `pkg/security/secrets.go` |
-| HMAC-SHA256 Skill-Signierung | ✅ fertig | `pkg/skills/signer.go` |
-| VirusTotal File-Scan | ✅ teilweise | `pkg/security/vt.go` |
-| Tailscale VPN-Sidecar | ✅ fertig | `docker-compose.yml` |
-| Pre-Commit Hook (Secret-Check) | ✅ fertig | `.git/hooks/pre-commit` |
-| .gitignore Hardening | ✅ fertig | `.gitignore` |
-| Dashboard Port 127.0.0.1 | ✅ fertig | `docker-compose.yml` |
-
-### Vault (AES-256-GCM)
-- Schlüssel-Priorität: `FLUXBOT_VAULT_KEY` (Env) → `.vaultkey` Datei → auto-generiert
-- Einmalige Migration: config.json → Vault beim ersten Start mit neuem Code
-- Hot-Reload: POST `/api/secrets` → `onReload()` → `applySecrets()` → sofort aktiv
-- Dashboard-Passwort Hot-Reload via `dash.UpdatePassword()`
-- `cfg.Validate()` läuft NACH `applySecrets()` (wichtig! Bug war hier)
-
-### Vault Secret-Keys (Naming Convention)
 ```
 TELEGRAM_TOKEN, DISCORD_TOKEN, SLACK_BOT_TOKEN, SLACK_APP_TOKEN
 SLACK_SIGNING_SECRET, MATRIX_TOKEN, WHATSAPP_API_KEY, WHATSAPP_WEBHOOK_SECRET
@@ -90,218 +85,29 @@ HMAC_SECRET
 OLLAMA_BASE_URL  (optional, Default: http://localhost:11434)
 INTEG_{NAME}  z.B. INTEG_CALCOM_API_KEY, INTEG_CALCOM_BASE_URL
 GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN
+CALCOM_BASE_URL, CALCOM_API_KEY, CALCOM_OWNER_EMAIL
 ```
 
-### Dashboard API
+---
+
+## Dashboard API (Quick Reference)
+
 | Endpoint | Methode | Funktion |
 |----------|---------|----------|
 | `/api/config` | GET | Konfiguration laden (keine Secrets) |
 | `/api/config` | PUT | Konfiguration speichern |
 | `/api/secrets` | GET | Alle Vault-Secrets laden |
 | `/api/secrets` | POST | Secrets batch-speichern + Hot-Reload |
+| `/api/secrets/backend` | GET | Secret-Backend-Info (Keyring/Vault) |
 | `/api/status` | GET | Bot-Status |
 | `/api/channels` | GET | Aktive Kanäle |
-
-### Dashboard JS (dashboard.html)
-- `secretsData` – globale Variable für Vault-Werte
-- `loadConfig()` – lädt `/api/config` + `/api/secrets` parallel (Promise.all)
-- `saveConfig()` – trennt: nicht-sensitiv → `/api/config`, Secrets → `/api/secrets`
-- `renderIntegrations()` – Werte aus `secretsData['INTEG_*']`
-- `collectIntegrations()` – gibt `{configList, secretsMap}` zurück
-- Info-Button ⓘ bei Platzhalter-Name erklärt das Platzhalter-Konzept
-
-### Kanäle
-- Telegram ✅, Discord ✅, Slack (konfigurierbar), Matrix (konfigurierbar), WhatsApp (konfigurierbar)
-
-### Skills
-- Skill-Dateien in `workspace/skills/*.md` + `.sig` (HMAC-SHA256 Signatur)
-- Platzhalter `{{NAME}}` werden aus Integrationen substituiert
-- **Cal.com Skill:** `{{CALCOM_BASE_URL}}` + `{{CALCOM_API_KEY}}` (cal.com UND cal.eu)
-- Im Dashboard unter Integrationen: Name muss exakt dem `{{PLATZHALTER}}` entsprechen
-
-### Infrastruktur
-- Docker Compose mit Tailscale-Sidecar
-- GitHub Actions CI/CD mit Bitwarden Secrets Manager (BWS)
-- BWS liefert `FLUXBOT_HMAC_SECRET` und `VIRUSTOTAL_API_KEY` im Build
-- Git Push funktioniert direkt aus der VM (Token in Remote-URL hinterlegt)
-- Pre-Commit Hook: CRLF-Problem wurde gefixt (`sed -i 's/\r//'`)
-
----
-
-## Offene Punkte / Agenda 📋
-
-### PRIORITÄT 1 – VirusTotal auf alle Kanäle erweitern ✅ ERLEDIGT
-```
-[x] Gemeinsame Scan-Hilfsfunktion in pkg/security/ (nicht kanal-spezifisch)
-[x] Telegram:   Dateien scannen (PDF, Bild, Dokument, Video, Audio, VideoNote)
-[x] Telegram:   Links in Textnachrichten auf Malware prüfen
-[x] Discord:    Datei-Uploads scannen (alle Anhänge)
-[x] Discord:    Links prüfen
-[x] Slack:      Datei-Uploads scannen (file_share Events)
-[x] Matrix:     Datei-Uploads scannen (m.file, m.image, m.audio, m.video)
-[x] WhatsApp:   Medien/Dokumente scannen (Audio, Bild, Dokument, Video, Sticker)
-[x] Alle:       Einheitliche Benutzer-Fehlermeldung bei Fund (VTFileBlockedMsg, VTURLBlockedMsg)
-```
-**Stand:** VT auf allen 5 Kanälen aktiv. Neue Funktionen in `pkg/security/vt.go`:
-- `ScanURL()` – URL-Prüfung via VT API (base64url SHA-256 Identifier)
-- `ScanURLsInText()` – extrahiert + prüft alle URLs aus Text
-- `ExtractURLs()` – HTTP/HTTPS-URL-Extraktor
-- `VTFileBlockedMsg` / `VTURLBlockedMsg` – einheitliche Fehlermeldungen (Konstanten)
-- `IsEnabled()` – VT-Status für Dashboard
-WhatsApp: Media-Download über Meta Graph API vollständig implementiert (2-Schritt: Info-URL → Datei).
-
-### PRIORITÄT 2 – HMAC Compendium ✅ ERLEDIGT
-```
-[x] Prüfen welche HMAC-Items aus dem Compendium noch fehlen
-[x] HMAC für Dashboard-API-Requests (nicht nur Skill-Signierung)
-```
-**Stand:** Dashboard-API-Request-Signing vollständig implementiert:
-- `pkg/dashboard/server.go`: `hmacVerify()` Middleware (HMAC-SHA256 + Replay-Schutz via Timestamp ±5 min)
-- `pkg/dashboard/server.go`: `handleHMACToken` Endpoint (`GET /api/hmac-token` → liefert Secret nach Auth)
-- `pkg/dashboard/server.go`: `UpdateHMACSecret()` für Hot-Reload
-- `pkg/dashboard/dashboard.html`: `initHMAC()` – lädt CryptoKey beim Start via Web Crypto API
-- `pkg/dashboard/dashboard.html`: `signPayload()` – HMAC-SHA256 im Browser (SubtleCrypto)
-- `pkg/dashboard/dashboard.html`: `api()` – fügt `X-Timestamp` + `X-Signature` bei POST/PUT/DELETE hinzu
-- `cmd/fluxbot/main.go`: `FLUXBOT_HMAC_SECRET` Env-Variable wird an `dashboard.New()` + Hot-Reload übergeben
-- Abwärtskompatibel: Wenn `FLUXBOT_HMAC_SECRET` nicht gesetzt → kein HMAC, kein Fehler
-
-### PRIORITÄT 3 – VT Dashboard Tab ✅ ERLEDIGT
-```
-[x] VirusTotal-Tab im Dashboard (Scan-History, Status, Statistiken)
-[x] pkg/security/vt.go: ScanEntry/VTStats Structs, recordScan(), GetStats(), GetHistory(), ClearHistory()
-[x] pkg/security/vt.go: History-Tracking in ScanFileHash() + ScanURL() (Cache-Hits werden ebenfalls gezählt)
-[x] pkg/dashboard/api.go: handleVTStatus(), handleVTHistory(), handleVTClear()
-[x] pkg/dashboard/server.go: GET /api/vt/status, GET /api/vt/history, POST /api/vt/clear (HMAC-geschützt)
-[x] pkg/dashboard/dashboard.html: 🛡️ VirusTotal Sidebar-Eintrag
-[x] pkg/dashboard/dashboard.html: VT-Section (Status-Badge, 5 Stats-Karten, History-Tabelle, Info-Box)
-[x] pkg/dashboard/dashboard.html: loadVTData(), renderVTStats(), renderVTHistory(), clearVTHistory()
-```
-**Stand:** In-Memory History (max 100 Einträge, FIFO, neueste zuerst). Statistiken zählen: Dateien, URLs, Geblockte, Cache-Hits. Badge-System: ✅ Sicher / 🚨 Blockiert / 💾 Cache. History-Reset per Button (HMAC-geschützt). Inaktiv-Banner wenn kein API-Key.
-
-### PRIORITÄT 7 – Ollama Integration (lokaler AI-Betrieb, kostenfrei) ✅ ERLEDIGT
-```
-[x] pkg/provider/ollama.go – OllamaProvider Struct (eigene Implementierung, kein OpenAICompat-Wrapper)
-[x] pkg/provider/ollama.go – PingOllama() – Erreichbarkeits-Check via /api/tags (5s Timeout)
-[x] pkg/provider/ollama.go – OllamaDefaultBaseURL Konstante ("http://localhost:11434")
-[x] pkg/provider/ollama.go – Authorization-Header nur wenn Bearer-Token gesetzt (Ollama braucht keinen)
-[x] pkg/provider/ollama.go – Timeout 300s (lokale Modelle brauchen länger)
-[x] config/config.go – Ollama-Modell-Defaults (llama3.2, llama3.2-vision für OCR)
-[x] Vault: OLLAMA_BASE_URL (Default: http://localhost:11434, aus Vault überschreibbar)
-[x] Vault: PROVIDER_OLLAMA (optional Bearer-Token falls Ollama hinter Auth-Proxy)
-[x] main.go – "ollama" expliziter Case im Provider-Switch (PingOllama + NewOllama)
-[x] main.go – OLLAMA_BASE_URL direkt aus Vault lesen (vault.Get, nach applySecrets)
-[x] main.go – extractSecrets() + applySecrets() für PROVIDER_OLLAMA ergänzt
-[x] main.go – getProviderModels() für "ollama" Case ergänzt
-[x] Dashboard: Ollama-Row mit Endpoint-URL + Modell-Name (ein-/ausgeblendet bei Auswahl)
-[x] Dashboard: API-Key-Feld ausgeblendet wenn Ollama aktiv (kein Key nötig)
-[x] Dashboard: Hardware-Warnhinweis (RAM/VRAM, ollama pull)
-[x] Dashboard: OLLAMA_BASE_URL wird beim Laden aus Vault angezeigt
-[x] Dashboard: OLLAMA_BASE_URL + Modell beim Speichern in Vault/config.json gesichert
-[x] Fallback: Startup-Warnung im Log wenn Ollama nicht erreichbar – kein Absturz
-```
-**Stand:** Vollständig implementiert. Eigener `OllamaProvider` (nicht OpenAICompat-Wrapper). OLLAMA_BASE_URL + optionaler Bearer-Token aus Vault. PingOllama gibt Warnung aber keinen Fatal-Error.
-**Designentscheidungen:**
-- Eigener Struct statt Wrapper → Authorization-Header nur wenn Token gesetzt (sauber)
-- OLLAMA_BASE_URL geht in Vault (nicht config.json) – konsistent mit Secret-Strategie
-- `.env` wird NICHT verwendet – Endpoint kommt ausschließlich aus Vault/Dashboard
-
-### PRIORITÄT 4 – Tests
-```
-[ ] Alle Blöcke aus der Hardcore Test Suite durchführen
-[ ] Vault-Persistenz nach Docker-Neustart bestätigen
-[ ] Hot-Reload verifizieren
-[ ] Cal.com Integration mit korrekten Platzhaltern testen
-```
-
-### PRIORITÄT 5 – Hilfe-System im Dashboard ✅ ERLEDIGT
-```
-[x] HAUPTMENÜ: Eigener Sidebar-Eintrag "❓ Hilfe" in der Dashboard-Navigation
-[x] HAUPT-INHALTE (6 Accordion-Panels):
-    [x] Kurzreferenz zu allen Dashboard-Bereichen (Status, Config, Kanäle, Integrationen, Skills, VT, Logs, System)
-    [x] Erklärung des Platzhalter-Systems ({{NAME}} → INTEG_{NAME} im Vault)
-    [x] Vault-Konzept verständlich erklären (kein Klartext, AES-256-GCM, Hot-Reload)
-    [x] Skill-Signatur-Workflow (wann neu signieren, wie Befehl ausführen, Python-Snippet)
-    [x] Kanal-Konfiguration Kurzübersicht (Token-Namen je Kanal als Tabelle)
-    [x] Häufige Fehlermeldungen + Lösungen (HMAC_SECRET, CRLF Hook, VT API-Key, etc.)
-[x] UI HAUPTMENÜ: Eigener Tab mit Accordion-Panels (6 Bereiche, aufklappbar)
-[x] UI SUCHFUNKTION: Echtzeit-Suche mit data-keywords-Filterung + Auto-Öffnen von Treffern
-
-[x] INFO-PUNKTE ⓘ ÜBERALL:
-    [x] Neben jedem Sidebar-Menüpunkt (Status, Kanäle, Integrationen, Skills, VT, Logs, System, Hilfe)
-    [x] Info-Icons zeigen Tooltip/Popover bei Hover (kein Klick nötig)
-    [x] Viewport-bewusstes Positioning (rechts/links je nach Platz, via requestAnimationFrame)
-    [x] Klick auf ⓘ öffnet nicht den Tab (event.stopPropagation)
-    [x] Konsistentes Design: ⓘ im Kreis, gleiche Hover-Farbe überall
-```
-**Stand:** Vollständige Hilfe-Section mit Suche und 6 Accordion-Panels. Alle Sidebar-Items haben ⓘ Info-Tooltips. `tipShow()`, `tipHide()`, `helpToggle()`, `helpSearch()` JS-Funktionen implementiert.
-
-### PRIORITÄT 6 – VirusTotal API-Key im Dashboard (Integrationen-Tab) ✅ ERLEDIGT
-```
-[x] Eigenen Bereich "VirusTotal" im Integrationen-Tab angelegt
-[x] Eingabefeld für VIRUSTOTAL_API_KEY (→ Vault-Key: VIRUSTOTAL_API_KEY, Passwort-Feld mit Eye-Button)
-[x] Deutlich sichtbarer Hinweis: "Erforderlich für sicheren Bot-Betrieb" (rotes Banner)
-[x] Erklärungstext: VT-Scan wird nur aktiv, wenn API-Key hinterlegt ist
-[x] Link zur kostenlosen API-Key-Registrierung (virustotal.com/gui/join-us)
-[x] Visuelles Warnsignal: gelber ⚠️ Badge wenn Key fehlt, grüner ✅ Badge wenn aktiv
-[x] updateVTIntegBadge() – aktualisiert sich beim Laden + nach Speichern live
-[x] Info-Card rechts: VT-Abschnitt mit Link + Hinweis auf 500 API-Calls/Tag kostenlos
-```
-**Stand:** VIRUSTOTAL_API_KEY direkt im Vault (kein INTEG_*-Prefix). Badge live. VT-Section (P3) verlinkt bereits auf Integrationen wenn Key fehlt.
-**Hintergrund:** VirusTotal erfordert einen eigenen API-Key pro Nutzer (kostenloser Plan verfügbar).
-Ohne eingetragenen Key bleibt der VT-Scan still deaktiviert – der User muss aktiv darauf hingewiesen werden.
-
----
-
-## Wichtige Entscheidungen (Why)
-
-| Entscheidung | Begründung |
-|-------------|------------|
-| VaultProvider (Docker) / Keyring (lokal) | Hybridstrategie: Docker → Vault (headless-kompatibel), lokale Installation → System-Keyring (Windows Credential Manager / macOS Keychain / libsecret). Beide Pfade werden unterstützt. |
-| Ollama als optionaler lokaler Provider | OpenAI-kompatibler API-Endpunkt → minimaler Code-Aufwand. Kein API-Key. Spart Kosten bei einfachen Use-Cases. User wählt selbst im Dashboard. |
-| AES-256-GCM statt bcrypt für Vault | Vault-Daten müssen entschlüsselbar sein (kein One-Way-Hash) |
-| Tailscale statt 2FA im Dashboard | Einfacher, sicherer, zero-trust – "zweiter Faktor" ist VPN-Zugang |
-| cfg.Validate() nach applySecrets() | Secrets kommen aus Vault, nicht aus config.json – Validate vorher = Fehler |
-| Skill-Platzhalter variabel halten | User bestimmt den Namen, Skill-Datei wird nicht geändert |
-| workspace/ gitignored | Enthält persönliche Daten, API-Keys (alt), Gedächtnis, Gesprächsverläufe |
-
----
-
-## Secret-Strategie: Keyring vs. Vault
-
-FluxBot unterstützt zwei Betriebsmodi mit unterschiedlicher Secret-Verwaltung:
-
-| Modus | Secret-Backend | Begründung |
-|-------|---------------|------------|
-| **Lokal** (direkt auf dem Rechner, kein Docker) | System-Keyring | Windows Credential Manager / macOS Keychain / libsecret (Linux). Sicher, OS-nativ, kein Passwort im Dateisystem. |
-| **Docker** (Container-Betrieb) | AES-256-GCM Vault (`.secrets.vault`) | Kein Display/Session-Bus → System-Keyring headless nicht nutzbar. Vault-Datei bleibt im `workspace/` Volume persistent. |
-
-### Secret-Priorität (Ladereihenfolge)
-
-```
-1. System-Keyring   ← bevorzugt bei lokaler Installation
-2. Vault            ← bevorzugt bei Docker
-3. Env-Variable     ← Fallback / CI-CD (z.B. FLUXBOT_HMAC_SECRET in .env)
-4. nicht gesetzt    ← Feature deaktiviert, Startup-Warnung
-```
-
-### Betrifft folgende Secrets
-
-- `HMAC_SECRET` – Dashboard-API-Request-Signierung (kein .env wenn vermeidbar)
-- `DASHBOARD_PASSWORD` – Dashboard Basic Auth
-- `SKILL_SECRET` – Skill-Datei-Signierung
-- Alle Provider-Keys, Kanal-Tokens, etc. folgen derselben Strategie
-
-### Implementierungs-Roadmap Keyring
-
-```
-[ ] pkg/security/keyring.go – Abstraktions-Schicht über System-Keyring (zalando/go-keyring oder 99designs/keyring)
-[ ] Detect-Funktion: läuft im Docker? → kein Keyring, direkt zu Vault
-[ ] Lokale Installation: Setup-Wizard speichert Secrets in Keyring + generiert .vaultkey aus Keyring
-[ ] main.go: loadSecrets() Funktion mit Prioritätskette (Keyring → Vault → Env)
-[ ] Dashboard: Hinweis anzeigen welches Backend aktiv ist (Keyring / Vault / Env)
-```
-
-> **Merke:** Die `.env` Datei ist nur für Infrastruktur-Secrets gedacht, die Docker selbst braucht (z.B. `TAILSCALE_AUTH_KEY`). Alle FluxBot-eigenen Secrets sollen mittelfristig über Keyring (lokal) oder Vault (Docker) laufen – nie im Klartext in einer Datei.
+| `/api/vt/status` | GET | VirusTotal Status + Stats |
+| `/api/vt/history` | GET | Scan-History |
+| `/api/vt/clear` | POST | History zurücksetzen (HMAC) |
+| `/api/google/auth-url` | GET | OAuth2 Auth-URL |
+| `/api/google/oauth-callback` | GET | OAuth2 Callback → Vault |
+| `/api/skills` | GET | Skill-Liste |
+| `/api/skills/sign` | POST | Skill neu signieren (HMAC) |
 
 ---
 
@@ -312,7 +118,9 @@ FluxBot unterstützt zwei Betriebsmodi mit unterschiedlicher Secret-Verwaltung:
 - **Pre-Commit Hook CRLF:** Windows-Zeilenenden in `.git/hooks/pre-commit` → `sed -i 's/\r//' .git/hooks/pre-commit && chmod +x` falls Hook-Fehler
 - **Git Push aus VM:** Token in Remote-URL hinterlegt – direkt `git push origin main` funktioniert
 - **Tailscale Auth-Key:** In `.env` als `TAILSCALE_AUTH_KEY=tskey-auth-...` – `.env` ist gitignored ✅
-- **Cal.com Integration:** Braucht zwei Einträge: `CALCOM_BASE_URL` und `CALCOM_API_KEY`
+- **Cal.com Integration:** Braucht zwei Einträge im Vault: `CALCOM_BASE_URL` und `CALCOM_API_KEY`
+- **applySecrets():** CALCOM_* Keys werden explizit in `cfg.Integrations` injiziert (kein INTEG_*-Prefix)
+- **skillsLoader.Reload():** Muss nach `SetIntegrations()` aufgerufen werden – sowohl beim Startup als auch in `onReload()`
 
 ---
 
@@ -344,206 +152,17 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 
 ---
 
-## Letzte Session (Stand: 2026-02-22, Session 2)
+## Aktueller Stand (Session 21 – 2026-02-23)
 
-**Erledigt Session 1:**
-- AES-256-GCM Vault vollständig implementiert + migriert
-- Dashboard lädt/speichert Secrets getrennt von Config
-- Bug gefixt: cfg.Validate() lief vor applySecrets() → zweiter Start schlug fehl
-- Tailscale VPN-Sidecar integriert, Port auf 127.0.0.1 gebunden
-- .env Datei erstellt (Tailscale Auth-Key eingetragen)
-- Cal.com Skill auf flexible Platzhalter umgestellt (cal.com + cal.eu)
-- Info-Button ⓘ im Dashboard für Platzhalter-Erklärung
-- CLAUDE.md erstellt (dieses File)
+**Letzte abgeschlossene Session:** 20 (Dashboard Redesign geplant, noch nicht implementiert)
+**Aktuelle Session:** 21
 
-**Erledigt Session 2 (Priorität 1 – VirusTotal auf alle Kanäle):**
-- `pkg/security/vt.go`: ScanURL, ScanURLsInText, ExtractURLs, VTFileBlockedMsg, VTURLBlockedMsg, IsEnabled()
-- `pkg/channels/telegram.go`: scannt Voice, Audio, Document, Photo, Video, VideoNote + URLs in Text
-- `pkg/channels/discord.go`: scannt alle Anhänge (alle MIME-Typen) + URLs in Text; Download-Logik auf memory-first umgestellt
-- `pkg/channels/slack.go`: scannt file_share Events (Bot-Token Auth Download) + URLs in Text; slackFile-Struct hinzugefügt
-- `pkg/channels/matrix.go`: verarbeitet m.image/m.video/m.audio/m.file Events, lädt mxc:// URLs herunter + scannt; URL-Scan für Text
-- `pkg/channels/whatsapp.go`: Media-Download über Meta Graph API (2-Schritt), scannt Audio/Bild/Dokument/Video/Sticker + URLs in Text
+**Offen / Nächste Schritte:**
+1. `pkg/dashboard/dashboard.html` komplett neu schreiben → siehe `memory-md/04-redesign-spec.md`
+2. Git commit + push nach Dashboard-Redesign
+3. Docker-Rebuild + Test
 
-**Erledigt Session 3 (Priorität 2 – HMAC Dashboard-API):**
-- `pkg/dashboard/server.go`: HMAC-SHA256 Middleware `hmacVerify()` für POST/PUT/DELETE-Endpoints
-- `pkg/dashboard/server.go`: Replay-Schutz via `X-Timestamp` (Unix-Sekunden, ±5 Minuten Toleranz)
-- `pkg/dashboard/server.go`: `GET /api/hmac-token` Endpoint (liefert Secret nach Basic Auth)
-- `pkg/dashboard/server.go`: `UpdateHMACSecret()` für Hot-Reload
-- `pkg/dashboard/dashboard.html`: `initHMAC()` – SubtleCrypto HMAC-Key Import beim Start
-- `pkg/dashboard/dashboard.html`: `signPayload()` – Browser-seitiges HMAC-SHA256 Signing
-- `pkg/dashboard/dashboard.html`: `api()` – automatisches Signing bei mutierenden Requests
-- `cmd/fluxbot/main.go`: `FLUXBOT_HMAC_SECRET` Env-Variable an `dashboard.New()` übergeben + Hot-Reload
-
-**Besprochen (noch nicht implementiert):**
-- Ollama-Integration als lokaler AI-Provider (Priorität 7) – spart OpenRouter-Kosten, User wählt im Dashboard
-- Secret-Strategie: HMAC_SECRET soll in den Vault (nicht .env), Keyring für lokale Installation geplant
-
-**Erledigt Session 4 (README + Assets):**
-- `assets/` Ordner erstellt – alle Logos mit sauberen Namen (`fluxion-logo.png`, `fluxion-character.png`, `virustotal-logo.png`, `bitwarden-logo.png`, `kiwerke-logo.png`)
-- `README.md` vollständig neu gestaltet: Header mit VirusTotal (links) + FluxBot-Logo (Mitte) + Bitwarden (rechts), alle Abschnitte als echte Markdown-Tabellen, Roadmap + Sicherheits-Tabelle aktualisiert
-- Originale Logos im Root noch vorhanden → per `git rm` entfernen sobald `assets/` committed ist
-
-**Erledigt Session 5 (Priorität 3 – VT Dashboard Tab):**
-- `pkg/security/vt.go`: `ScanEntry` + `VTStats` Structs; `recordScan()`, `GetStats()`, `GetHistory()`, `ClearHistory()`
-- `pkg/security/vt.go`: History-Tracking in `ScanFileHash()` (incl. Cache-Hits) und `ScanURL()`; Stats-Zähler für Dateien/URLs/Geblockte/Cache
-- `pkg/dashboard/api.go`: `handleVTStatus()` (Stats+Status), `handleVTHistory()` (letzte 100 Scans), `handleVTClear()` (Reset, HMAC-geschützt)
-- `pkg/dashboard/server.go`: Routen `GET /api/vt/status`, `GET /api/vt/history`, `POST /api/vt/clear` registriert
-- `pkg/dashboard/dashboard.html`: Sidebar-Eintrag 🛡️ VirusTotal; komplette Section mit Status-Badge, 5 Statistik-Karten, History-Tabelle (Zeit/Typ/Ziel/Ergebnis), Inaktiv-Banner, Info-Box; JS: `loadVTData()`, `renderVTStats()`, `renderVTHistory()`, `clearVTHistory()`
-
-**Erledigt Session 6 (Priorität 6 – VT API-Key im Integrationen-Tab):**
-- `pkg/dashboard/dashboard.html`: Eigener VT-Panel im Integrationen-Tab (zwischen SMTP und generischen Keys)
-- `pkg/dashboard/dashboard.html`: Rotes Wichtigkeits-Banner ("Erforderlich für sicheren Bot-Betrieb")
-- `pkg/dashboard/dashboard.html`: Passwort-Feld für VIRUSTOTAL_API_KEY mit Eye-Toggle
-- `pkg/dashboard/dashboard.html`: Gelber ⚠️-Badge → Grüner ✅-Badge (live per `updateVTIntegBadge()`)
-- `pkg/dashboard/dashboard.html`: Info-Card rechts ergänzt (VT, 500 API-Calls/Tag, kostenlos)
-- `pkg/dashboard/dashboard.html`: `loadConfig()` lädt VT-Key + Badge; `saveConfig()` speichert VT-Key in Vault
-
-**Erledigt Session 7 (Priorität 5 – Hilfe-System im Dashboard):**
-- `pkg/dashboard/dashboard.html`: Sidebar-Eintrag ❓ Hilfe; alle 6 Sidebar-Items mit ⓘ Info-Button
-- `pkg/dashboard/dashboard.html`: CSS für `.info-btn`, `#info-tooltip`, `.help-*` (Accordion, Search, Table, Code, Tags)
-- `pkg/dashboard/dashboard.html`: Komplette `#section-help` mit Suchfeld + 6 Accordion-Panels:
-  1. Dashboard-Überblick (Tabelle aller Bereiche)
-  2. Vault & Sicherheit (AES-256-GCM, Hot-Reload, Docker vs. Keyring)
-  3. Platzhalter-System ({{NAME}} → INTEG_NAME Erklärung)
-  4. Skill-Signatur-Workflow (Python-Snippet, wann neu signieren)
-  5. Kanäle & Vault-Schlüssel (Token-Namen je Kanal als Tabelle)
-  6. Häufige Fehler & Lösungen (HMAC, CRLF Hook, VT, Cache, Git Push)
-- `pkg/dashboard/dashboard.html`: `tipShow(btn, text)` + `tipHide()` – viewport-bewusstes Tooltip-Positioning
-- `pkg/dashboard/dashboard.html`: `helpToggle(item)` + `helpSearch(query)` – Accordion + Echtzeit-Suche mit data-keywords
-
-**Erledigt Session 8 (Priorität 7 – Ollama Integration):**
-- `pkg/provider/ollama.go`: `OllamaProvider` Struct mit `Complete()`, `Name()`, `PingOllama()`; `OllamaDefaultBaseURL` Konstante
-- `pkg/config/config.go`: Ollama-Modell-Defaults in `Load()` (llama3.2 / llama3.2-vision)
-- `cmd/fluxbot/main.go`: Expliziter `"ollama"` Case im Provider-Switch; OLLAMA_BASE_URL direkt aus Vault; PROVIDER_OLLAMA in extractSecrets/applySecrets; "ollama" in getProviderModels()
-- `pkg/dashboard/dashboard.html`: `#dash-ollama-row` mit Endpoint-URL + Modell-Name; `onDashProviderChange()` blendet Ollama-Row + API-Key-Feld ein/aus; `loadConfig()` liest OLLAMA_BASE_URL aus Vault; `saveConfig()` schreibt OLLAMA_BASE_URL + Modell
-
-**Erledigt Session 9 (Bugfixes aus INBOX):**
-- `README.md`: `ki-werke.de` → `kiwerkepro.com` (alle 2 Vorkommen); Install-URLs auf `fluxbot.kiwerke.com` gesetzt
-- `pkg/agent/agent.go`: `isForgetCommand()` – erweitert um `entferne`, `entfernen`, `delete`, `remove`
-- `pkg/agent/agent.go`: `extractForgetKeyword()` – Präfixe korrekt nach Länge sortiert (längste zuerst), damit „lösche 1" nicht als „e 1" geparst wird; neue Kurzformen `lösche`, `entferne`, `delete`, `remove` ergänzt
-- `pkg/skills/loader.go`: `parseSkillFile()` – strippt äußeren ` ```markdown ``` `-Wrapper vor dem Frontmatter-Parsing; dadurch werden Tags (inkl. „kalender") und Name aus dem Frontmatter korrekt gelesen
-- **Root Cause Kalender:** `calcom-termine.md` war in ` ```markdown ``` ` gewickelt → Frontmatter wurde nie geparst → Tags-Fallback war nur `[calcom, termine]` → Skill matchte nicht auf „Kalender/kalendereinträge" → KI antwortete aus Training heraus negativ. Fix behebt das ohne Skill-Datei anzufassen (Signatur bleibt gültig).
-
-**Erledigt Session 10 (Kalender Hot-Reload-Bug):**
-- **Root Cause:** `CALCOM_BASE_URL` fehlte in `workspace/config.json` → `applySecrets()` holte nur Einträge die bereits in `cfg.Integrations` standen → Platzhalter blieb unersetzt → AI las `{{CALCOM_BASE_URL}}` als Literal und meldete "nicht konfiguriert"
-- **Root Cause 2:** `onReload()` in `main.go` rief nie `skillsLoader.SetIntegrations()` + `Reload()` auf → nach Dashboard-Speichern blieben alte Skills (mit unresolvierten Platzhaltern) aktiv
-- `workspace/config.json`: `CALCOM_BASE_URL` als Integration hinzugefügt (neben `CALCOM_API_KEY`)
-- `pkg/skills/loader.go`: `Reload()` Methode hinzugefügt (setzt `l.skills` zurück + ruft `loadAll()` neu auf)
-- `cmd/fluxbot/main.go`: `onReload()` erweitert – nach Config-Reload werden Integrationen neu gebaut, `skillsLoader.SetIntegrations()` + `skillsLoader.Reload()` aufgerufen
-- `INBOX.md` geleert
-
-**Erledigt Session 11 (Cal.com Skill – Defaults + natürliche Sprache):**
-- `workspace/skills/calcom-termine.md`: Skill komplett überarbeitet – `eventTypeId`, `email`, `name`, `timeZone` werden NIEMALS beim Nutzer erfragt, kommen als Platzhalter-Defaults
-- Neue Platzhalter: `{{CALCOM_EVENT_TYPE_ID}}`, `{{CALCOM_OWNER_EMAIL}}`
-- Tags erweitert: `kalendereintrag`, `appointment` ergänzt
-- `.sig` entfernt (Skill wurde geändert → läuft ohne Signatur mit Log-Warnung bis zur Neusignierung)
-- `workspace/config.json`: `CALCOM_BASE_URL`, `CALCOM_EVENT_TYPE_ID`, `CALCOM_OWNER_EMAIL` als Integrationen ergänzt
-
-**Was JJ noch im Dashboard → Integrationen eintragen muss:**
-- `CALCOM_EVENT_TYPE_ID` = Event Type ID aus cal.com → Event Types (Zahl, z.B. 123456)
-- `CALCOM_OWNER_EMAIL` = eigene E-Mail (z.B. kiwerkepro@gmail.com)
-- Danach: Dashboard → Speichern → Hot-Reload lädt Skill sofort neu (kein Docker-Rebuild nötig)
-
-**Erledigt Session 12 (Dashboard-Fixes aus Fehlerbildern):**
-- `pkg/dashboard/dashboard.html`: Placeholder `sk-…` in generischen Integrationsfeldern → `dein Wert` (weniger verwirrend)
-- `pkg/dashboard/dashboard.html`: Label `Key / Token` → `Wert` (neutraler)
-- `pkg/dashboard/dashboard.html`: `showIntegrationHelp()` – springt jetzt direkt ins Hilfe-Panel + öffnet Platzhalter-Accordion (statt Modal)
-- `pkg/dashboard/dashboard.html`: Hilfe-Panel „Platzhalter-System" komplett neu geschrieben – 5-Schritte-Anleitung + Beispiel-Tabelle mit realen Werten (CALCOM_EVENT_TYPE_ID, CALCOM_OWNER_EMAIL etc.), kein technischer Vault-Schlüssel mehr sichtbar
-
-**Nächster Schritt:**
-1. Im Dashboard → Integrationen: `CALCOM_EVENT_TYPE_ID` und `CALCOM_OWNER_EMAIL` eintragen + speichern
-2. Test: "Essen mit Anita, heute Abend 20:00"
-3. Nach erfolgreichem Test: Skill neu signieren mit `python3 -c "..."` (SKILL_SECRET aus Vault)
-
-**Erledigt Session 13 (Dashboard UX-Überarbeitung aus Fehlerbildern):**
-- `pkg/dashboard/dashboard.html`: Accordion-Bug gefixt – `showIntegrationHelp()` nutzt jetzt `classList.add('open')` statt `style.display='block'` → kein permanentes Offenbleiben mehr
-- `pkg/dashboard/dashboard.html`: Dedizierter **Cal.com-Panel** im Integrationen-Tab (wie VirusTotal-Panel) mit freundlichen deutschen Labels: API-Adresse, API-Key, E-Mail-Adresse, Event Type ID (optional mit Erklärung)
-- `pkg/dashboard/dashboard.html`: `loadConfig()` + `saveConfig()` + `updateCalcomBadge()` für Cal.com-Felder (direkt in Vault: `CALCOM_BASE_URL`, `CALCOM_API_KEY`, `CALCOM_OWNER_EMAIL`, `CALCOM_EVENT_TYPE_ID`)
-- `pkg/dashboard/dashboard.html`: Generische Integrationen-Panel-Beschriftung vereinfacht (kein `{{PLATZHALTER_NAME}}` mehr sichtbar)
-- `pkg/dashboard/dashboard.html`: Hilfe-Panel „Platzhalter-System" → „Weitere Integrationen" umbenannt und komplett neu geschrieben (Cal.com-spezifisches raus, generische Beispiele rein, kein Skill-Suchen nötig)
-- `workspace/skills/calcom-termine.md`: Event Type ID wird automatisch via `GET /event-types` ermittelt wenn nicht konfiguriert – Nutzer muss sie nicht kennen
-- `workspace/config.json`: CALCOM_*-Einträge aus generischen Integrationen entfernt (werden jetzt direkt im Cal.com-Panel gespeichert)
-
-**Erledigt Session 14 (Dashboard-Fixes aus Fehlerbild 20260222_150607):**
-- `pkg/dashboard/dashboard.html`: Globale CSS-Regel `a { color: var(--accent); }` + `a:hover { color: #8bb4f8; }` – alle Links im Dashboard jetzt einheitlich hellblau
-- `pkg/dashboard/dashboard.html`: `input[type="email"]` bekommt explizit `background: var(--input-bg) !important` – kein weißer Browser-Default-Hintergrund mehr beim E-Mail-Feld
-- `pkg/dashboard/dashboard.html`: Cal.eu-Link ergänzt neben Cal.com-Link (API-Key erstellen)
-- `pkg/dashboard/dashboard.html`: Event Type ID ist kein `<input>` mehr, sondern ein nicht-klickbares Info-Display (`cursor:default; user-select:none`) – „✓ Wird automatisch von FluxBot ermittelt"
-- `pkg/dashboard/dashboard.html`: `loadConfig()` + `saveConfig()` – `CALCOM_EVENT_TYPE_ID` vollständig entfernt (kein Vault-Key mehr, keine UI)
-
-**Erledigt Session 15 (Dashboard-Fixes aus Fehlerbildern 154412 + 154655):**
-- `pkg/dashboard/dashboard.html`: Sidebar-Footer `v1.0` → `v1.1.1`
-- `pkg/dashboard/api.go`: `Version: "1.0.0"` → `"1.1.1"`
-- `pkg/dashboard/dashboard.html`: API-Adresse (Cal.com) ist jetzt ein `<select>`-Dropdown – „Cal.com" oder „Cal.eu" wählbar; kein Freitext mehr
-- `pkg/dashboard/dashboard.html`: Platzhalter-Name in „Weitere Integrationen" – Beispiel `CAL_API_KEY` → generisches `MEIN_SERVICE`; Beschreibungs-Label → „Bezeichnung (optional)"; Placeholder → `z.B. Mein Dienst – API Key`
-
-**Erledigt Session 16 (Cal.com Integration Bugfix – 3 Root Causes):**
-
-**Root Cause 1 – applySecrets() ignorierte CALCOM_*:**
-Das Cal.com-Dashboard-Panel (Session 13) speichert Werte im Vault als `CALCOM_BASE_URL`, `CALCOM_API_KEY`, `CALCOM_OWNER_EMAIL` (kein `INTEG_`-Prefix). `applySecrets()` kannte diese Keys nicht → sie landeten NIE in `cfg.Integrations` → Skills Loader substituierte `{{CALCOM_BASE_URL}}` nie.
-
-**Root Cause 2 – Startup: skillsLoader.Reload() fehlte:**
-`NewLoader()` lädt alle Skills mit leeren Integrations (weil `SetIntegrations()` erst danach aufgerufen wird). Ohne `Reload()` nach `SetIntegrations()` bleiben alle `{{PLATZHALTER}}` unsubstituiert bis zum ersten Dashboard-Save. Betrifft ALLE Integrationen, nicht nur Cal.com.
-
-**Root Cause 3 – veraltete .sig blockierte Skill:**
-Skill wurde in Sessions 11+13 geändert, `.sig` war noch die alte. → `verifySkill()` hat Skill als "manipuliert" geblockt → Skill wurde gar nicht geladen.
-
-**Fixes:**
-- `cmd/fluxbot/main.go`: `applySecrets()` – nach `INTEG_*`-Loop: CALCOM_* aus Vault in `cfg.Integrations` injizieren (add/update)
-- `cmd/fluxbot/main.go`: Startup-Pfad – `skillsLoader.Reload()` nach `skillsLoader.SetIntegrations()` ergänzt
-- `workspace/skills/calcom-termine.md.sig` – neu generiert mit aktuellem SKILL_SECRET
-
-**Session 16 – Nächster Schritt (erledigt in Session 17):** Docker-Rebuild + Im Dashboard → Integrationen → Cal.com: Dienst (Cal.com oder Cal.eu) wählen, API-Key + E-Mail eintragen + speichern → Test "Essen mit Anita, heute Abend 20:00"
-
-**Erledigt Session 17 (Google Workspace Integration – Calendar, Docs, Sheets, Drive, Gmail):**
-
-### PRIORITÄT 8 – Google Workspace Integration ✅ ERLEDIGT
-```
-[x] pkg/google/google.go – OAuth2 Client (New, IsConfigured, GetAuthURL, ExchangeCode, getAccessToken, doRequest)
-[x] pkg/google/google.go – Google Calendar (CalendarCreate, CalendarList)
-[x] pkg/google/google.go – Google Docs (DocsCreate, DocsAppend, DocsRead)
-[x] pkg/google/google.go – Google Sheets (SheetsCreate, SheetsRead, SheetsWrite, SheetsAppend)
-[x] pkg/google/google.go – Google Drive (DriveList)
-[x] pkg/google/google.go – Gmail (GmailSend, GmailList)
-[x] pkg/agent/agent.go – googleClient Feld + GoogleClient Config + UpdateGoogleClient() Hot-Reload
-[x] pkg/agent/agent.go – 12 Marker-Handler: __GOOGLE_CAL_CREATE/LIST__, __GOOGLE_DOCS_CREATE/APPEND/READ__, __GOOGLE_SHEETS_CREATE/READ/WRITE__, __GOOGLE_DRIVE_LIST__, __GMAIL_SEND/LIST__
-[x] pkg/agent/agent.go – buildSystemPrompt() erweitert mit Google-Anweisungen (wenn konfiguriert)
-[x] pkg/agent/agent.go – parseGoogleMarker() Hilfsfunktion
-[x] cmd/fluxbot/main.go – buildGoogleClient() aus Vault (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN)
-[x] cmd/fluxbot/main.go – onReload() UpdateGoogleClient()
-[x] pkg/dashboard/api.go – handleGoogleAuthURL() + handleGoogleOAuthCallback() (OAuth2-Code-Exchange → Vault)
-[x] pkg/dashboard/server.go – GET /api/google/auth-url + GET /api/google/oauth-callback Routen
-[x] pkg/dashboard/dashboard.html – Google Workspace Panel (Client ID, Client Secret, Refresh Token, OAuth-Button, Badge)
-[x] pkg/dashboard/dashboard.html – updateGoogleBadge() + googleStartOAuth() JS-Funktionen
-[x] pkg/dashboard/dashboard.html – loadConfig() + saveConfig() für Google-Felder
-[x] workspace/skills/google-calendar.md + .sig – Skills mit Markern
-[x] workspace/skills/google-docs.md + .sig – Skills für Docs, Sheets, Drive
-[x] workspace/skills/gmail.md + .sig – Gmail-Skill
-```
-
-**Vault-Keys Google:**
-```
-GOOGLE_CLIENT_ID       – aus Google Cloud Console → Credentials → OAuth 2.0 Client ID
-GOOGLE_CLIENT_SECRET   – aus Google Cloud Console → Credentials → OAuth 2.0 Client ID
-GOOGLE_REFRESH_TOKEN   – wird automatisch via OAuth-Callback befüllt
-```
-
-**OAuth2-Setup (einmalig):**
-1. Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client ID erstellen (Typ: Web-Anwendung)
-2. Redirect URI: `http://localhost:9090/api/google/oauth-callback`
-3. APIs aktivieren: Calendar API, Docs API, Sheets API, Drive API, Gmail API
-4. Dashboard → Integrationen → Google: Client ID + Secret eintragen → Speichern
-5. „Google-Konto verbinden" klicken → Browser-Fenster öffnet sich → Konto auswählen → Bestätigen
-6. Refresh Token wird automatisch im Vault gespeichert + Hot-Reload
-
-**Marker-Übersicht:**
-- `__GOOGLE_CAL_LIST__` / `__GOOGLE_CAL_CREATE__` + `__GOOGLE_CAL_CREATE_END__`
-- `__GOOGLE_DOCS_CREATE__` + `_END__` / `__GOOGLE_DOCS_APPEND__` + `_END__` / `__GOOGLE_DOCS_READ__` + `_END__`
-- `__GOOGLE_SHEETS_CREATE__` + `_END__` / `__GOOGLE_SHEETS_READ__` + `_END__` / `__GOOGLE_SHEETS_WRITE__` + `_END__`
-- `__GOOGLE_DRIVE_LIST__` + `_END__`
-- `__GMAIL_SEND__` + `_END__` / `__GMAIL_LIST__` + `_END__`
-
-**Nächster Schritt:**
-1. Docker-Rebuild: `docker compose down; docker compose up -d --build`
-2. Dashboard → Integrationen → Google: Client ID + Secret eintragen → Speichern → „Google-Konto verbinden"
-3. Test: „Zeig mir meine Google-Termine" / „Erstelle ein Google Doc: Besprechungsprotokoll"
+**Erledigt in Session 21:**
+- `memory-md/` Ordner erstellt ✅
+- `.gitignore` um `memory-md/` ergänzt ✅
+- CLAUDE.md in 4 thematische Dateien aufgeteilt ✅

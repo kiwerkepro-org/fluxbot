@@ -113,13 +113,15 @@ func runBot(ctx context.Context, configPath string) {
 		}
 	}
 
-	// ── Vault initialisieren (AES-256-GCM Secret-Speicher) ───────────────────
-	vault, err := security.NewVaultProvider(cfg.Workspace.Path)
+	// ── Secret-Provider initialisieren (Keyring → Vault → Fallback) ─────────
+	// Lokal (Windows/macOS): ChainedProvider(KeyringProvider, VaultProvider)
+	// Docker (Linux):        VaultProvider (AES-256-GCM Datei)
+	vault, err := security.NewSecretProvider(cfg.Workspace.Path)
 	if err != nil {
-		log.Fatalf("[Main] Vault konnte nicht initialisiert werden: %v", err)
+		log.Fatalf("[Main] Secret-Provider konnte nicht initialisiert werden: %v", err)
 	}
 
-	// ── Einmalige Migration: Secrets aus config.json → Vault ─────────────────
+	// ── Einmalige Migration: Secrets aus config.json → primären Provider ─────
 	configSecrets := extractSecrets(cfg)
 	if migrated, err := vault.MigrateFromConfig(configSecrets); err != nil {
 		log.Printf("[Main] Vault-Migration fehlgeschlagen: %v", err)
@@ -315,8 +317,17 @@ func runBot(ctx context.Context, configPath string) {
 		logPath := filepath.Join(cfg.Workspace.Path, "logs", "fluxbot.log")
 		var dash *dashboard.Server
 
-		// HMAC-Secret für Dashboard-API-Request-Signierung (aus Umgebungsvariable)
-		dashHMACSecret := os.Getenv("FLUXBOT_HMAC_SECRET")
+		// HMAC-Secret Ladereihenfolge:
+		//  1. Secret-Provider (Keyring / Vault) – Schlüssel: "HMAC_SECRET"
+		//  2. Umgebungsvariable FLUXBOT_HMAC_SECRET (CI/CD Fallback)
+		dashHMACSecret := ""
+		if v, err := vault.Get("HMAC_SECRET"); err == nil && v != "" {
+			dashHMACSecret = v
+			log.Printf("[Security] ✅ HMAC_SECRET aus %s geladen.", vault.Backend())
+		} else if envSecret := os.Getenv("FLUXBOT_HMAC_SECRET"); envSecret != "" {
+			dashHMACSecret = envSecret
+			log.Println("[Security] ✅ HMAC_SECRET aus Umgebungsvariable geladen.")
+		}
 
 		onReload := func() {
 			newCfg, err := config.Load(configPath)
@@ -342,9 +353,11 @@ func runBot(ctx context.Context, configPath string) {
 				if pass, err := vault.Get("DASHBOARD_PASSWORD"); err == nil && pass != "" {
 					dash.UpdatePassword(pass)
 				}
-				// HMAC-Secret bei Hot-Reload aktualisieren (falls Env-Variable geändert)
-				if newSecret := os.Getenv("FLUXBOT_HMAC_SECRET"); newSecret != "" {
-					dash.UpdateHMACSecret(newSecret)
+				// HMAC-Secret bei Hot-Reload: Provider (Vault/Keyring) hat Vorrang vor Env
+				if newHMAC, err := vault.Get("HMAC_SECRET"); err == nil && newHMAC != "" {
+					dash.UpdateHMACSecret(newHMAC)
+				} else if envHMAC := os.Getenv("FLUXBOT_HMAC_SECRET"); envHMAC != "" {
+					dash.UpdateHMACSecret(envHMAC)
 				}
 			}
 
@@ -446,9 +459,9 @@ func extractSecrets(cfg *config.Config) map[string]string {
 	return m
 }
 
-// applySecrets füllt sensitive Config-Felder aus dem Vault.
-// Vault-Werte überschreiben config.json-Werte (Vault hat Priorität).
-func applySecrets(cfg *config.Config, vault *security.VaultProvider) {
+// applySecrets füllt sensitive Config-Felder aus dem Secret-Provider.
+// Provider-Werte (Keyring / Vault) überschreiben config.json-Werte.
+func applySecrets(cfg *config.Config, vault security.SecretProvider) {
 	all, err := vault.GetAll()
 	if err != nil || len(all) == 0 {
 		return
@@ -762,16 +775,13 @@ func loadSoul(workspacePath string) string {
 }
 
 func init() {
-	hmacSecret := os.Getenv("FLUXBOT_HMAC_SECRET")
-	if hmacSecret == "" {
-		log.Println("[Security] HINWEIS: FLUXBOT_HMAC_SECRET nicht gesetzt – Dashboard-API läuft ohne Request-Signierung.")
-	} else {
-		log.Printf("[Security] ✅ FLUXBOT_HMAC_SECRET geladen (%d Zeichen) – Dashboard-API-Requests werden signiert.", len(hmacSecret))
-	}
+	// HMAC-Secret-Prüfung erfolgt jetzt in runBot() nach Provider-Initialisierung.
+	// Die Umgebungsvariable FLUXBOT_HMAC_SECRET dient nur noch als Fallback (CI/CD).
+	// Primärquelle: Secret-Provider (Vault-Key "HMAC_SECRET") → sicherer als Env-Variable.
 }
 
-// buildGoogleClient erstellt einen Google API-Client aus Vault-Secrets.
-func buildGoogleClient(cfg *config.Config, vault *security.VaultProvider) *googleapi.Client {
+// buildGoogleClient erstellt einen Google API-Client aus dem Secret-Provider.
+func buildGoogleClient(cfg *config.Config, vault security.SecretProvider) *googleapi.Client {
 	clientID, _ := vault.Get("GOOGLE_CLIENT_ID")
 	clientSecret, _ := vault.Get("GOOGLE_CLIENT_SECRET")
 	refreshToken, _ := vault.Get("GOOGLE_REFRESH_TOKEN")

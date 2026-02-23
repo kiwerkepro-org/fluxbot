@@ -37,7 +37,7 @@ type Server struct {
 	startTime     time.Time
 	getChannels   func() []string         // Callback: liefert aktive Kanäle zur Laufzeit
 	logPath       string                  // Pfad zur Terminal-Log-Datei (fluxbot.log)
-	vault         *security.VaultProvider // Secret-Speicher (AES-256-GCM)
+	vault         security.SecretProvider  // Secret-Speicher (Keyring / Vault / Chained)
 	onReload      func()                  // Callback: wird nach Config-Änderung aufgerufen
 }
 
@@ -46,7 +46,7 @@ type Server struct {
 // vault: Secret-Speicher für API-Keys und Passwörter (AES-256-GCM).
 // onReload: wird nach jeder Config- oder Secret-Änderung aufgerufen.
 // hmacSecret: HMAC-Schlüssel für Dashboard-API-Request-Signierung (leer = deaktiviert).
-func New(configPath, workspacePath, password string, port int, getChannels func() []string, logPath string, vault *security.VaultProvider, onReload func(), hmacSecret string) *Server {
+func New(configPath, workspacePath, password string, port int, getChannels func() []string, logPath string, vault security.SecretProvider, onReload func(), hmacSecret string) *Server {
 	return &Server{
 		configPath:    configPath,
 		workspacePath: workspacePath,
@@ -91,6 +91,7 @@ func (s *Server) Start(ctx context.Context) {
 
 	// ── API-Endpunkte (lesend – kein HMAC erforderlich) ─────────────────────
 	mux.HandleFunc("/api/status", s.auth(s.handleStatus))
+	mux.HandleFunc("/api/secrets/backend", s.auth(s.handleSecretBackend))
 	mux.HandleFunc("/api/logs", s.auth(s.handleLogs))
 	mux.HandleFunc("/api/logs/terminal", s.auth(s.handleTerminalLogs))
 	mux.HandleFunc("/api/hmac-token", s.auth(s.handleHMACToken))
