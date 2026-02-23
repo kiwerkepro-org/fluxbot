@@ -230,6 +230,27 @@
   .vt-type-file { color: var(--yellow); font-size: 13px; }
   .vt-type-url  { color: var(--accent); font-size: 13px; }
   .vt-empty { text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px; }
+
+  /* ── Kanäle Accordion ── */
+  .ch-acc { border:1px solid var(--border); border-radius:10px; margin-bottom:10px; background:var(--card); }
+  .ch-acc-header { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; gap:16px; }
+  .ch-acc-left { flex:1; }
+  .ch-acc-name { font-size:15px; font-weight:600; color:var(--text); display:flex; align-items:center; gap:4px; }
+  .ch-acc-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+  .ch-acc-right { display:flex; align-items:center; gap:14px; flex-shrink:0; }
+  .ch-acc-help { font-size:12px; color:var(--muted); max-width:260px; text-align:right; line-height:1.5; }
+  .ch-acc-body { padding:16px 18px 18px; border-top:1px solid var(--border); background:rgba(255,255,255,0.018); }
+
+  /* ── Danger Zone Tabs ── */
+  .dtab-bar { display:flex; gap:4px; margin-bottom:20px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+  .dtab-btn { padding:8px 14px; font-size:13px; cursor:pointer; color:var(--muted); background:none; border:none; border-bottom:2px solid transparent; transition:all 0.15s; white-space:nowrap; }
+  .dtab-btn.active { color:var(--red); border-bottom-color:var(--red); }
+  .dtab-content { display:none; }
+  .dtab-content.active { display:block; }
+
+  /* ── Google Services Grid ── */
+  .gsvc-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .gsvc-item { }
 </style>
 </head>
 <body>
@@ -248,21 +269,17 @@
     <span class="nav-icon">⚙️</span> Konfiguration
     <button class="info-btn" onmouseenter="tipShow(this,'API-Keys, Kanäle, AI-Provider, Bild-/Videogenerierung, Voice und Integrationen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
-  <div class="nav-item" onclick="showSection('soul', this)">
-    <span class="nav-icon">🎭</span> Persönlichkeit
-    <button class="info-btn" onmouseenter="tipShow(this,'Definiert wie FluxBot antwortet. Änderungen erfordern einen Neustart.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
-  </div>
-  <div class="nav-item" onclick="showSection('logs', this)">
-    <span class="nav-icon">📋</span> Logs
-    <button class="info-btn" onmouseenter="tipShow(this,'Terminal-Ausgabe und Audit-Logs. Audit-Logs enthalten alle Benutzer-Interaktionen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  <div class="nav-item" onclick="showSection('virustotal', this)">
+    <span class="nav-icon">🛡️</span> VirusTotal
+    <button class="info-btn" onmouseenter="tipShow(this,'Malware-Scan-History und Statistiken. Erfordert API-Key in Danger Zone.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('system', this)">
     <span class="nav-icon">🔧</span> System
     <button class="info-btn" onmouseenter="tipShow(this,'Befehle für Neustart und Neu-Bauen – angepasst an dein Betriebssystem.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
-  <div class="nav-item" onclick="showSection('virustotal', this)">
-    <span class="nav-icon">🛡️</span> VirusTotal
-    <button class="info-btn" onmouseenter="tipShow(this,'Malware-Scan-History und Statistiken. Erfordert API-Key unter Integrationen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  <div class="nav-item" onclick="showSection('danger', this)">
+    <span class="nav-icon">🔥</span> Danger Zone
+    <button class="info-btn" onmouseenter="tipShow(this,'Sicherheits-Schlüssel, Persönlichkeit und direkte Konfiguration.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('help', this)">
     <span class="nav-icon">❓</span> Hilfe
@@ -295,7 +312,30 @@
       <div class="panel-title">📡 Verbundene Kanäle</div>
       <div class="channel-list" id="status-channels">Lädt...</div>
     </div>
+    <div class="panel">
+      <div class="panel-title">🔐 Secret-Backend</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px">
+        <span id="secret-backend-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(91,141,238,0.12);color:var(--accent);border:1px solid rgba(91,141,238,0.3)">⏳ Laden…</span>
+        <span id="secret-backend-mode" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6">
+        Secrets (API-Keys, Tokens) werden im aktiven Backend sicher gespeichert.<br>
+        <strong>Windows Credential Manager</strong> = lokal, OS-nativ, kein Klartext.<br>
+        <strong>AES-256-GCM Vault</strong> = verschlüsselte Datei (primär im Docker-Betrieb).
+      </p>
+    </div>
     <button class="btn btn-secondary" onclick="loadStatus()">🔄 Aktualisieren</button>
+
+    <div id="status-vt-warning" class="warn-banner" style="display:none">
+      <span class="warn-icon">⚠️</span>
+      <div>
+        <strong>VirusTotal nicht aktiv</strong>
+        Dateien und Links werden ungeprüft weitergeleitet.
+        <br><a href="#" onclick="event.preventDefault();showSection('danger',document.querySelector('[onclick*=danger]'));showDangerTab('keys',null);" style="color:var(--accent);font-size:12px">
+          → API-Key in Danger Zone → Sicherheits-Keys eintragen
+        </a>
+      </div>
+    </div>
   </div>
 
   <!-- CONFIG -->
@@ -309,8 +349,8 @@
       <button class="tab-btn" onclick="showTab('imagegen', this)">🎨 Bilder</button>
       <button class="tab-btn" onclick="showTab('videogen', this)">🎬 Videos</button>
       <button class="tab-btn" onclick="showTab('voice', this)">🎙️ Voice</button>
+      <button class="tab-btn" onclick="showTab('google', this)">🔵 Google</button>
       <button class="tab-btn" onclick="showTab('integrations', this)">🔌 Integrationen</button>
-      <button class="tab-btn" onclick="showTab('raw', this)">📄 JSON</button>
     </div>
 
     <!-- ── Kanäle ── -->
@@ -318,65 +358,116 @@
       <div class="panel">
         <div class="panel-title">📱 Kommunikationskanäle</div>
 
-        <div class="toggle-row">
-          <div><div class="toggle-label">Telegram</div><div class="toggle-sub">Long-Polling, kein Webhook nötig</div></div>
-          <label class="toggle"><input type="checkbox" id="tg-enabled"><span class="toggle-slider"></span></label>
-        </div>
-        <div style="margin-top:12px">
-          <div class="field"><label>Telegram Bot Token</label>
-            <div class="input-wrap"><input type="password" id="tg-token" placeholder="1234567890:ABCdef..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+        <!-- Telegram Accordion -->
+        <div class="ch-acc">
+          <div class="ch-acc-header">
+            <div class="ch-acc-left">
+              <span class="ch-acc-name">Telegram <button class="info-btn" onmouseenter="tipShow(this,'Long-Polling, kein Webhook nötig')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></span>
+              <div class="ch-acc-sub">Long-Polling, kein Webhook nötig</div>
+            </div>
+            <div class="ch-acc-right">
+              <span class="ch-acc-help">Bot via @BotFather erstellen. Token hat Format 123456:ABCdef...</span>
+              <label class="toggle"><input type="checkbox" id="tg-enabled" onchange="toggleChannel('tg',this)"><span class="toggle-slider"></span></label>
+            </div>
           </div>
-          <div class="field"><label>Erlaubte User-IDs (kommagetrennt)</label>
-            <div class="input-wrap"><input type="password" id="tg-allowfrom" placeholder="123456789, 987654321" autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-        </div>
-
-        <div class="toggle-row" style="margin-top:8px">
-          <div><div class="toggle-label">Discord</div><div class="toggle-sub">Gateway WebSocket</div></div>
-          <label class="toggle"><input type="checkbox" id="dc-enabled"><span class="toggle-slider"></span></label>
-        </div>
-        <div style="margin-top:12px">
-          <div class="field"><label>Discord Bot Token</label>
-            <div class="input-wrap"><input type="password" id="dc-token" placeholder="MTxxxxxx..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-        </div>
-
-        <div class="toggle-row" style="margin-top:8px">
-          <div><div class="toggle-label">Slack</div><div class="toggle-sub">Events API (Webhook)</div></div>
-          <label class="toggle"><input type="checkbox" id="slack-enabled"><span class="toggle-slider"></span></label>
-        </div>
-        <div class="two-col" style="margin-top:12px">
-          <div class="field"><label>Bot Token</label>
-            <div class="input-wrap"><input type="password" id="slack-bot-token" placeholder="xoxb-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
-          </div>
-          <div class="field"><label>Signing Secret</label>
-            <div class="input-wrap"><input type="password" id="slack-signing" placeholder="abc123..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          <div class="ch-acc-body" id="ch-body-tg" style="display:none">
+            <div class="field"><label>Telegram Bot Token</label>
+              <div class="input-wrap"><input type="password" id="tg-token" placeholder="1234567890:ABCdef..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Erlaubte User-IDs (kommagetrennt)</label>
+              <div class="input-wrap"><input type="password" id="tg-allowfrom" placeholder="123456789, 987654321" autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
           </div>
         </div>
 
-        <div class="toggle-row" style="margin-top:8px">
-          <div><div class="toggle-label">Matrix</div><div class="toggle-sub">HTTP Long-Polling</div></div>
-          <label class="toggle"><input type="checkbox" id="matrix-enabled"><span class="toggle-slider"></span></label>
-        </div>
-        <div class="two-col" style="margin-top:12px">
-          <div class="field"><label>Homeserver</label>
-            <input type="text" id="matrix-homeserver" placeholder="https://matrix.org">
+        <!-- Discord Accordion -->
+        <div class="ch-acc">
+          <div class="ch-acc-header">
+            <div class="ch-acc-left">
+              <span class="ch-acc-name">Discord <button class="info-btn" onmouseenter="tipShow(this,'Gateway WebSocket')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></span>
+              <div class="ch-acc-sub">Gateway WebSocket</div>
+            </div>
+            <div class="ch-acc-right">
+              <span class="ch-acc-help">Bot unter discord.com/developers anlegen → Bot → Token kopieren.</span>
+              <label class="toggle"><input type="checkbox" id="dc-enabled" onchange="toggleChannel('dc',this)"><span class="toggle-slider"></span></label>
+            </div>
           </div>
-          <div class="field"><label>Access Token</label>
-            <div class="input-wrap"><input type="password" id="matrix-token" placeholder="syt_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          <div class="ch-acc-body" id="ch-body-dc" style="display:none">
+            <div class="field"><label>Discord Bot Token</label>
+              <div class="input-wrap"><input type="password" id="dc-token" placeholder="MTxxxxxx..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
           </div>
         </div>
 
-        <div class="toggle-row" style="margin-top:8px">
-          <div><div class="toggle-label">WhatsApp</div><div class="toggle-sub">Meta Business Cloud API</div></div>
-          <label class="toggle"><input type="checkbox" id="wa-enabled"><span class="toggle-slider"></span></label>
-        </div>
-        <div class="two-col" style="margin-top:12px">
-          <div class="field"><label>Phone Number ID</label>
-            <input type="text" id="wa-phoneid" placeholder="1234567890">
+        <!-- Slack Accordion -->
+        <div class="ch-acc">
+          <div class="ch-acc-header">
+            <div class="ch-acc-left">
+              <span class="ch-acc-name">Slack <button class="info-btn" onmouseenter="tipShow(this,'Events API (Webhook)')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></span>
+              <div class="ch-acc-sub">Events API (Webhook)</div>
+            </div>
+            <div class="ch-acc-right">
+              <span class="ch-acc-help">Slack App anlegen → Bot Token (xoxb-) + Signing Secret aus Basic Information.</span>
+              <label class="toggle"><input type="checkbox" id="slack-enabled" onchange="toggleChannel('slack',this)"><span class="toggle-slider"></span></label>
+            </div>
           </div>
-          <div class="field"><label>Access Token</label>
-            <div class="input-wrap"><input type="password" id="wa-token" placeholder="EAA..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          <div class="ch-acc-body" id="ch-body-slack" style="display:none">
+            <div class="two-col">
+              <div class="field"><label>Bot Token</label>
+                <div class="input-wrap"><input type="password" id="slack-bot-token" placeholder="xoxb-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+              </div>
+              <div class="field"><label>Signing Secret</label>
+                <div class="input-wrap"><input type="password" id="slack-signing" placeholder="abc123..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Matrix Accordion -->
+        <div class="ch-acc">
+          <div class="ch-acc-header">
+            <div class="ch-acc-left">
+              <span class="ch-acc-name">Matrix <button class="info-btn" onmouseenter="tipShow(this,'HTTP Long-Polling')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></span>
+              <div class="ch-acc-sub">HTTP Long-Polling</div>
+            </div>
+            <div class="ch-acc-right">
+              <span class="ch-acc-help">Access Token aus Element → Einstellungen → Hilfe & Über → Zugangsdaten.</span>
+              <label class="toggle"><input type="checkbox" id="matrix-enabled" onchange="toggleChannel('matrix',this)"><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+          <div class="ch-acc-body" id="ch-body-matrix" style="display:none">
+            <div class="two-col">
+              <div class="field"><label>Homeserver</label>
+                <input type="text" id="matrix-homeserver" placeholder="https://matrix.org">
+              </div>
+              <div class="field"><label>Access Token</label>
+                <div class="input-wrap"><input type="password" id="matrix-token" placeholder="syt_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WhatsApp Accordion -->
+        <div class="ch-acc">
+          <div class="ch-acc-header">
+            <div class="ch-acc-left">
+              <span class="ch-acc-name">WhatsApp <button class="info-btn" onmouseenter="tipShow(this,'Meta Business Cloud API')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></span>
+              <div class="ch-acc-sub">Meta Business Cloud API</div>
+            </div>
+            <div class="ch-acc-right">
+              <span class="ch-acc-help">Meta for Developers → WhatsApp Business API → Phone Number ID + Token.</span>
+              <label class="toggle"><input type="checkbox" id="wa-enabled" onchange="toggleChannel('wa',this)"><span class="toggle-slider"></span></label>
+            </div>
+          </div>
+          <div class="ch-acc-body" id="ch-body-wa" style="display:none">
+            <div class="two-col">
+              <div class="field"><label>Phone Number ID</label>
+                <input type="text" id="wa-phoneid" placeholder="1234567890">
+              </div>
+              <div class="field"><label>Access Token</label>
+                <div class="input-wrap"><input type="password" id="wa-token" placeholder="EAA..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -706,6 +797,118 @@
       </div>
     </div>
 
+    <!-- ── Google Workspace (Neu) ── -->
+    <div class="tab-content" id="tab-google">
+      <div class="tile-layout">
+        <div style="display:flex;flex-direction:column;gap:20px">
+
+          <!-- Panel 1: OAuth2 -->
+          <div class="panel" style="margin-bottom:0">
+            <div class="panel-title">🔵 Google OAuth2 (Master-Zugangsdaten)</div>
+            <div style="background:rgba(91,141,238,0.07);border:1px solid rgba(91,141,238,0.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.7">
+              FluxBot benötigt ein <strong>Google OAuth2 App-Zugangsdaten</strong> (Client ID + Client Secret) sowie einen <strong>Refresh Token</strong> für deinen Account.<br>
+              <strong>Einmalige Einrichtung:</strong>
+              <ol style="margin:8px 0 0 16px;padding:0">
+                <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console → Credentials → OAuth 2.0 Client ID</a> erstellen (Typ: Web-Anwendung)</li>
+                <li>Redirect URI hinzufügen: <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px">http://localhost:9090/api/google/oauth-callback</code></li>
+                <li>APIs aktivieren: Calendar, Docs, Sheets, Drive, Gmail</li>
+                <li>Client ID + Secret unten eintragen → <strong>Speichern</strong> → dann <strong>„Google-Konto verbinden"</strong></li>
+              </ol>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+              <div class="field"><label>Google Client ID</label>
+                <input id="google-client-id" type="text" placeholder="...apps.googleusercontent.com" autocomplete="off">
+              </div>
+              <div class="field"><label>Google Client Secret</label>
+                <div class="input-wrap">
+                  <input id="google-client-secret" type="password" placeholder="GOCSPX-..." autocomplete="new-password">
+                  <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+                </div>
+              </div>
+            </div>
+            <div style="margin-bottom:12px">
+              <label>Refresh Token <span style="font-weight:400;color:var(--muted)">(wird automatisch befüllt nach Autorisierung)</span></label>
+              <div class="input-wrap">
+                <input id="google-refresh-token" type="password" placeholder="1//..." autocomplete="new-password">
+                <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-secondary" onclick="googleStartOAuth()" id="google-oauth-btn">🔗 Google-Konto verbinden</button>
+              <span id="google-oauth-status" style="font-size:13px;color:var(--muted);align-self:center"></span>
+            </div>
+          </div>
+
+          <!-- Panel 2: Dienste aktivieren -->
+          <div class="panel" style="margin-bottom:0">
+            <div class="panel-title">🔧 Dienste aktivieren</div>
+            <div class="gsvc-grid">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+                <label style="font-size:13px;color:var(--text)">Gmail</label>
+                <label class="toggle"><input type="checkbox" id="gsvc-gmail"><span class="toggle-slider"></span></label>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+                <label style="font-size:13px;color:var(--text)">Google Kalender</label>
+                <label class="toggle"><input type="checkbox" id="gsvc-calendar"><span class="toggle-slider"></span></label>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+                <label style="font-size:13px;color:var(--text)">Google Docs</label>
+                <label class="toggle"><input type="checkbox" id="gsvc-docs"><span class="toggle-slider"></span></label>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+                <label style="font-size:13px;color:var(--text)">Google Sheets</label>
+                <label class="toggle"><input type="checkbox" id="gsvc-sheets"><span class="toggle-slider"></span></label>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+                <label style="font-size:13px;color:var(--text)">Google Slides</label>
+                <label class="toggle"><input type="checkbox" id="gsvc-slides"><span class="toggle-slider"></span></label>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+                <label style="font-size:13px;color:var(--text)">Formulare</label>
+                <label class="toggle"><input type="checkbox" id="gsvc-forms"><span class="toggle-slider"></span></label>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
+                <label style="font-size:13px;color:var(--text)">Google Drive</label>
+                <label class="toggle"><input type="checkbox" id="gsvc-drive"><span class="toggle-slider"></span></label>
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0">
+                <label style="font-size:13px;color:var(--text)">YouTube API</label>
+                <label class="toggle"><input type="checkbox" id="gsvc-youtube" onchange="updateYoutubeKeyRow()"><span class="toggle-slider"></span></label>
+              </div>
+            </div>
+            <div id="youtube-key-row" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+              <div class="field">
+                <label>YouTube API Key</label>
+                <div class="input-wrap">
+                  <input id="youtube-apikey" type="password" placeholder="AIza..." autocomplete="off">
+                  <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Info-Card rechts -->
+        <div>
+          <div class="info-card">
+            <h4>🔵 Google Cloud Console</h4>
+            <p>Schritt-für-Schritt Anleitung zur Einrichtung von Google OAuth2:</p>
+            <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="info-link">→ Google Cloud Console öffnen</a>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Erforderliche APIs</h4>
+            <div class="other-list">
+              <div>📧 <strong>Gmail API</strong> – E-Mail versenden</div>
+              <div>📅 <strong>Calendar API</strong> – Termine erstellen</div>
+              <div>📄 <strong>Docs API</strong> – Dokumente bearbeiten</div>
+              <div>📊 <strong>Sheets API</strong> – Tabellen bearbeiten</div>
+              <div>💾 <strong>Drive API</strong> – Dateien verwalten</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Integrationen ── -->
     <div class="tab-content" id="tab-integrations">
       <div class="tile-layout">
@@ -763,33 +966,6 @@
             </div>
           </div>
 
-          <!-- VirusTotal Panel -->
-          <div class="panel" style="margin-bottom:0" id="vt-integ-panel">
-            <div class="panel-title" style="justify-content:space-between">
-              <span>🛡️ VirusTotal – Malware-Schutz</span>
-              <span id="vt-integ-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Inaktiv</span>
-            </div>
-
-            <!-- Wichtigkeits-Banner -->
-            <div style="background:rgba(226,93,93,0.07);border:1px solid rgba(226,93,93,0.25);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.6;color:#f08080">
-              <strong style="color:var(--red);display:block;margin-bottom:4px">🔒 Erforderlich für sicheren Bot-Betrieb</strong>
-              VirusTotal scannt alle eingehenden Dateien und Links auf Malware – auf allen Kanälen gleichzeitig (Telegram, Discord, Slack, Matrix, WhatsApp).<br>
-              <span style="color:var(--muted);font-size:12px;margin-top:4px;display:inline-block">Ohne API-Key bleibt der Scan deaktiviert – Dateien werden dann ungeprüft weitergeleitet.</span>
-            </div>
-
-            <div class="field">
-              <label>VIRUSTOTAL_API_KEY</label>
-              <div class="input-wrap">
-                <input id="vt-apikey" type="password" placeholder="Dein VirusTotal API-Key…" autocomplete="off">
-                <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
-              </div>
-            </div>
-            <div style="font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:12px;line-height:1.6">
-              Kostenloser API-Key (500 Scans/Tag) verfügbar auf:
-              <a href="https://www.virustotal.com/gui/join-us" target="_blank" style="color:var(--accent)">virustotal.com/gui/join-us</a>
-            </div>
-          </div>
-
           <!-- Cal.com Panel -->
           <div class="panel" style="margin-bottom:0" id="calcom-integ-panel">
             <div class="panel-title" style="justify-content:space-between">
@@ -828,48 +1004,6 @@
               <div style="font-size:11px;color:var(--muted);margin-top:4px">
                 Leer lassen = FluxBot ermittelt automatisch. Falls das nicht klappt: Cal.com öffnen → Event Types → die Zahl aus der URL kopieren (z.B. <code style="background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px">/event-types/<strong>123456</strong></code>).
               </div>
-            </div>
-          </div>
-
-          <!-- Google Workspace Panel -->
-          <div class="panel" style="margin-bottom:0" id="google-integ-panel">
-            <div class="panel-title" style="display:flex;align-items:center;gap:10px">
-              <span>🔵 Google Workspace – Calendar, Docs, Sheets, Drive, Gmail</span>
-              <span id="google-integ-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Nicht konfiguriert</span>
-            </div>
-            <div style="background:rgba(91,141,238,0.07);border:1px solid rgba(91,141,238,0.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.7">
-              FluxBot benötigt ein <strong>Google OAuth2 App-Zugangsdaten</strong> (Client ID + Client Secret) sowie einen <strong>Refresh Token</strong> für deinen Account.<br>
-              <strong>Einmalige Einrichtung:</strong>
-              <ol style="margin:8px 0 0 16px;padding:0">
-                <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console → Credentials → OAuth 2.0 Client ID</a> erstellen (Typ: Web-Anwendung)</li>
-                <li>Redirect URI hinzufügen: <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px">http://localhost:9090/api/google/oauth-callback</code></li>
-                <li>APIs aktivieren: Calendar, Docs, Sheets, Drive, Gmail</li>
-                <li>Client ID + Secret unten eintragen → <strong>Speichern</strong> → dann <strong>„Google-Konto verbinden"</strong></li>
-              </ol>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-              <div>
-                <label>Google Client ID</label>
-                <input id="google-client-id" type="text" placeholder="...apps.googleusercontent.com" autocomplete="off">
-              </div>
-              <div>
-                <label>Google Client Secret</label>
-                <div class="password-wrap">
-                  <input id="google-client-secret" type="password" placeholder="GOCSPX-..." autocomplete="new-password">
-                  <button class="eye-btn" onclick="togglePassword('google-client-secret',this)">👁</button>
-                </div>
-              </div>
-            </div>
-            <div style="margin-bottom:12px">
-              <label>Refresh Token <span style="font-weight:400;color:var(--muted)">(wird automatisch befüllt nach Autorisierung)</span></label>
-              <div class="password-wrap">
-                <input id="google-refresh-token" type="password" placeholder="1//..." autocomplete="new-password">
-                <button class="eye-btn" onclick="togglePassword('google-refresh-token',this)">👁</button>
-              </div>
-            </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button class="btn btn-secondary" onclick="googleStartOAuth()" id="google-oauth-btn">🔗 Google-Konto verbinden</button>
-              <span id="google-oauth-status" style="font-size:13px;color:var(--muted);align-self:center"></span>
             </div>
           </div>
 
@@ -918,12 +1052,6 @@
               </div>
             </div>
             <hr class="divider">
-            <h4>🛡️ VirusTotal (kostenlos)</h4>
-            <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px">
-              Der kostenlose Plan bietet <strong style="color:var(--text)">500 API-Anfragen/Tag</strong> – mehr als ausreichend für die meisten Bot-Installationen.
-            </p>
-            <a href="https://www.virustotal.com/gui/join-us" target="_blank" class="info-link">🔑 Kostenlosen API-Key holen</a>
-            <hr class="divider">
             <h4>🔌 Weitere API-Keys</h4>
             <div class="other-list">
               <div>📅 <strong>Cal.com</strong> – Terminbuchungen</div>
@@ -936,31 +1064,6 @@
       </div>
     </div>
 
-    <!-- ── JSON (gesperrt + Blur) ── -->
-    <div class="tab-content" id="tab-raw">
-      <div class="warn-banner">
-        <span class="warn-icon">⚠️</span>
-        <div>
-          <strong>Direkter JSON-Zugriff – nur für Experten!</strong>
-          Syntaxfehler können FluxBot unbrauchbar machen. Erstelle vor Änderungen immer eine Sicherungskopie.
-        </div>
-      </div>
-      <div class="panel">
-        <div class="panel-title">📄 config.json (direkter Zugriff)</div>
-        <div class="blur-wrap" id="json-wrap">
-          <div class="blur-overlay" id="json-overlay" onclick="requestEdit('json')">
-            <div class="blur-hint">
-              <span class="lock-icon">🔒</span>
-              <strong>Zum Bearbeiten klicken</strong>
-              <p>Direkter Zugriff auf die Konfigurationsdatei</p>
-              <span class="click-btn">Entsperren &amp; Bearbeiten</span>
-            </div>
-          </div>
-          <textarea class="config-editor blurred" id="raw-config" spellcheck="false"></textarea>
-        </div>
-      </div>
-    </div>
-
     <div id="config-notice" style="display:none;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:10px;background:rgba(62,207,142,0.12);border:1px solid rgba(62,207,142,0.35);color:var(--green)">
       ✅ Konfiguration gespeichert – Hot-Reload aktiv, keine weiteren Schritte nötig.
     </div>
@@ -968,53 +1071,6 @@
       <button class="btn btn-primary" onclick="saveConfig()">💾 Speichern</button>
       <button class="btn btn-secondary" onclick="loadConfig()">↺ Verwerfen</button>
     </div>
-  </div>
-
-  <!-- SOUL (gesperrt + Blur) -->
-  <div class="section" id="section-soul">
-    <h2>Persönlichkeit</h2>
-    <p class="subtitle">Fluxys Charakter und Verhalten bearbeiten (SOUL.md)</p>
-    <div class="warn-banner">
-      <span class="warn-icon">⚠️</span>
-      <div>
-        <strong>Persönlichkeit bearbeiten – mit Bedacht!</strong>
-        Diese Datei definiert, wie FluxBot sich in ALLEN Gesprächen verhält. Änderungen sind sofort nach dem nächsten Neustart aktiv.
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-title">🎭 SOUL.md – Persönlichkeit von FluxBot</div>
-      <div class="blur-wrap" id="soul-wrap">
-        <div class="blur-overlay" id="soul-overlay" onclick="requestEdit('soul')">
-          <div class="blur-hint">
-            <span class="lock-icon">🎭</span>
-            <strong>Zum Bearbeiten klicken</strong>
-            <p>Persönlichkeit von FluxBot – beeinflusst alle Gespräche</p>
-            <span class="click-btn">Entsperren &amp; Bearbeiten</span>
-          </div>
-        </div>
-        <textarea class="soul-editor blurred" id="soul-content" spellcheck="false" placeholder="Du bist Fluxy, der KI-Assistent von KI-WERKE...&#10;&#10;Schreibe hier Fluxys Persönlichkeit in natürlicher Sprache."></textarea>
-      </div>
-    </div>
-    <div class="notice" id="soul-notice">
-      ⚠️ Gespeichert – FluxBot muss neu gestartet werden damit die neue Persönlichkeit aktiv wird.
-    </div>
-    <div class="actions">
-      <button class="btn btn-primary" onclick="saveSoul()">💾 Speichern</button>
-      <button class="btn btn-secondary" onclick="loadSoul()">↺ Verwerfen</button>
-    </div>
-  </div>
-
-  <!-- LOGS -->
-  <div class="section" id="section-logs">
-    <h2>Logs</h2>
-    <p class="subtitle">Terminal-Ausgabe und Audit-Protokoll</p>
-    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
-      <button class="tab-btn active" id="log-tab-terminal" onclick="switchLogTab('terminal')">🖥️ Terminal</button>
-      <button class="tab-btn" id="log-tab-audit" onclick="switchLogTab('audit')">📋 Audit-Log</button>
-      <button class="btn btn-secondary" style="margin-left:auto" onclick="loadCurrentLogs()">🔄 Aktualisieren</button>
-      <span class="log-filename" id="log-filename" style="font-size:12px;color:var(--muted)">–</span>
-    </div>
-    <div class="log-box" id="log-box">Lade Logs...</div>
   </div>
 
   <!-- SYSTEM -->
@@ -1031,6 +1087,8 @@
       <span class="os-btn" onclick="selectMainOS('mac', this)">🍎 Mac</span>
       <span class="os-btn" onclick="selectMainOS('linux', this)">🐧 Linux</span>
       <span class="os-btn" onclick="selectMainOS('docker', this)">🐳 Docker</span>
+      <span class="os-btn" onclick="selectMainOS('skills', this)">📝 Skills</span>
+      <span class="os-btn" onclick="selectMainOS('logs', this)">📋 Logs</span>
     </div>
 
     <!-- Ebene 2: Sub-Auswahl (erscheint je nach Haupt-OS) -->
@@ -1044,7 +1102,7 @@
     <!-- Info-Banner: Was ist der Unterschied? -->
     <div id="os-info-banner" style="background:rgba(91,141,238,0.07);border:1px solid rgba(91,141,238,0.2);border-radius:10px;padding:14px 18px;margin-bottom:24px;font-size:13px;line-height:1.7;color:var(--muted)"></div>
 
-    <div class="system-tiles">
+    <div class="system-tiles" id="system-os-tiles">
       <!-- Restart -->
       <div class="system-tile">
         <h3>🔄 Neustart <span class="tile-badge restart">Schnell · ~5 Sek.</span></h3>
@@ -1066,6 +1124,37 @@
       <strong>🌐 Browser-Cache leeren nach Rebuild:</strong>
       Nach einem Neu-Build zeigt der Browser manchmal noch das alte Dashboard.
       Drücke <kbd>Strg + Shift + R</kbd> (Windows/Linux) oder <kbd>Cmd + Shift + R</kbd> (Mac) – das lädt alles frisch.
+    </div>
+
+    <div id="system-skills-panel" style="display:none">
+      <div class="panel">
+        <div class="panel-title">📝 Skill-Verwaltung</div>
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
+          <div class="field" style="flex:1;margin:0;min-width:200px">
+            <label>Skill auswählen</label>
+            <select id="skill-select" onchange="onSkillSelect()">
+              <option value="">– Skill wählen –</option>
+            </select>
+          </div>
+          <button id="skill-sign-btn" class="btn btn-secondary" onclick="signSkill()" disabled style="opacity:0.5">🔏 Signieren</button>
+          <button class="btn btn-secondary" onclick="loadSkillsList()">🔄 Alle Skills neu laden</button>
+        </div>
+        <div id="skill-sign-result" style="display:none"></div>
+        <div class="howto-box">
+          <strong>Wann muss ich neu signieren?</strong> Immer wenn du den Inhalt einer Skill-Datei
+          (<code class="help-code">workspace/skills/*.md</code>) bearbeitest.
+        </div>
+      </div>
+    </div>
+
+    <div id="system-logs-panel" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
+        <button class="tab-btn active" id="log-tab-terminal" onclick="switchLogTab('terminal')">🖥️ Terminal</button>
+        <button class="tab-btn" id="log-tab-audit" onclick="switchLogTab('audit')">📋 Audit-Log</button>
+        <button class="btn btn-secondary" style="margin-left:auto" onclick="loadCurrentLogs()">🔄 Aktualisieren</button>
+        <span class="log-filename" id="log-filename">–</span>
+      </div>
+      <div class="log-box" id="log-box">Lade Logs...</div>
     </div>
   </div>
 
@@ -1105,7 +1194,7 @@
       <span class="warn-icon">⚠️</span>
       <div>
         <strong>VirusTotal nicht aktiv</strong>
-        Kein API-Key konfiguriert. Trage <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px">VIRUSTOTAL_API_KEY</code> im Vault ein (Konfiguration → Integrationen) um den Scan zu aktivieren.<br>
+        Kein API-Key konfiguriert. Trage <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px">VIRUSTOTAL_API_KEY</code> in der Danger Zone ein (Danger Zone → Sicherheits-Keys) um den Scan zu aktivieren.<br>
         <a href="https://www.virustotal.com/gui/join-us" target="_blank" style="color:var(--accent);font-size:12px;margin-top:4px;display:inline-block">→ Kostenloser VirusTotal API-Key</a>
       </div>
     </div>
@@ -1167,8 +1256,7 @@
             <tbody>
               <tr><td>📊 Status</td><td>Zeigt ob FluxBot läuft, Uptime und welche Kanäle aktiv sind.</td></tr>
               <tr><td>⚙️ Konfiguration</td><td>Alle Einstellungen: Kanäle, AI-Provider, Bild-/Videogenerierung, Voice, Integrationen und JSON-Direktzugriff.</td></tr>
-              <tr><td>🎭 Persönlichkeit</td><td>Bearbeite <code class="help-code">SOUL.md</code> – legt Charakter, Ton und Verhalten von FluxBot fest. Neustart nötig nach Änderung.</td></tr>
-              <tr><td>📋 Logs</td><td>Terminal-Ausgabe (fluxbot.log) und Audit-Logs (Gesprächs-Protokolle je Kanal). Letzte 100–200 Zeilen.</td></tr>
+              <tr><td>🔥 Danger Zone</td><td>Sicherheits-Schlüssel (HMAC, Dashboard-Passwort, Skill-Secret, VT-Key), Persönlichkeit (SOUL.md) und direkter JSON-Zugang.</td></tr>
               <tr><td>🔧 System</td><td>Copy-paste-fertige Befehle zum Neustarten oder Neu-Bauen, angepasst an Windows / Mac / Linux / Docker.</td></tr>
               <tr><td>🛡️ VirusTotal</td><td>Echtzeit-Statistiken und Scan-History aller geprüften Dateien und Links (max. 100 Einträge im RAM).</td></tr>
               <tr><td>❓ Hilfe</td><td>Diese Seite – Konzepte, Token-Namen und häufige Fehler.</td></tr>
@@ -1196,7 +1284,7 @@
             </tbody>
           </table>
           <p style="margin-top:14px;color:var(--muted)">
-            <strong style="color:var(--text)">Tipp:</strong> Das Dashboard-Passwort und alle API-Keys werden über <em>Konfiguration → Integrationen</em> bzw. die jeweiligen Tabs gesetzt – nicht direkt in Dateien.
+            <strong style="color:var(--text)">Tipp:</strong> Das Dashboard-Passwort und alle API-Keys werden über <em>Danger Zone → Sicherheits-Keys</em> bzw. die jeweiligen Tabs gesetzt – nicht direkt in Dateien.
           </p>
         </div>
       </div>
@@ -1295,7 +1383,7 @@
               </tr>
               <tr>
                 <td>VirusTotal scannt nichts,<br>kein Fehler</td>
-                <td>API-Key fehlt. Trage <code class="help-code">VIRUSTOTAL_API_KEY</code> im Vault ein (<em>Konfiguration → Integrationen</em>). Kostenloser Key auf <a href="https://www.virustotal.com/gui/join-us" target="_blank" style="color:var(--accent)">virustotal.com</a>.</td>
+                <td>API-Key fehlt. Trage <code class="help-code">VIRUSTOTAL_API_KEY</code> im Vault ein (<em>Danger Zone → Sicherheits-Keys</em>). Kostenloser Key auf <a href="https://www.virustotal.com/gui/join-us" target="_blank" style="color:var(--accent)">virustotal.com</a>.</td>
               </tr>
               <tr>
                 <td>Bot antwortet nicht<br>nach Config-Änderung</td>
@@ -1311,7 +1399,7 @@
               </tr>
               <tr>
                 <td><code class="help-code">git push</code> schlägt fehl</td>
-                <td>Token in Remote-URL prüfen: <code class="help-code">git remote -v</code> – URL muss das Token enthalten. Ggf. neu setzen: <code class="help-code">git remote set-url origin https://TOKEN@github.com/org/repo.git</code></td>
+                <td>Token in Remote-URL prüfen: <code class="help-code">git remote -v</code> – URL muss das Token enthalten. Ggf. neu setzen: <code class="help-code">git remote set-url origin https://<a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="bde9f2f6f8f3fddad4c9d5c8df93ded2d0">[email&#160;protected]</a>/org/repo.git</code></td>
               </tr>
             </tbody>
           </table>
@@ -1320,6 +1408,108 @@
 
     </div><!-- /help-accordion -->
     <div class="help-no-result" id="help-no-result">Keine Treffer für deine Suche.</div>
+  </div>
+
+  <!-- DANGER ZONE -->
+  <div class="section" id="section-danger">
+    <h2>🔥 Danger Zone</h2>
+    <p class="subtitle">Sicherheits-Schlüssel, Persönlichkeit und direkte Konfiguration.</p>
+
+    <div class="dtab-bar">
+      <button class="dtab-btn active" onclick="showDangerTab('keys', this)">🔐 Sicherheits-Keys</button>
+      <button class="dtab-btn" onclick="showDangerTab('soul', this)">🎭 soul.md</button>
+      <button class="dtab-btn" onclick="showDangerTab('json', this)">📄 config.json</button>
+    </div>
+
+    <!-- Tab 1: Sicherheits-Keys -->
+    <div class="dtab-content active" id="dtab-keys">
+      <div class="panel">
+        <div class="panel-title">🔐 Sicherheits-Schlüssel</div>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+          <span id="danger-keyring-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(91,141,238,0.12);color:var(--accent);border:1px solid rgba(91,141,238,0.3)">⏳ Laden…</span>
+          <span id="danger-keyring-mode" style="font-size:12px;color:var(--muted)"></span>
+        </div>
+
+        <div class="field"><label>HMAC Secret</label>
+          <div class="input-wrap"><input id="hmac-secret-input" type="password" placeholder="hex-string..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+        </div>
+        <div class="field"><label>Dashboard-Passwort</label>
+          <div class="input-wrap"><input id="dashboard-pw-input" type="password" placeholder="dein-passwort..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+        </div>
+        <div class="field"><label>Skill-Secret</label>
+          <div class="input-wrap"><input id="skill-secret-input" type="password" placeholder="geheim..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+        </div>
+        <div class="field"><label style="justify-content:space-between">
+          <span>VirusTotal API-Key</span>
+          <span id="vt-danger-badge" style="font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Inaktiv</span>
+        </label>
+          <div class="input-wrap"><input id="vt-apikey" type="password" placeholder="Dein VirusTotal API-Key…" autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="saveDangerKeys()">💾 Speichern</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: SOUL.md -->
+    <div class="dtab-content" id="dtab-soul">
+      <div class="warn-banner">
+        <span class="warn-icon">⚠️</span>
+        <div>
+          <strong>Persönlichkeit bearbeiten – mit Bedacht!</strong>
+          Diese Datei definiert, wie FluxBot sich in ALLEN Gesprächen verhält. Änderungen erfordern einen Neustart.
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">🎭 SOUL.md – Persönlichkeit von FluxBot</div>
+        <div class="blur-wrap" id="soul-wrap">
+          <div class="blur-overlay" id="soul-overlay" onclick="requestEdit('soul')">
+            <div class="blur-hint">
+              <span class="lock-icon">🎭</span>
+              <strong>Zum Bearbeiten klicken</strong>
+              <p>Persönlichkeit von FluxBot – beeinflusst alle Gespräche</p>
+              <span class="click-btn">Entsperren & Bearbeiten</span>
+            </div>
+          </div>
+          <textarea class="soul-editor blurred" id="soul-content" spellcheck="false" placeholder="Du bist Fluxy, der KI-Assistent von KI-WERKE...&#10;&#10;Schreibe hier Fluxys Persönlichkeit in natürlicher Sprache."></textarea>
+        </div>
+      </div>
+      <div class="notice" id="soul-notice">
+        ⚠️ Gespeichert – FluxBot muss neu gestartet werden damit die neue Persönlichkeit aktiv wird.
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="saveSoul()">💾 Speichern</button>
+        <button class="btn btn-secondary" onclick="loadSoul()">↺ Verwerfen</button>
+      </div>
+    </div>
+
+    <!-- Tab 3: config.json -->
+    <div class="dtab-content" id="dtab-json">
+      <div class="warn-banner">
+        <span class="warn-icon">⚠️</span>
+        <div>
+          <strong>Direkter JSON-Zugriff – nur für Experten!</strong>
+          Syntaxfehler können FluxBot unbrauchbar machen. Erstelle vor Änderungen immer eine Sicherungskopie.
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📄 config.json (direkter Zugriff)</div>
+        <div class="blur-wrap" id="json-wrap">
+          <div class="blur-overlay" id="json-overlay" onclick="requestEdit('json')">
+            <div class="blur-hint">
+              <span class="lock-icon">🔒</span>
+              <strong>Zum Bearbeiten klicken</strong>
+              <p>Direkter Zugriff auf die Konfigurationsdatei</p>
+              <span class="click-btn">Entsperren & Bearbeiten</span>
+            </div>
+          </div>
+          <textarea class="config-editor blurred" id="raw-config" spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="saveRawConfig()">💾 Speichern</button>
+      </div>
+    </div>
   </div>
 
 </div><!-- /main -->
@@ -1342,7 +1532,7 @@
 
 <div id="toast"></div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 let configData = null;
 let secretsData = {}; // Vault-Secrets (API-Keys, Tokens, Passwörter)
 let pendingEditTarget = null;
@@ -1363,10 +1553,9 @@ function showSection(name, el) {
   if (el) el.classList.add('active');
   if (name === 'status')     loadStatus();
   if (name === 'config')     loadConfig();
-  if (name === 'soul')       loadSoul();
-  if (name === 'logs')       loadCurrentLogs();
   if (name === 'system')     updateSystemCmds();
   if (name === 'virustotal') loadVTData();
+  if (name === 'danger')     { showDangerTab('keys', document.querySelector('.dtab-btn')); loadDangerKeys(); }
   if (name === 'help') {
     document.getElementById('help-search-input').value = '';
     helpSearch('');
@@ -1374,15 +1563,10 @@ function showSection(name, el) {
 }
 
 function showTab(name, el) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('#section-config .tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('#section-config .tab-content').forEach(c => c.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   if (el) el.classList.add('active');
-  if (name === 'raw' && configData) {
-    document.getElementById('raw-config').value = JSON.stringify(configData, null, 2);
-    // Immer mit Blur starten wenn Tab geöffnet wird
-    reBlur('json');
-  }
 }
 
 // ── Blur / Confirm ─────────────────────────────────────────────────────────
@@ -1597,7 +1781,14 @@ async function api(url, method = 'GET', body = null) {
 
 // ── STATUS ─────────────────────────────────────────────────────────────────
 async function loadStatus() {
-  const data = await api('/api/status');
+  const [data, backendData, vtStats] = await Promise.all([
+    api('/api/status'),
+    api('/api/secrets/backend').catch(() => null),
+    api('/api/vt/status').catch(() => null),
+  ]);
+  const vtWarn = document.getElementById('status-vt-warning');
+  if (vtWarn) vtWarn.style.display = (!vtStats || !vtStats.enabled) ? 'flex' : 'none';
+
   document.getElementById('status-text').textContent = data.status === 'running' ? '✅ Online' : '❌ Offline';
   document.getElementById('status-uptime').textContent = data.uptime || '–';
   const channels = data.channels || [];
@@ -1606,6 +1797,28 @@ async function loadStatus() {
   list.innerHTML = channels.length === 0
     ? '<span style="color:var(--muted)">Keine aktiven Kanäle</span>'
     : channels.map(c => `<span class="channel-tag">📡 ${c}</span>`).join('');
+
+  // Secret-Backend-Badge aktualisieren
+  if (backendData) {
+    const badge = document.getElementById('secret-backend-badge');
+    const mode  = document.getElementById('secret-backend-mode');
+    const name  = backendData.backend || 'unbekannt';
+    const isDocker = backendData.isDocker || false;
+
+    // Icon + Farbe je Backend
+    let icon = '🔐', color = 'var(--accent)', bg = 'rgba(91,141,238,0.12)', border = 'rgba(91,141,238,0.3)';
+    if (name.includes('Credential Manager')) {
+      icon = '🗝️'; color = 'var(--green)'; bg = 'rgba(62,207,142,0.12)'; border = 'rgba(62,207,142,0.3)';
+    } else if (name.includes('Vault') || name.includes('AES')) {
+      icon = '🏦'; color = 'var(--blue)'; bg = 'rgba(91,141,238,0.12)'; border = 'rgba(91,141,238,0.3)';
+    } else if (name.includes('nicht verfügbar')) {
+      icon = '⚠️'; color = 'var(--yellow)'; bg = 'rgba(245,166,35,0.1)'; border = 'rgba(245,166,35,0.3)';
+    }
+
+    badge.style.cssText = `display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:${bg};color:${color};border:1px solid ${border}`;
+    badge.textContent = `${icon} ${name}`;
+    mode.textContent  = isDocker ? '(Docker-Modus)' : '(Lokaler Modus)';
+  }
 }
 
 // ── CONFIG: Laden ──────────────────────────────────────────────────────────
@@ -1685,11 +1898,6 @@ async function loadConfig() {
   // JSON-Tab immer mit Blur starten
   reBlur('json');
 
-  // ── VirusTotal API-Key (direkt im Vault, nicht INTEG_*) ─────────────────
-  const vtKey = secretsData['VIRUSTOTAL_API_KEY'] || '';
-  setVal('vt-apikey', vtKey);
-  updateVTIntegBadge(vtKey);
-
   // ── Cal.com (Werte direkt aus Vault) ─────────────────────────────────────
   setVal('calcom-base-url',    secretsData['CALCOM_BASE_URL']    || '');
   setVal('calcom-api-key',     secretsData['CALCOM_API_KEY']     || '');
@@ -1705,6 +1913,22 @@ async function loadConfig() {
 
   // Integrationen laden (Werte kommen aus Vault)
   renderIntegrations(configData.integrations || []);
+
+  // Google services
+  const googleSvc = configData.google?.services || {};
+  setVal('gsvc-gmail',     googleSvc.gmail     !== false, 'toggle');
+  setVal('gsvc-calendar',  googleSvc.calendar  !== false, 'toggle');
+  setVal('gsvc-docs',      googleSvc.docs      !== false, 'toggle');
+  setVal('gsvc-sheets',    googleSvc.sheets    !== false, 'toggle');
+  setVal('gsvc-slides',    googleSvc.slides    || false,  'toggle');
+  setVal('gsvc-forms',     googleSvc.forms     || false,  'toggle');
+  setVal('gsvc-drive',     googleSvc.drive     !== false, 'toggle');
+  setVal('gsvc-youtube',   googleSvc.youtube   || false,  'toggle');
+  setVal('youtube-apikey', secretsData['YOUTUBE_API_KEY'] || '');
+  updateYoutubeKeyRow();
+
+  // Channel Accordions initialisieren
+  initChannelAccordions();
 }
 
 function setVal(id, val, type = 'text') {
@@ -1723,21 +1947,10 @@ function getVal(id, type = 'text') {
 
 // ── CONFIG: Speichern ──────────────────────────────────────────────────────
 async function saveConfig() {
-  const rawTab = document.getElementById('tab-raw').classList.contains('active');
   let newConfig;
   const secretsPatch = {}; // Vault-Secrets – gehen an /api/secrets
 
-  if (rawTab) {
-    // Raw-JSON-Tab: nur config.json, keine Secrets (Sicherheit)
-    const ta = document.getElementById('raw-config');
-    if (ta.classList.contains('blurred')) {
-      toast('JSON-Editor ist noch gesperrt. Bitte erst entsperren.', true);
-      return;
-    }
-    try { newConfig = JSON.parse(ta.value); }
-    catch(e) { toast('Ungültiges JSON: ' + e.message, true); return; }
-    setTimeout(() => reBlur('json'), 500);
-  } else {
+  {
     newConfig = JSON.parse(JSON.stringify(configData));
 
     // ── Kanäle (Tokens → Vault, Rest → config.json) ──────────────────────
@@ -1845,8 +2058,19 @@ async function saveConfig() {
     newConfig.voice.apiKey   = '';  // im Vault
     secretsPatch['VOICE_API_KEY'] = getVal('voice-apikey');
 
-    // ── VirusTotal API-Key → Vault ────────────────────────────────────────
-    secretsPatch['VIRUSTOTAL_API_KEY'] = getVal('vt-apikey');
+    // ── Google Services → config.json ─────────────────────────────────
+    newConfig.google = newConfig.google || {};
+    newConfig.google.services = {
+      gmail:    getVal('gsvc-gmail',    'toggle'),
+      calendar: getVal('gsvc-calendar', 'toggle'),
+      docs:     getVal('gsvc-docs',     'toggle'),
+      sheets:   getVal('gsvc-sheets',   'toggle'),
+      slides:   getVal('gsvc-slides',   'toggle'),
+      forms:    getVal('gsvc-forms',    'toggle'),
+      drive:    getVal('gsvc-drive',    'toggle'),
+      youtube:  getVal('gsvc-youtube',  'toggle'),
+    };
+    secretsPatch['YOUTUBE_API_KEY'] = getVal('youtube-apikey');
 
     // ── Cal.com → Vault ───────────────────────────────────────────────────
     secretsPatch['CALCOM_BASE_URL']    = getVal('calcom-base-url');
@@ -1881,8 +2105,7 @@ async function saveConfig() {
 
   configData = newConfig;
   secretsData = Object.assign({}, secretsData, secretsPatch);
-  // Badges im Integrationen-Panel aktualisieren
-  updateVTIntegBadge(secretsData['VIRUSTOTAL_API_KEY'] || '');
+  // Badges aktualisieren
   updateCalcomBadge();
   updateGoogleBadge();
   const n = document.getElementById('config-notice');
@@ -2097,23 +2320,31 @@ function selectMainOS(main, el) {
   document.querySelectorAll('#os-main-selector .os-btn').forEach(b => b.classList.remove('active'));
   if (el) el.classList.add('active');
 
-  const subPanel = document.getElementById('os-sub-panel');
-  const subSel   = document.getElementById('os-sub-selector');
-  const subLabel = document.getElementById('os-sub-label');
+  const isOsMode = !['skills', 'logs'].includes(main);
+  document.getElementById('os-sub-panel').style.display      = 'none';
+  document.getElementById('os-info-banner').style.display    = isOsMode ? '' : 'none';
+  document.getElementById('system-os-tiles').style.display   = isOsMode ? 'grid' : 'none';
+  document.getElementById('system-skills-panel').style.display = (main === 'skills') ? 'block' : 'none';
+  document.getElementById('system-logs-panel').style.display   = (main === 'logs')   ? 'block' : 'none';
 
-  if (osSubOptions[main]) {
-    const sub = osSubOptions[main];
-    subLabel.textContent = sub.label;
-    subSel.innerHTML = sub.options.map((o, i) =>
-      `<span class="os-btn${i===0?' active':''}" onclick="selectSubOS('${o.key}', this)">${o.label}</span>`
-    ).join('');
-    subPanel.style.display = 'block';
-    currentOSKey = sub.options[0].key;
-  } else {
-    subPanel.style.display = 'none';
-    currentOSKey = main;
+  if (isOsMode) {
+    if (osSubOptions[main]) {
+      const sub = osSubOptions[main];
+      document.getElementById('os-sub-label').textContent = sub.label;
+      document.getElementById('os-sub-selector').innerHTML = sub.options.map((o,i) =>
+        `<span class="os-btn${i===0?' active':''}" onclick="selectSubOS('${o.key}',this)">${o.label}</span>`
+      ).join('');
+      document.getElementById('os-sub-panel').style.display = 'block';
+      currentOSKey = sub.options[0].key;
+    } else {
+      currentOSKey = main;
+    }
+    renderSystemCmds();
+  } else if (main === 'logs') {
+    loadCurrentLogs();
+  } else if (main === 'skills') {
+    loadSkillsList();
   }
-  renderSystemCmds();
 }
 
 function selectSubOS(key, el) {
@@ -2404,23 +2635,6 @@ function helpSearch(query) {
   noResult.style.display = (!anyVisible && q) ? 'block' : 'none';
 }
 
-// ── VIRUSTOTAL Integration Badge ───────────────────────────────────────────
-function updateVTIntegBadge(key) {
-  const badge = document.getElementById('vt-integ-badge');
-  if (!badge) return;
-  if (key && key.trim()) {
-    badge.textContent = '✅ Aktiv';
-    badge.style.background = 'rgba(62,207,142,0.12)';
-    badge.style.color = 'var(--green)';
-    badge.style.borderColor = 'rgba(62,207,142,0.3)';
-  } else {
-    badge.textContent = '⚠️ Inaktiv';
-    badge.style.background = 'rgba(245,166,35,0.12)';
-    badge.style.color = 'var(--yellow)';
-    badge.style.borderColor = 'rgba(245,166,35,0.3)';
-  }
-}
-
 function updateCalcomBadge() {
   const badge = document.getElementById('calcom-integ-badge');
   if (!badge) return;
@@ -2443,26 +2657,19 @@ function updateCalcomBadge() {
 // ── GOOGLE WORKSPACE ────────────────────────────────────────────────────────
 
 function updateGoogleBadge() {
-  const badge = document.getElementById('google-integ-badge');
+  const badge = document.getElementById('google-oauth-status');
   if (!badge) return;
   const clientId     = (document.getElementById('google-client-id')?.value      || '').trim();
   const clientSecret = (document.getElementById('google-client-secret')?.value  || '').trim();
   const refreshToken = (document.getElementById('google-refresh-token')?.value  || '').trim();
   if (clientId && clientSecret && refreshToken) {
     badge.textContent = '✅ Verbunden';
-    badge.style.background = 'rgba(62,207,142,0.12)';
     badge.style.color = 'var(--green)';
-    badge.style.borderColor = 'rgba(62,207,142,0.3)';
   } else if (clientId && clientSecret) {
     badge.textContent = '🔗 Autorisierung ausstehend';
-    badge.style.background = 'rgba(91,141,238,0.12)';
     badge.style.color = 'var(--accent)';
-    badge.style.borderColor = 'rgba(91,141,238,0.3)';
   } else {
-    badge.textContent = '⚠️ Nicht konfiguriert';
-    badge.style.background = 'rgba(245,166,35,0.12)';
-    badge.style.color = 'var(--yellow)';
-    badge.style.borderColor = 'rgba(245,166,35,0.3)';
+    badge.textContent = '';
   }
 }
 
@@ -2588,10 +2795,149 @@ async function clearVTHistory() {
   }
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────
-initHMAC(); // HMAC-Secret laden (lautlos falls nicht konfiguriert)
-loadStatus();
-updateSystemCmds();
+// ── DANGER ZONE ─────────────────────────────────────────────────────────
+function showDangerTab(name, el) {
+  document.querySelectorAll('.dtab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.dtab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('dtab-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (name === 'keys') loadDangerKeys();
+  if (name === 'soul') { if (!document.getElementById('soul-content').value) loadSoul(); }
+  if (name === 'json') {
+    if (configData) { document.getElementById('raw-config').value = JSON.stringify(configData,null,2); reBlur('json'); }
+    else api('/api/config').then(d => { configData=d; document.getElementById('raw-config').value=JSON.stringify(d,null,2); reBlur('json'); });
+  }
+}
+
+async function loadDangerKeys() {
+  const [secrets, backendData] = await Promise.all([
+    api('/api/secrets').catch(() => ({})),
+    api('/api/secrets/backend').catch(() => null)
+  ]);
+  secretsData = Object.assign(secretsData, secrets || {});
+  setVal('hmac-secret-input',   secrets['HMAC_SECRET']          || '');
+  setVal('dashboard-pw-input',  secrets['DASHBOARD_PASSWORD']   || '');
+  setVal('skill-secret-input',  secrets['SKILL_SECRET']         || '');
+  setVal('vt-apikey',           secrets['VIRUSTOTAL_API_KEY']   || '');
+  updateVTDangerBadge(secrets['VIRUSTOTAL_API_KEY'] || '');
+  if (backendData) {
+    const badge = document.getElementById('danger-keyring-badge');
+    const mode  = document.getElementById('danger-keyring-mode');
+    const name  = backendData.backend || 'unbekannt';
+    let icon='🔐', color='var(--accent)', bg='rgba(91,141,238,0.12)', border='rgba(91,141,238,0.3)';
+    if (name.includes('Credential Manager')) { icon='🗝️'; color='var(--green)'; bg='rgba(62,207,142,0.12)'; border='rgba(62,207,142,0.3)'; }
+    else if (name.includes('Vault')||name.includes('AES')) { icon='🏦'; }
+    else if (name.includes('nicht verfügbar')) { icon='⚠️'; color='var(--yellow)'; bg='rgba(245,166,35,0.1)'; border='rgba(245,166,35,0.3)'; }
+    badge.style.cssText=`display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:${bg};color:${color};border:1px solid ${border}`;
+    badge.textContent=`${icon} ${name}`;
+    mode.textContent=backendData.isDocker ? '(Docker-Modus)' : '(Lokaler Modus)';
+  }
+}
+
+async function saveDangerKeys() {
+  const patch = {};
+  const h  = getVal('hmac-secret-input');  if (h)  patch['HMAC_SECRET']          = h;
+  const dp = getVal('dashboard-pw-input'); if (dp) patch['DASHBOARD_PASSWORD']   = dp;
+  const sk = getVal('skill-secret-input'); if (sk) patch['SKILL_SECRET']         = sk;
+  const vt = getVal('vt-apikey');          if (vt) patch['VIRUSTOTAL_API_KEY']   = vt;
+  const result = await api('/api/secrets', 'POST', patch);
+  if (result?.error) { toast('Fehler: '+result.error, true); return; }
+  toast('✅ Sicherheits-Keys gespeichert');
+  Object.assign(secretsData, patch);
+  updateVTDangerBadge(secretsData['VIRUSTOTAL_API_KEY'] || '');
+}
+
+async function saveRawConfig() {
+  const ta = document.getElementById('raw-config');
+  if (ta.classList.contains('blurred')) { toast('Editor gesperrt – bitte erst entsperren.', true); return; }
+  let parsed;
+  try { parsed = JSON.parse(ta.value); } catch(e) { toast('Ungültiges JSON: '+e.message, true); return; }
+  const result = await api('/api/config', 'PUT', parsed);
+  if (result.error) { toast('Fehler: '+result.error, true); return; }
+  configData = parsed;
+  toast('✅ config.json gespeichert');
+  setTimeout(() => reBlur('json'), 500);
+}
+
+function updateVTDangerBadge(key) {
+  const badge = document.getElementById('vt-danger-badge');
+  if (!badge) return;
+  if (key?.trim()) {
+    badge.textContent='✅ Aktiv'; badge.style.background='rgba(62,207,142,0.12)'; badge.style.color='var(--green)'; badge.style.borderColor='rgba(62,207,142,0.3)';
+  } else {
+    badge.textContent='⚠️ Inaktiv'; badge.style.background='rgba(245,166,35,0.12)'; badge.style.color='var(--yellow)'; badge.style.borderColor='rgba(245,166,35,0.3)';
+  }
+}
+
+// ── KANÄLE ACCORDION ─────────────────────────────────────────────────────
+function toggleChannel(id, checkbox) {
+  const body = document.getElementById('ch-body-' + id);
+  if (body) body.style.display = checkbox.checked ? 'block' : 'none';
+}
+
+function initChannelAccordions() {
+  ['tg','dc','slack','matrix','wa'].forEach(id => {
+    const cb = document.getElementById(id+'-enabled');
+    const body = document.getElementById('ch-body-'+id);
+    if (cb && body) body.style.display = cb.checked ? 'block' : 'none';
+  });
+}
+
+// ── SKILLS ──────────────────────────────────────────────────────────────
+async function loadSkillsList() {
+  try {
+    const data = await api('/api/skills');
+    const sel = document.getElementById('skill-select');
+    if (!sel) return;
+    const skills = Array.isArray(data) ? data : (data.skills || []);
+    sel.innerHTML = '<option value="">– Skill wählen –</option>' +
+      skills.map(s => `<option value="${escHtml(s.name||s)}">${escHtml(s.name||s)}</option>`).join('');
+    onSkillSelect();
+  } catch(e) {
+    const sel = document.getElementById('skill-select');
+    if (sel) sel.innerHTML = '<option value="">API /api/skills nicht verfügbar</option>';
+  }
+}
+
+function onSkillSelect() {
+  const sel = document.getElementById('skill-select');
+  const btn = document.getElementById('skill-sign-btn');
+  if (!sel || !btn) return;
+  const has = sel.value !== '';
+  btn.disabled = !has;
+  btn.className = 'btn ' + (has ? 'btn-success' : 'btn-secondary');
+  btn.style.opacity = has ? '1' : '0.5';
+}
+
+async function signSkill() {
+  const sel = document.getElementById('skill-select');
+  if (!sel?.value) { toast('Bitte erst einen Skill auswählen.', true); return; }
+  const btn = document.getElementById('skill-sign-btn');
+  btn.disabled = true;
+  try {
+    const result = await api('/api/skills/sign', 'POST', { skill: sel.value });
+    const res = document.getElementById('skill-sign-result');
+    if (result?.error) {
+      toast('Fehler: ' + result.error, true);
+    } else {
+      toast('✅ Skill "' + sel.value + '" signiert');
+      if (res) { res.style.display='block'; res.innerHTML=`<div style="background:rgba(62,207,142,0.1);border:1px solid rgba(62,207,142,0.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--green)">✅ <strong>${escHtml(sel.value)}</strong> wurde neu signiert.</div>`; }
+    }
+  } catch(e) { toast('Fehler: '+e.message, true); }
+  btn.disabled = false; onSkillSelect();
+}
+
+function updateYoutubeKeyRow() {
+  const row = document.getElementById('youtube-key-row');
+  if (row) row.style.display = document.getElementById('gsvc-youtube')?.checked ? 'block' : 'none';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+(async function init() {
+  await initHmac();
+  showSection('status', document.querySelector('.nav-item'));
+})();
+
 </script>
 </body>
 </html>
