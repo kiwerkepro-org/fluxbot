@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/ki-werke/fluxbot/pkg/security"
+	"github.com/ki-werke/fluxbot/pkg/skills"
 )
 
 //go:embed dashboard.html
@@ -39,6 +40,7 @@ type Server struct {
 	logPath       string                  // Pfad zur Terminal-Log-Datei (fluxbot.log)
 	vault         security.SecretProvider  // Secret-Speicher (Keyring / Vault / Chained)
 	onReload      func()                  // Callback: wird nach Config-Änderung aufgerufen
+	skillsLoader  *skills.Loader          // SkillsLoader für Skill-Verwaltung
 }
 
 // New erstellt einen neuen Dashboard-Server.
@@ -46,7 +48,8 @@ type Server struct {
 // vault: Secret-Speicher für API-Keys und Passwörter (AES-256-GCM).
 // onReload: wird nach jeder Config- oder Secret-Änderung aufgerufen.
 // hmacSecret: HMAC-Schlüssel für Dashboard-API-Request-Signierung (leer = deaktiviert).
-func New(configPath, workspacePath, password string, port int, getChannels func() []string, logPath string, vault security.SecretProvider, onReload func(), hmacSecret string) *Server {
+// skillsLoader: SkillsLoader für Skill-Verwaltung (optional, kann nil sein).
+func New(configPath, workspacePath, password string, port int, getChannels func() []string, logPath string, vault security.SecretProvider, onReload func(), hmacSecret string, skillsLoader *skills.Loader) *Server {
 	return &Server{
 		configPath:    configPath,
 		workspacePath: workspacePath,
@@ -58,6 +61,7 @@ func New(configPath, workspacePath, password string, port int, getChannels func(
 		logPath:       logPath,
 		vault:         vault,
 		onReload:      onReload,
+		skillsLoader:  skillsLoader,
 	}
 }
 
@@ -97,6 +101,7 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/hmac-token", s.auth(s.handleHMACToken))
 	mux.HandleFunc("/api/vt/status", s.auth(s.handleVTStatus))
 	mux.HandleFunc("/api/vt/history", s.auth(s.handleVTHistory))
+	mux.HandleFunc("/api/skills", s.auth(s.handleSkills))
 
 	// ── Google OAuth2 (kein HMAC nötig – auth reicht; Callback ist öffentlich) ──
 	mux.HandleFunc("/api/google/auth-url", s.auth(s.handleGoogleAuthURL))
@@ -107,6 +112,7 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/secrets", s.auth(s.hmacVerify(s.handleSecrets)))
 	mux.HandleFunc("/api/soul", s.auth(s.hmacVerify(s.handleSoul)))
 	mux.HandleFunc("/api/vt/clear", s.auth(s.hmacVerify(s.handleVTClear)))
+	mux.HandleFunc("/api/skills/sign", s.auth(s.hmacVerify(s.handleSkillsSign)))
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),

@@ -305,6 +305,18 @@ func (l *Loader) ListSkills() []*Skill {
 	return result
 }
 
+// SignSkill signiert eine Skill-Datei neu.
+func (l *Loader) SignSkill(skillName string) error {
+	skill, ok := l.skills[skillName]
+	if !ok {
+		return fmt.Errorf("skill '%s' nicht gefunden", skillName)
+	}
+	if l.secret == "" {
+		return fmt.Errorf("skill-secret nicht gesetzt")
+	}
+	return SignFile(skill.Path, l.secret)
+}
+
 // loadDefaultAgents lädt den AGENTS.md-Fallback
 func (l *Loader) loadDefaultAgents() string {
 	for _, name := range []string{"AGENTS.md", "master.md"} {
