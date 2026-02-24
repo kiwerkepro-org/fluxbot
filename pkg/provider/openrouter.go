@@ -78,6 +78,22 @@ func (o *OpenRouter) Complete(ctx context.Context, req Request) (string, error) 
 
 	body, _ := io.ReadAll(resp.Body)
 
+	// HTTP-Status prüfen
+	if resp.StatusCode != http.StatusOK {
+		var errResp struct {
+			Error struct {
+				Message string `json:"message"`
+				Code    string `json:"code"`
+			} `json:"error"`
+		}
+		json.Unmarshal(body, &errResp)
+		errMsg := errResp.Error.Message
+		if errMsg == "" {
+			errMsg = string(body)
+		}
+		return "", fmt.Errorf("openRouter HTTP %d: %s", resp.StatusCode, errMsg)
+	}
+
 	var result struct {
 		Choices []struct {
 			Message struct {
@@ -86,6 +102,7 @@ func (o *OpenRouter) Complete(ctx context.Context, req Request) (string, error) 
 		} `json:"choices"`
 		Error struct {
 			Message string `json:"message"`
+			Code    string `json:"code"`
 		} `json:"error"`
 	}
 
@@ -94,7 +111,7 @@ func (o *OpenRouter) Complete(ctx context.Context, req Request) (string, error) 
 	}
 
 	if result.Error.Message != "" {
-		return "", fmt.Errorf("openRouter API Fehler: %s", result.Error.Message)
+		return "", fmt.Errorf("openRouter API Fehler: %s (Code: %s)", result.Error.Message, result.Error.Code)
 	}
 
 	if len(result.Choices) == 0 {

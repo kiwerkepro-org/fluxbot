@@ -9,7 +9,8 @@
 
 | Datei | Pfad | Hinweis |
 |-------|------|---------|
-| INBOX.md | `C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT\INBOX.md` | Nur lesen wenn JJ explizit darum bittet |
+| INBOX.md | `C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT\INBOX.md` | **Auto-Cleanup:** Notizen unterhalb des grünen Kommentars werden nach dem Lesen/Verarbeiten automatisch gelöscht |
+| Z-FEHLERBILDER | `C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT\Z-FEHLERBILDER\` | **Auto-Cleanup:** Verarbeitete Bilder werden nach dem Lesen automatisch gelöscht (von Claude oder manuell von JJ) |
 
 ---
 
@@ -152,17 +153,20 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 
 ---
 
-## Aktueller Stand (Session 21 – 2026-02-23)
+## Aktueller Stand (Session 23 – 2026-02-24)
 
-**Letzte abgeschlossene Session:** 20 (Dashboard Redesign geplant, noch nicht implementiert)
-**Aktuelle Session:** 21
+**Letzte abgeschlossene Session:** 22 (P1 Dashboard Redesign erledigt)
+**Aktuelle Session:** 23
 
 **Offen / Nächste Schritte:**
-1. `pkg/dashboard/dashboard.html` komplett neu schreiben → siehe `memory-md/04-redesign-spec.md`
-2. Git commit + push nach Dashboard-Redesign
-3. Docker-Rebuild + Test
+1. **P2:** System-Testing (Hardcore Test Suite)
+2. **P3:** Lucide Icons einbinden (P8.5 in `memory-md/01-features.md`)
+3. **P4:** Sprachausgabe Brainstorming + Implementierung
+4. **P5:** Cronjobs
+5. Git commit + push nach jeder Priorität
 
-**Erledigt in Session 21:**
-- `memory-md/` Ordner erstellt ✅
-- `.gitignore` um `memory-md/` ergänzt ✅
-- CLAUDE.md in 4 thematische Dateien aufgeteilt ✅
+**Erledigt in Session 22:**
+- INBOX.md geleert (Notizen verarbeitet) ✅
+- Fehlerbilder analysiert + Auto-Cleanup-Regel definiert ✅
+- Lucide Icons als P8.5 in `memory-md/01-features.md` dokumentiert ✅
+- CLAUDE.md: Auto-Cleanup-Regel für INBOX.md + Z-FEHLERBILDER hinzugefügt ✅

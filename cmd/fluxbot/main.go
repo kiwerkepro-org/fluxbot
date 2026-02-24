@@ -386,6 +386,7 @@ func runBot(ctx context.Context, configPath string) {
 			vault,
 			onReload,
 			dashHMACSecret,
+			skillsLoader,
 		)
 		go dash.Start(ctx)
 	}

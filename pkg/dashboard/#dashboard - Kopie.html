@@ -1,0 +1,2635 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FluxBot Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { color: #8bb4f8; }
+  input[type="email"] { background: var(--input-bg) !important; color: var(--text) !important; }
+  :root {
+    --bg: #0f1117; --sidebar: #161b27; --card: #1e2535; --border: #2a3347;
+    --accent: #5b8dee; --accent2: #7c5cbf; --green: #3ecf8e;
+    --red: #e25d5d; --yellow: #f5a623; --text: #e2e8f0; --muted: #8892a4; --input-bg: #0f1117;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar { width: 220px; background: var(--sidebar); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 24px 0; flex-shrink: 0; }
+  .logo { padding: 0 20px 24px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .logo h1 { font-size: 18px; font-weight: 700; color: var(--text); }
+  .logo span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; color: var(--muted); font-size: 14px; transition: all 0.15s; border-left: 3px solid transparent; }
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .nav-item.active { color: var(--accent); background: rgba(91,141,238,0.1); border-left-color: var(--accent); }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+  .sidebar-footer { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+
+  /* ── Main ── */
+  .main { flex: 1; overflow-y: auto; padding: 32px; }
+  .section { display: none; }
+  .section.active { display: block; }
+  h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+
+  /* ── Status Cards ── */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .card-value { font-size: 24px; font-weight: 700; }
+  .card-value.green { color: var(--green); }
+  .card-value.blue { color: var(--accent); }
+  .card-value.yellow { color: var(--yellow); }
+  .channel-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .channel-tag { background: rgba(91,141,238,0.15); color: var(--accent); border: 1px solid rgba(91,141,238,0.3); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 500; }
+
+  /* ── Forms ── */
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; }
+  .panel-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .field input[type=text], .field input[type=password], .field input[type=number], .field select {
+    width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 8px 12px; font-size: 14px; outline: none; transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--muted); }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .toggle-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .toggle-label { font-size: 14px; color: var(--text); }
+  .toggle-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 24px; cursor: pointer; transition: 0.2s; }
+  .toggle-slider:before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+  input:checked + .toggle-slider { background: var(--accent); }
+  input:checked + .toggle-slider:before { transform: translateX(20px); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+  /* ── Eye-Input (Passwort-Masking) ── */
+  .input-wrap { position: relative; display: flex; align-items: center; }
+  .input-wrap input { flex: 1; padding-right: 38px !important; }
+  .eye-btn { position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1; padding: 0; transition: color 0.15s; }
+  .eye-btn:hover { color: var(--text); }
+
+  /* ── Buttons ── */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 7px; font-size: 14px; font-weight: 500; border: none; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #4a7ee0; }
+  .btn-success { background: var(--green); color: #0f1117; }
+  .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-danger:hover { background: #c94f4f; }
+  .actions { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
+
+  /* ── Toast ── */
+  #toast { position: fixed; bottom: 24px; right: 24px; background: var(--green); color: #0f1117; padding: 12px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; opacity: 0; transform: translateY(10px); transition: all 0.3s; pointer-events: none; z-index: 2000; }
+  #toast.error { background: var(--red); color: #fff; }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── Editors ── */
+  .soul-editor { width: 100%; min-height: 300px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 16px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 1.6; resize: vertical; outline: none; }
+  .soul-editor:focus { border-color: var(--accent); }
+  .config-editor { width: 100%; min-height: 400px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 16px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; resize: vertical; outline: none; }
+  .config-editor:focus { border-color: var(--accent); }
+
+  /* ── Logs ── */
+  .log-box { background: #080c14; border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.8; max-height: 500px; overflow-y: auto; color: #a0aec0; }
+  .log-box .log-line { display: block; }
+  .log-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .log-filename { font-size: 12px; color: var(--muted); }
+
+  /* ── Notice ── */
+  .notice { background: rgba(245,166,35,0.1); border: 1px solid rgba(245,166,35,0.3); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--yellow); margin-top: 16px; display: none; }
+  .notice.show { display: block; }
+
+  /* ── Tabs ── */
+  .tab-bar { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .tab-btn { padding: 8px 14px; font-size: 13px; cursor: pointer; color: var(--muted); background: none; border: none; border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── Provider Hint ── */
+  .provider-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
+  .provider-hint a { color: var(--accent); text-decoration: none; }
+
+  /* ── Tile Layout (Provider / Voice) ── */
+  .tile-layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+  @media(max-width: 900px) { .tile-layout { grid-template-columns: 1fr; } }
+  .info-card { background: linear-gradient(135deg, rgba(91,141,238,0.07), rgba(124,92,191,0.07)); border: 1px solid rgba(91,141,238,0.22); border-radius: 12px; padding: 20px; position: sticky; top: 0; }
+  .info-card h4 { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
+  .info-card p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
+  .info-card .info-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 13px; text-decoration: none; border: 1px solid rgba(91,141,238,0.3); border-radius: 6px; padding: 6px 14px; transition: all 0.15s; }
+  .info-card .info-link:hover { background: rgba(91,141,238,0.12); }
+  .info-card .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  .info-card .other-list { font-size: 12px; color: var(--muted); line-height: 2.2; }
+  .info-card .other-list strong { color: var(--text); }
+  .info-card .other-list { line-height: 1.5; }
+  .smtp-prov-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+  .smtp-prov-btn:hover { background: rgba(91,141,238,0.12); border-color: rgba(91,141,238,0.4); color: var(--accent); }
+  .smtp-prov-btn.active { background: rgba(91,141,238,0.15); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+  /* ── Blur Overlay (JSON / Soul) ── */
+  .blur-wrap { position: relative; border-radius: 8px; overflow: hidden; }
+  .blurred { filter: blur(5px); pointer-events: none; user-select: none; }
+  .blur-overlay { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: rgba(15,17,23,0.35); cursor: pointer; transition: background 0.2s; }
+  .blur-overlay:hover { background: rgba(91,141,238,0.1); }
+  .blur-hint { text-align: center; padding: 28px; }
+  .blur-hint .lock-icon { font-size: 36px; display: block; margin-bottom: 12px; }
+  .blur-hint strong { font-size: 16px; color: var(--text); display: block; margin-bottom: 6px; }
+  .blur-hint p { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+  .blur-hint .click-btn { display: inline-block; background: var(--accent); color: #fff; border-radius: 7px; padding: 8px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+  /* ── Warning Banner ── */
+  .warn-banner { background: rgba(226,93,93,0.08); border: 1px solid rgba(226,93,93,0.28); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: #f08080; margin-bottom: 14px; display: flex; gap: 10px; align-items: flex-start; }
+  .warn-banner .warn-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .warn-banner strong { display: block; color: var(--red); font-size: 13px; margin-bottom: 2px; }
+
+  /* ── Confirmation Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 14px; }
+  .modal p { font-size: 14px; color: var(--muted); line-height: 1.65; margin-bottom: 8px; }
+  .modal-confirm-text { color: var(--text); font-weight: 600; margin-top: 4px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 22px; justify-content: flex-end; }
+
+  /* ── System Section ── */
+  .os-selector { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; }
+  .os-btn { padding: 9px 22px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--muted); transition: all 0.15s; user-select: none; }
+  .os-btn:hover { border-color: var(--accent); color: var(--text); }
+  .os-btn.active { background: rgba(91,141,238,0.14); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .system-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width: 700px) { .system-tiles { grid-template-columns: 1fr; } }
+  .system-tile { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+  .system-tile h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .tile-badge { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
+  .tile-badge.restart { background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); }
+  .tile-badge.rebuild { background: rgba(91,141,238,0.15); color: var(--accent); border: 1px solid rgba(91,141,238,0.3); }
+  .tile-desc { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 18px; }
+  .cmd-box { background: #080c14; border: 1px solid var(--border); border-radius: 8px; padding: 12px 42px 12px 14px; font-family: 'Courier New', monospace; font-size: 12px; color: #a8c0d6; word-break: break-all; line-height: 1.6; position: relative; margin-bottom: 14px; min-height: 48px; }
+  .copy-btn { position: absolute; top: 8px; right: 8px; background: var(--border); color: var(--muted); border: none; border-radius: 5px; padding: 4px 9px; font-size: 11px; cursor: pointer; transition: all 0.15s; }
+  .copy-btn:hover { background: var(--accent); color: #fff; }
+  .howto-box { background: rgba(91,141,238,0.05); border: 1px solid rgba(91,141,238,0.14); border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--muted); line-height: 1.9; }
+  .howto-box strong { color: var(--text); }
+  .howto-box a { color: var(--accent); text-decoration: none; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; border-radius: 50%; width: 17px; height: 17px; font-size: 10px; font-weight: 700; margin-right: 4px; flex-shrink: 0; }
+  .cache-hint { background: rgba(245,166,35,0.07); border: 1px solid rgba(245,166,35,0.22); border-radius: 8px; padding: 14px 18px; font-size: 13px; color: var(--muted); line-height: 1.7; margin-top: 20px; }
+  .cache-hint strong { color: var(--yellow); }
+  kbd { background: var(--border); padding: 2px 7px; border-radius: 4px; font-size: 12px; color: var(--text); font-family: 'Courier New', monospace; }
+
+  /* ── Info-Tooltip (ⓘ) ── */
+  .info-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 0 0 0 5px; vertical-align: middle; line-height: 1; transition: color 0.15s; }
+  .info-btn:hover { color: var(--accent); }
+  #info-tooltip { position: fixed; z-index: 9000; max-width: 280px; background: #1a2235; border: 1px solid rgba(91,141,238,0.35); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text); line-height: 1.55; box-shadow: 0 8px 28px rgba(0,0,0,0.45); pointer-events: none; opacity: 0; transition: opacity 0.15s; }
+  #info-tooltip.show { opacity: 1; }
+
+  /* ── Hilfe Section ── */
+  .help-search { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 10px 16px; font-size: 14px; outline: none; margin-bottom: 24px; transition: border-color 0.15s; }
+  .help-search:focus { border-color: var(--accent); }
+  .help-search::placeholder { color: var(--muted); }
+  .help-accordion { display: flex; flex-direction: column; gap: 10px; }
+  .help-item { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; transition: border-color 0.15s; }
+  .help-item.hidden { display: none; }
+  .help-item-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; user-select: none; gap: 12px; }
+  .help-item-header:hover { background: rgba(255,255,255,0.03); }
+  .help-item-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .help-item-arrow { color: var(--muted); font-size: 12px; flex-shrink: 0; transition: transform 0.2s; }
+  .help-item.open .help-item-arrow { transform: rotate(180deg); }
+  .help-item-body { display: none; padding: 0 20px 20px; font-size: 13px; color: var(--muted); line-height: 1.7; border-top: 1px solid var(--border); }
+  .help-item.open .help-item-body { display: block; }
+  .help-item-body p { margin-top: 14px; }
+  .help-item-body p:first-child { margin-top: 14px; }
+  .help-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+  .help-table th { text-align: left; padding: 7px 10px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .help-table td { padding: 7px 10px; border-bottom: 1px solid rgba(42,51,71,0.5); vertical-align: top; }
+  .help-table tr:last-child td { border-bottom: none; }
+  .help-table td:first-child { color: var(--text); font-weight: 500; white-space: nowrap; }
+  .help-code { background: rgba(0,0,0,0.3); border-radius: 5px; padding: 2px 7px; font-family: 'Courier New', monospace; font-size: 12px; color: #a8d8a8; }
+  .help-tag { display: inline-block; background: rgba(91,141,238,0.12); color: var(--accent); border: 1px solid rgba(91,141,238,0.25); border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: 600; margin: 1px; }
+  .help-tag.red { background: rgba(226,93,93,0.12); color: var(--red); border-color: rgba(226,93,93,0.25); }
+  .help-tag.green { background: rgba(62,207,142,0.12); color: var(--green); border-color: rgba(62,207,142,0.25); }
+  .help-no-result { text-align: center; padding: 60px 0; color: var(--muted); font-size: 14px; display: none; }
+
+  /* ── VirusTotal Section ── */
+  .vt-status-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+  .vt-status-badge.active  { background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); }
+  .vt-status-badge.inactive { background: rgba(245,166,35,0.1); color: var(--yellow); border: 1px solid rgba(245,166,35,0.3); }
+  .vt-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .vt-table th { text-align: left; padding: 10px 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  .vt-table td { padding: 10px 12px; border-bottom: 1px solid rgba(42,51,71,0.6); vertical-align: middle; }
+  .vt-table tr:last-child td { border-bottom: none; }
+  .vt-table tr:hover td { background: rgba(255,255,255,0.025); }
+  .vt-badge-safe    { display: inline-block; background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .vt-badge-blocked { display: inline-block; background: rgba(226,93,93,0.15); color: var(--red); border: 1px solid rgba(226,93,93,0.3); border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .vt-badge-cached  { display: inline-block; background: rgba(91,141,238,0.12); color: var(--accent); border: 1px solid rgba(91,141,238,0.25); border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .vt-type-file { color: var(--yellow); font-size: 13px; }
+  .vt-type-url  { color: var(--accent); font-size: 13px; }
+  .vt-empty { text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<div class="sidebar">
+  <div class="logo">
+    <h1>🤖 FluxBot</h1>
+    <span>Dashboard</span>
+  </div>
+  <div class="nav-item active" onclick="showSection('status', this)">
+    <span class="nav-icon">📊</span> Status
+    <button class="info-btn" onmouseenter="tipShow(this,'Laufzeit, Uptime und aktive Kanäle auf einen Blick.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  </div>
+  <div class="nav-item" onclick="showSection('config', this)">
+    <span class="nav-icon">⚙️</span> Konfiguration
+    <button class="info-btn" onmouseenter="tipShow(this,'API-Keys, Kanäle, AI-Provider, Bild-/Videogenerierung, Voice und Integrationen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  </div>
+  <div class="nav-item" onclick="showSection('soul', this)">
+    <span class="nav-icon">🎭</span> Persönlichkeit
+    <button class="info-btn" onmouseenter="tipShow(this,'Definiert wie FluxBot antwortet. Änderungen erfordern einen Neustart.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  </div>
+  <div class="nav-item" onclick="showSection('logs', this)">
+    <span class="nav-icon">📋</span> Logs
+    <button class="info-btn" onmouseenter="tipShow(this,'Terminal-Ausgabe und Audit-Logs. Audit-Logs enthalten alle Benutzer-Interaktionen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  </div>
+  <div class="nav-item" onclick="showSection('system', this)">
+    <span class="nav-icon">🔧</span> System
+    <button class="info-btn" onmouseenter="tipShow(this,'Befehle für Neustart und Neu-Bauen – angepasst an dein Betriebssystem.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  </div>
+  <div class="nav-item" onclick="showSection('virustotal', this)">
+    <span class="nav-icon">🛡️</span> VirusTotal
+    <button class="info-btn" onmouseenter="tipShow(this,'Malware-Scan-History und Statistiken. Erfordert API-Key unter Integrationen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  </div>
+  <div class="nav-item" onclick="showSection('help', this)">
+    <span class="nav-icon">❓</span> Hilfe
+  </div>
+  <div class="sidebar-footer">KI-WERKE · FluxBot v1.1.1</div>
+</div>
+
+<!-- ── Main ── -->
+<div class="main">
+
+  <!-- STATUS -->
+  <div class="section active" id="section-status">
+    <h2>Status</h2>
+    <p class="subtitle">Laufzeitinformationen von FluxBot</p>
+    <div class="cards">
+      <div class="card">
+        <div class="card-label">Status</div>
+        <div class="card-value green" id="status-text">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Laufzeit</div>
+        <div class="card-value blue" id="status-uptime">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Aktive Kanäle</div>
+        <div class="card-value yellow" id="status-channel-count">–</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">📡 Verbundene Kanäle</div>
+      <div class="channel-list" id="status-channels">Lädt...</div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🔐 Secret-Backend</div>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px">
+        <span id="secret-backend-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(91,141,238,0.12);color:var(--accent);border:1px solid rgba(91,141,238,0.3)">⏳ Laden…</span>
+        <span id="secret-backend-mode" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6">
+        Secrets (API-Keys, Tokens) werden im aktiven Backend sicher gespeichert.<br>
+        <strong>Windows Credential Manager</strong> = lokal, OS-nativ, kein Klartext.<br>
+        <strong>AES-256-GCM Vault</strong> = verschlüsselte Datei (primär im Docker-Betrieb).
+      </p>
+    </div>
+    <button class="btn btn-secondary" onclick="loadStatus()">🔄 Aktualisieren</button>
+  </div>
+
+  <!-- CONFIG -->
+  <div class="section" id="section-config">
+    <h2>Konfiguration</h2>
+    <p class="subtitle">API-Keys und Einstellungen verwalten</p>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="showTab('channels', this)">📡 Kanäle</button>
+      <button class="tab-btn" onclick="showTab('providers', this)">🤖 Provider</button>
+      <button class="tab-btn" onclick="showTab('imagegen', this)">🎨 Bilder</button>
+      <button class="tab-btn" onclick="showTab('videogen', this)">🎬 Videos</button>
+      <button class="tab-btn" onclick="showTab('voice', this)">🎙️ Voice</button>
+      <button class="tab-btn" onclick="showTab('integrations', this)">🔌 Integrationen</button>
+      <button class="tab-btn" onclick="showTab('raw', this)">📄 JSON</button>
+    </div>
+
+    <!-- ── Kanäle ── -->
+    <div class="tab-content active" id="tab-channels">
+      <div class="panel">
+        <div class="panel-title">📱 Kommunikationskanäle</div>
+
+        <div class="toggle-row">
+          <div><div class="toggle-label">Telegram</div><div class="toggle-sub">Long-Polling, kein Webhook nötig</div></div>
+          <label class="toggle"><input type="checkbox" id="tg-enabled"><span class="toggle-slider"></span></label>
+        </div>
+        <div style="margin-top:12px">
+          <div class="field"><label>Telegram Bot Token</label>
+            <div class="input-wrap"><input type="password" id="tg-token" placeholder="1234567890:ABCdef..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Erlaubte User-IDs (kommagetrennt)</label>
+            <div class="input-wrap"><input type="password" id="tg-allowfrom" placeholder="123456789, 987654321" autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+        </div>
+
+        <div class="toggle-row" style="margin-top:8px">
+          <div><div class="toggle-label">Discord</div><div class="toggle-sub">Gateway WebSocket</div></div>
+          <label class="toggle"><input type="checkbox" id="dc-enabled"><span class="toggle-slider"></span></label>
+        </div>
+        <div style="margin-top:12px">
+          <div class="field"><label>Discord Bot Token</label>
+            <div class="input-wrap"><input type="password" id="dc-token" placeholder="MTxxxxxx..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+        </div>
+
+        <div class="toggle-row" style="margin-top:8px">
+          <div><div class="toggle-label">Slack</div><div class="toggle-sub">Events API (Webhook)</div></div>
+          <label class="toggle"><input type="checkbox" id="slack-enabled"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="two-col" style="margin-top:12px">
+          <div class="field"><label>Bot Token</label>
+            <div class="input-wrap"><input type="password" id="slack-bot-token" placeholder="xoxb-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+          <div class="field"><label>Signing Secret</label>
+            <div class="input-wrap"><input type="password" id="slack-signing" placeholder="abc123..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+        </div>
+
+        <div class="toggle-row" style="margin-top:8px">
+          <div><div class="toggle-label">Matrix</div><div class="toggle-sub">HTTP Long-Polling</div></div>
+          <label class="toggle"><input type="checkbox" id="matrix-enabled"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="two-col" style="margin-top:12px">
+          <div class="field"><label>Homeserver</label>
+            <input type="text" id="matrix-homeserver" placeholder="https://matrix.org">
+          </div>
+          <div class="field"><label>Access Token</label>
+            <div class="input-wrap"><input type="password" id="matrix-token" placeholder="syt_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+        </div>
+
+        <div class="toggle-row" style="margin-top:8px">
+          <div><div class="toggle-label">WhatsApp</div><div class="toggle-sub">Meta Business Cloud API</div></div>
+          <label class="toggle"><input type="checkbox" id="wa-enabled"><span class="toggle-slider"></span></label>
+        </div>
+        <div class="two-col" style="margin-top:12px">
+          <div class="field"><label>Phone Number ID</label>
+            <input type="text" id="wa-phoneid" placeholder="1234567890">
+          </div>
+          <div class="field"><label>Access Token</label>
+            <div class="input-wrap"><input type="password" id="wa-token" placeholder="EAA..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Provider (Tile-Layout) ── -->
+    <div class="tab-content" id="tab-providers">
+      <div class="tile-layout">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-title">🤖 KI-Provider (Sprache / Text)</div>
+          <div class="field">
+            <label>Aktiver Anbieter</label>
+            <select id="ai-provider" onchange="onDashProviderChange()">
+              <optgroup label="── Empfohlen ──────────────────────────">
+                <option value="openrouter">🌐  OpenRouter – alle Modelle über eine API</option>
+              </optgroup>
+              <optgroup label="── Führende Anbieter ──────────────────">
+                <option value="anthropic">🧠  Anthropic – Claude Sonnet / Opus</option>
+                <option value="openai">🤖  OpenAI – GPT-4o / o1 / o3</option>
+                <option value="google">🔵  Google – Gemini 2.0 / 1.5 Pro</option>
+                <option value="xai">✖️   xAI – Grok 2 / Grok 3</option>
+                <option value="groq">⚡  Groq – Llama 3.3 (kostenloser Tier)</option>
+                <option value="mistral">🌊  Mistral AI – Mistral Large / Codestral</option>
+                <option value="together">🤝  Together AI – Open-Source-Modelle</option>
+                <option value="deepseek">🔍  DeepSeek – V3 / R1</option>
+                <option value="perplexity">🔎  Perplexity – Sonar Pro (mit Websuche)</option>
+                <option value="cohere">🔗  Cohere – Command R+</option>
+              </optgroup>
+              <optgroup label="── Weitere Anbieter ───────────────────">
+                <option value="fireworks">🎆  Fireworks AI</option>
+                <option value="novita">🆕  NovitaAI</option>
+                <option value="deepinfra">🏗️  DeepInfra</option>
+                <option value="cerebras">🧠  Cerebras</option>
+                <option value="lepton">⚛️  Lepton AI</option>
+                <option value="anyscale">📡  Anyscale Endpoints</option>
+                <option value="replicate">♻️  Replicate</option>
+                <option value="ollama">🏠  Ollama – lokale Modelle (kein API-Key)</option>
+              </optgroup>
+              <optgroup label="── Benutzerdefiniert ──────────────────">
+                <option value="custom">⚙️  Eigener Provider (OpenAI-kompatible API)</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="provider-hint" id="dash-provider-hint" style="margin-bottom:12px">
+            Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr – alles mit einem Key. →
+            <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai</a>
+          </div>
+          <div class="field">
+            <label id="dash-apikey-label">API Key</label>
+            <div class="input-wrap">
+              <input type="password" id="ai-apikey" placeholder="sk-or-v1-..." autocomplete="off">
+              <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+            </div>
+          </div>
+          <div id="dash-custom-url-row" style="display:none">
+            <div class="field"><label>API Base-URL</label><input type="text" id="ai-custom-url" placeholder="https://mein-anbieter.com/v1/chat/completions"></div>
+            <div class="field"><label>Anbieter-Name</label><input type="text" id="ai-custom-name" placeholder="z.B. MeinLLM"></div>
+            <div class="field"><label>Standard-Modell</label><input type="text" id="ai-custom-model" placeholder="z.B. gpt-4o"></div>
+          </div>
+          <div id="dash-ollama-row" style="display:none">
+            <div class="field">
+              <label>Ollama Endpoint-URL</label>
+              <input type="text" id="ai-ollama-url" placeholder="http://localhost:11434">
+              <div class="provider-hint">Standard: localhost. Docker-Setup: <code>http://ollama:11434</code>. Entfernt via Tailscale möglich.</div>
+            </div>
+            <div class="field">
+              <label>Modell-Name</label>
+              <input type="text" id="ai-ollama-model" placeholder="llama3.2, mistral, phi4, qwen2.5 ...">
+              <div class="provider-hint">Exakter Name wie in <code>ollama list</code>. Muss zuvor mit <code>ollama pull &lt;modell&gt;</code> geladen werden.</div>
+            </div>
+            <div style="margin-top:10px;padding:10px 14px;background:#fffbea;border:1px solid #fbbf24;border-radius:6px;font-size:12px;color:#92400e">
+              ⚠️ <strong>Hardware-Anforderung:</strong> Ollama benötigt ausreichend RAM/VRAM. Empfehlung: mind. 8 GB RAM für 7B-Modelle, GPU für beste Performance.
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="info-card">
+            <h4>⭐ Empfehlung: OpenRouter</h4>
+            <p>Zugang zu über 200 KI-Modellen – Claude, GPT-4, Gemini, Llama u.v.m. – über eine einzige API und eine Rechnung.</p>
+            <a href="https://openrouter.ai/keys" target="_blank" class="info-link">→ Kostenlos registrieren</a>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Andere Optionen</h4>
+            <div class="other-list">
+              <div>⚡ <strong>Groq</strong> – kostenloser Tier, sehr schnell</div>
+              <div>🧠 <strong>Anthropic</strong> – direkter Claude-Zugang</div>
+              <div>🔍 <strong>DeepSeek</strong> – günstig, leistungsstark</div>
+              <div>🏠 <strong>Ollama</strong> – lokal, kein API-Key nötig</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Bilder (Tile-Layout) ── -->
+    <div class="tab-content" id="tab-imagegen">
+      <div class="tile-layout">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-title">🎨 Bild-Generierung</div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+            Wähle einen Provider und trage deinen API-Key ein. FluxBot fragt beim Nutzer automatisch nach Format und Modell.
+            Wenn kein Provider aktiv ist, teilt FluxBot dem Nutzer mit, dass Bildgenerierung deaktiviert ist.
+          </p>
+          <div class="field">
+            <label>Aktiver Provider</label>
+            <select id="img-default" onchange="onImgProviderChange()">
+              <option value="disabled">⬜  Deaktiviert – keine Bilder</option>
+              <option value="openrouter-shared">🌐  OpenRouter (gemeinsamer Key aus Provider-Tab)</option>
+              <option value="openrouter">🌐  OpenRouter (eigener Key für Bilder)</option>
+              <option value="fal">🔥  fal.ai – FLUX Pro Ultra, Recraft, Ideogram</option>
+              <option value="openai">🎨  OpenAI – DALL-E 3</option>
+              <option value="stability">🌈  Stability AI – Stable Diffusion 3.5</option>
+              <option value="together">🤝  Together AI – FLUX.1 Schnell</option>
+              <option value="replicate">♻️  Replicate – tausende Modelle</option>
+            </select>
+          </div>
+          <div class="provider-hint" id="img-provider-hint" style="margin-bottom:16px"></div>
+
+          <div id="img-openrouter-row" style="display:none">
+            <div class="field"><label>OpenRouter API Key (für Bilder)</label>
+              <div class="input-wrap"><input type="password" id="img-openrouter-key" placeholder="sk-or-v1-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field">
+              <label>Modelle (kommagetrennte Slugs – leer = Defaults)</label>
+              <input type="text" id="img-openrouter-models" placeholder="black-forest-labs/flux-2-pro, bytedance-seed/seedream-4.5">
+              <div class="provider-hint">FluxBot bietet dem Nutzer alle eingetragenen Modelle zur Auswahl an.</div>
+            </div>
+          </div>
+          <div id="img-fal-row" style="display:none">
+            <div class="field"><label>fal.ai API Key</label>
+              <div class="input-wrap"><input type="password" id="img-fal-key" placeholder="fal_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modelle (kommagetrennte Slugs – leer = Defaults)</label>
+              <input type="text" id="img-fal-models" placeholder="fal-ai/flux-pro/v1.1-ultra">
+            </div>
+          </div>
+          <div id="img-openai-row" style="display:none">
+            <div class="field"><label>OpenAI API Key</label>
+              <div class="input-wrap"><input type="password" id="img-openai-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Qualität</label>
+              <select id="img-quality"><option value="standard">Standard</option><option value="hd">HD</option></select>
+            </div>
+          </div>
+          <div id="img-stability-row" style="display:none">
+            <div class="field"><label>Stability AI API Key</label>
+              <div class="input-wrap"><input type="password" id="img-stability-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modelle (kommagetrennte Slugs – leer = Defaults)</label>
+              <input type="text" id="img-stability-models" placeholder="stability-ai/stable-diffusion-3.5-large">
+            </div>
+          </div>
+          <div id="img-together-row" style="display:none">
+            <div class="field"><label>Together AI API Key</label>
+              <div class="input-wrap"><input type="password" id="img-together-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modelle (kommagetrennte Slugs – leer = Defaults)</label>
+              <input type="text" id="img-together-models" placeholder="black-forest-labs/FLUX.1-schnell-Free">
+            </div>
+          </div>
+          <div id="img-replicate-row" style="display:none">
+            <div class="field"><label>Replicate API Token</label>
+              <div class="input-wrap"><input type="password" id="img-replicate-key" placeholder="r8_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modelle (kommagetrennte Slugs – leer = Defaults)</label>
+              <input type="text" id="img-replicate-models" placeholder="black-forest-labs/flux-1.1-pro">
+            </div>
+          </div>
+
+          <div class="notice" style="display:block;margin-top:8px">
+            💡 Format und Modell fragt FluxBot den Nutzer bei jeder Anfrage automatisch ab – wenn mehrere Modelle konfiguriert sind, kann der Nutzer wählen.
+          </div>
+        </div>
+        <div>
+          <div class="info-card">
+            <h4>⭐ Empfehlung: OpenRouter</h4>
+            <p>Über 50 Bildmodelle mit einem einzigen API-Key – FLUX.2 Pro, Seedream 4.5, Stable Diffusion u.v.m. Kein separater Account pro Modell nötig.</p>
+            <a href="https://openrouter.ai/keys" target="_blank" class="info-link">→ Kostenlos registrieren</a>
+            <hr class="divider">
+            <p style="font-size:12px;color:var(--muted);margin-bottom:8px">
+              💡 <strong>Format & Modell</strong> fragt FluxBot automatisch beim Nutzer ab – du musst hier nichts festlegen.
+            </p>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Andere Optionen</h4>
+            <div class="other-list">
+              <div>🔥 <strong>fal.ai</strong> – schnell, günstig, viele Modelle</div>
+              <div>🎨 <strong>OpenAI</strong> – DALL-E 3, hohe Qualität</div>
+              <div>🌈 <strong>Stability AI</strong> – Stable Diffusion 3.5</div>
+              <div>🤝 <strong>Together AI</strong> – FLUX.1 kostenlos</div>
+              <div>♻️ <strong>Replicate</strong> – tausende Open-Source-Modelle</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Videos (Tile-Layout) ── -->
+    <div class="tab-content" id="tab-videogen">
+      <div class="tile-layout">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-title">🎬 Video-Generierung</div>
+          <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+            Wähle einen Provider und trage deinen API-Key ein. Wenn kein Provider aktiv ist, teilt FluxBot dem Nutzer mit, dass Video-Generierung deaktiviert ist.
+          </p>
+          <div class="field">
+            <label>Aktiver Provider</label>
+            <select id="vid-default" onchange="onVidProviderChange()">
+              <option value="">⬜  Deaktiviert – keine Videos</option>
+              <option value="runway">🚀  Runway – Gen-4 Turbo (führend)</option>
+              <option value="kling">🎭  Kling AI – 2.0 (Kuaishou)</option>
+              <option value="luma">💡  Luma AI – Dream Machine</option>
+              <option value="pika">✨  Pika Labs – Pika 2.0</option>
+              <option value="hailuo">🌊  HailuoAI – Minimax Video</option>
+              <option value="sora">🤖  OpenAI – Sora</option>
+              <option value="veo">🔵  Google – Veo 3</option>
+            </select>
+          </div>
+          <div class="provider-hint" id="vid-provider-hint" style="margin-bottom:16px"></div>
+
+          <div id="vid-runway-row" style="display:none">
+            <div class="field"><label>Runway API Key</label>
+              <div class="input-wrap"><input type="password" id="vid-runway-key" placeholder="key_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-runway-model" placeholder="gen4_turbo"></div>
+          </div>
+          <div id="vid-kling-row" style="display:none">
+            <div class="field"><label>Kling AI API Key</label>
+              <div class="input-wrap"><input type="password" id="vid-kling-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-kling-model" placeholder="kling-v2"></div>
+          </div>
+          <div id="vid-luma-row" style="display:none">
+            <div class="field"><label>Luma AI API Key</label>
+              <div class="input-wrap"><input type="password" id="vid-luma-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-luma-model" placeholder="dream-machine"></div>
+          </div>
+          <div id="vid-pika-row" style="display:none">
+            <div class="field"><label>Pika Labs API Key</label>
+              <div class="input-wrap"><input type="password" id="vid-pika-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-pika-model" placeholder="pika-2.0"></div>
+          </div>
+          <div id="vid-hailuo-row" style="display:none">
+            <div class="field"><label>HailuoAI API Key</label>
+              <div class="input-wrap"><input type="password" id="vid-hailuo-key" placeholder="..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-hailuo-model" placeholder="minimax-video-01"></div>
+          </div>
+          <div id="vid-sora-row" style="display:none">
+            <div class="field"><label>OpenAI API Key (für Sora)</label>
+              <div class="input-wrap"><input type="password" id="vid-sora-key" placeholder="sk-..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-sora-model" placeholder="sora-1.0"></div>
+          </div>
+          <div id="vid-veo-row" style="display:none">
+            <div class="field"><label>Google API Key (für Veo)</label>
+              <div class="input-wrap"><input type="password" id="vid-veo-key" placeholder="AIza..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="field"><label>Modell (optional)</label><input type="text" id="vid-veo-model" placeholder="veo-3"></div>
+          </div>
+
+          <div class="notice" style="display:block;margin-top:8px">
+            💡 Länge, Format und Qualität fragt FluxBot den Nutzer bei jeder Anfrage automatisch ab.
+          </div>
+        </div>
+        <div>
+          <div class="info-card">
+            <h4>⭐ Empfehlung: Runway Gen-4</h4>
+            <p>Runway ist der führende Anbieter für KI-Videos – realistische Bewegungen, hohe Qualität, einfache API.</p>
+            <a href="https://app.runwayml.com/settings/tokens" target="_blank" class="info-link">→ Runway API Key holen</a>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Andere Optionen</h4>
+            <div class="other-list">
+              <div>🎭 <strong>Kling AI</strong> – günstiger, gute Qualität</div>
+              <div>💡 <strong>Luma Dream Machine</strong> – kreativ, cinematisch</div>
+              <div>🌊 <strong>HailuoAI</strong> – Minimax, sehr schnell</div>
+              <div>🤖 <strong>Sora</strong> – OpenAI, hohe Qualität</div>
+              <div>🔵 <strong>Veo 3</strong> – Google, mit Audio</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Voice (Tile-Layout) ── -->
+    <div class="tab-content" id="tab-voice">
+      <div class="tile-layout">
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-title">🎙️ Spracherkennung</div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">Voice aktivieren</div><div class="toggle-sub">Sprachnachrichten werden transkribiert</div></div>
+            <label class="toggle"><input type="checkbox" id="voice-enabled"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="two-col" style="margin-top:16px">
+            <div class="field"><label>Provider</label>
+              <select id="voice-provider">
+                <option value="groq">Groq Whisper (kostenlos)</option>
+                <option value="openai">OpenAI Whisper</option>
+                <option value="ollama">Ollama (lokal)</option>
+              </select>
+            </div>
+            <div class="field"><label>Sprache</label>
+              <select id="voice-lang">
+                <option value="de">Deutsch</option>
+                <option value="en">Englisch</option>
+                <option value="">Automatisch</option>
+              </select>
+            </div>
+          </div>
+          <div class="field"><label>API Key (Groq oder OpenAI)</label>
+            <div class="input-wrap"><input type="password" id="voice-apikey" placeholder="gsk_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+          </div>
+        </div>
+        <div>
+          <div class="info-card">
+            <h4>⭐ Empfehlung: Groq Whisper</h4>
+            <p>Kostenloser Tier verfügbar. Extrem schnell, sehr gute Erkennungsrate für Deutsch und Englisch.</p>
+            <a href="https://console.groq.com/keys" target="_blank" class="info-link">→ Kostenlos registrieren</a>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Andere Optionen</h4>
+            <div class="other-list">
+              <div>🤖 <strong>OpenAI Whisper</strong> – sehr präzise, kostenpflichtig</div>
+              <div>🏠 <strong>Ollama</strong> – lokal, kein API-Key nötig</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Integrationen ── -->
+    <div class="tab-content" id="tab-integrations">
+      <div class="tile-layout">
+        <div style="display:flex;flex-direction:column;gap:20px">
+
+          <!-- SMTP E-Mail Panel -->
+          <div class="panel" style="margin-bottom:0">
+            <div class="panel-title">📧 E-Mail-Versand (SMTP)</div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+              FluxBot kann E-Mails direkt versenden – aber <strong>nur wenn du es explizit befiehlst</strong>. Wähle deinen Anbieter und trage die Zugangsdaten ein.
+            </p>
+
+            <!-- Provider-Schnellauswahl -->
+            <div style="margin-bottom:16px">
+              <label style="display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px">Anbieter wählen</label>
+              <div style="display:flex;flex-wrap:wrap;gap:8px" id="smtp-provider-btns">
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('gmail')">Gmail</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('outlook')">Outlook / Hotmail</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('gmx')">GMX</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('webde')">Web.de</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('strato')">Strato</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('ionos')">IONOS</button>
+                <button type="button" class="smtp-prov-btn" onclick="setSmtpProvider('custom')">Eigener Server</button>
+              </div>
+            </div>
+
+            <!-- Credential-Link (je nach Provider) -->
+            <div id="smtp-cred-hint" style="display:none;background:rgba(91,141,238,0.08);border:1px solid rgba(91,141,238,0.25);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.6"></div>
+
+            <!-- Felder -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="field" style="margin:0">
+                <label>SMTP-Server (Host)</label>
+                <input id="smtp-host" type="text" placeholder="smtp.gmail.com">
+              </div>
+              <div class="field" style="margin:0">
+                <label>Port</label>
+                <input id="smtp-port" type="text" placeholder="587" value="587" style="max-width:100px">
+              </div>
+              <div class="field" style="margin:0">
+                <label>E-Mail-Adresse (Benutzername)</label>
+                <input id="smtp-user" type="text" placeholder="dein@gmail.com" autocomplete="off">
+              </div>
+              <div class="field" style="margin:0">
+                <label>App-Passwort / Passwort</label>
+                <div class="input-wrap">
+                  <input id="smtp-password" type="password" placeholder="●●●●●●●●●●●●●●●●" autocomplete="new-password">
+                  <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+                </div>
+              </div>
+              <div class="field" style="margin:0;grid-column:1/-1">
+                <label>Absender-Anzeigename (optional) – leer = E-Mail-Adresse</label>
+                <input id="smtp-from" type="text" placeholder='FluxBot <dein@gmail.com>'>
+              </div>
+            </div>
+          </div>
+
+          <!-- VirusTotal Panel -->
+          <div class="panel" style="margin-bottom:0" id="vt-integ-panel">
+            <div class="panel-title" style="justify-content:space-between">
+              <span>🛡️ VirusTotal – Malware-Schutz</span>
+              <span id="vt-integ-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Inaktiv</span>
+            </div>
+
+            <!-- Wichtigkeits-Banner -->
+            <div style="background:rgba(226,93,93,0.07);border:1px solid rgba(226,93,93,0.25);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.6;color:#f08080">
+              <strong style="color:var(--red);display:block;margin-bottom:4px">🔒 Erforderlich für sicheren Bot-Betrieb</strong>
+              VirusTotal scannt alle eingehenden Dateien und Links auf Malware – auf allen Kanälen gleichzeitig (Telegram, Discord, Slack, Matrix, WhatsApp).<br>
+              <span style="color:var(--muted);font-size:12px;margin-top:4px;display:inline-block">Ohne API-Key bleibt der Scan deaktiviert – Dateien werden dann ungeprüft weitergeleitet.</span>
+            </div>
+
+            <div class="field">
+              <label>VIRUSTOTAL_API_KEY</label>
+              <div class="input-wrap">
+                <input id="vt-apikey" type="password" placeholder="Dein VirusTotal API-Key…" autocomplete="off">
+                <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+              </div>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:-8px;margin-bottom:12px;line-height:1.6">
+              Kostenloser API-Key (500 Scans/Tag) verfügbar auf:
+              <a href="https://www.virustotal.com/gui/join-us" target="_blank" style="color:var(--accent)">virustotal.com/gui/join-us</a>
+            </div>
+          </div>
+
+          <!-- Cal.com Panel -->
+          <div class="panel" style="margin-bottom:0" id="calcom-integ-panel">
+            <div class="panel-title" style="justify-content:space-between">
+              <span>📅 Cal.com – Kalender & Termine</span>
+              <span id="calcom-integ-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Nicht konfiguriert</span>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+              Damit FluxBot Kalendereinträge für dich erstellen kann, trage hier deine Zugangsdaten ein.<br>
+              <a href="https://app.cal.com/settings/developer/api-keys" target="_blank" style="font-size:12px">→ API-Key in Cal.com erstellen (Einstellungen → Developer → API Keys)</a><br>
+              <a href="https://app.cal.eu/settings/developer/api-keys" target="_blank" style="font-size:12px">→ API-Key in Cal.eu erstellen (Einstellungen → Developer → API Keys)</a>
+            </p>
+            <div class="field">
+              <label>Dienst auswählen</label>
+              <select id="calcom-base-url" style="background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:14px;width:100%;outline:none;cursor:pointer">
+                <option value="https://api.cal.eu/v2">Cal.eu V2 &nbsp;— https://api.cal.eu/v2 ✅ empfohlen</option>
+                <option value="https://api.cal.com/v2">Cal.com V2 &nbsp;— https://api.cal.com/v2</option>
+                <option value="https://api.cal.com/v1">Cal.com V1 &nbsp;— https://api.cal.com/v1 (Legacy)</option>
+                <option value="https://api.cal.eu/v1">Cal.eu V1 &nbsp;— https://api.cal.eu/v1 (Legacy)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>API-Key</label>
+              <div class="input-wrap">
+                <input id="calcom-api-key" type="password" placeholder="cal_live_… (aus Cal.com → Einstellungen → API Keys)" autocomplete="off">
+                <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Deine E-Mail-Adresse</label>
+              <input id="calcom-owner-email" type="email" placeholder="name@beispiel.com" autocomplete="off">
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">Wird automatisch als Teilnehmer beim Termin eingetragen – du wirst nie danach gefragt.</div>
+            </div>
+            <div class="field">
+              <label>Event Type ID <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+              <input id="calcom-event-type-id" type="text" placeholder="z.B. 123456 – aus Cal.com → Event Types → URL" autocomplete="off">
+              <div style="font-size:11px;color:var(--muted);margin-top:4px">
+                Leer lassen = FluxBot ermittelt automatisch. Falls das nicht klappt: Cal.com öffnen → Event Types → die Zahl aus der URL kopieren (z.B. <code style="background:rgba(255,255,255,0.06);padding:1px 4px;border-radius:3px">/event-types/<strong>123456</strong></code>).
+              </div>
+            </div>
+          </div>
+
+          <!-- Google Workspace Panel -->
+          <div class="panel" style="margin-bottom:0" id="google-integ-panel">
+            <div class="panel-title" style="display:flex;align-items:center;gap:10px">
+              <span>🔵 Google Workspace – Calendar, Docs, Sheets, Drive, Gmail</span>
+              <span id="google-integ-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Nicht konfiguriert</span>
+            </div>
+            <div style="background:rgba(91,141,238,0.07);border:1px solid rgba(91,141,238,0.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.7">
+              FluxBot benötigt ein <strong>Google OAuth2 App-Zugangsdaten</strong> (Client ID + Client Secret) sowie einen <strong>Refresh Token</strong> für deinen Account.<br>
+              <strong>Einmalige Einrichtung:</strong>
+              <ol style="margin:8px 0 0 16px;padding:0">
+                <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console → Credentials → OAuth 2.0 Client ID</a> erstellen (Typ: Web-Anwendung)</li>
+                <li>Redirect URI hinzufügen: <code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:3px">http://localhost:9090/api/google/oauth-callback</code></li>
+                <li>APIs aktivieren: Calendar, Docs, Sheets, Drive, Gmail</li>
+                <li>Client ID + Secret unten eintragen → <strong>Speichern</strong> → dann <strong>„Google-Konto verbinden"</strong></li>
+              </ol>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+              <div>
+                <label>Google Client ID</label>
+                <input id="google-client-id" type="text" placeholder="...apps.googleusercontent.com" autocomplete="off">
+              </div>
+              <div>
+                <label>Google Client Secret</label>
+                <div class="password-wrap">
+                  <input id="google-client-secret" type="password" placeholder="GOCSPX-..." autocomplete="new-password">
+                  <button class="eye-btn" onclick="togglePassword('google-client-secret',this)">👁</button>
+                </div>
+              </div>
+            </div>
+            <div style="margin-bottom:12px">
+              <label>Refresh Token <span style="font-weight:400;color:var(--muted)">(wird automatisch befüllt nach Autorisierung)</span></label>
+              <div class="password-wrap">
+                <input id="google-refresh-token" type="password" placeholder="1//..." autocomplete="new-password">
+                <button class="eye-btn" onclick="togglePassword('google-refresh-token',this)">👁</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-secondary" onclick="googleStartOAuth()" id="google-oauth-btn">🔗 Google-Konto verbinden</button>
+              <span id="google-oauth-status" style="font-size:13px;color:var(--muted);align-self:center"></span>
+            </div>
+          </div>
+
+          <!-- Generische API-Keys Panel -->
+          <div class="panel" style="margin-bottom:0">
+            <div class="panel-title">🔌 Weitere Integrationen</div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">
+              Für Skills die eigene Zugangsdaten benötigen. Name und Wert eintragen – FluxBot verbindet beides automatisch mit dem passenden Skill.
+            </p>
+            <div id="integrations-list"></div>
+            <button class="btn btn-secondary" style="margin-top:12px" onclick="addIntegration()">＋ Weitere Integration hinzufügen</button>
+          </div>
+
+        </div>
+
+        <!-- Info-Card rechts -->
+        <div>
+          <div class="info-card">
+            <h4>📧 App-Passwörter erstellen</h4>
+            <p style="margin-bottom:12px;font-size:13px">Die meisten Anbieter verlangen ein spezielles App-Passwort statt deines normalen Passworts. Klicke auf den Link für deinen Anbieter:</p>
+            <div class="other-list" style="gap:10px">
+              <div>
+                <strong>Gmail</strong><br>
+                <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">→ myaccount.google.com/apppasswords</a><br>
+                <span style="font-size:11px;color:var(--muted)">2-Faktor-Auth muss aktiv sein</span>
+              </div>
+              <div>
+                <strong>Outlook / Hotmail / Live</strong><br>
+                <a href="https://account.microsoft.com/security" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">→ account.microsoft.com/security</a><br>
+                <span style="font-size:11px;color:var(--muted)">Sicherheit → Erweitert → App-Kennwörter</span>
+              </div>
+              <div>
+                <strong>GMX &amp; Web.de</strong><br>
+                <a href="https://hilfe.gmx.net/email/sicherheit/app-passwort.html" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">→ hilfe.gmx.net – App-Passwort</a><br>
+                <span style="font-size:11px;color:var(--muted)">Nur nötig wenn 2FA aktiv</span>
+              </div>
+              <div>
+                <strong>Strato</strong><br>
+                <a href="https://www.strato.de/faq/e-mail/smtp-und-imap-fuer-verschiedene-e-mail-programme/" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">→ Strato SMTP-Daten</a><br>
+                <span style="font-size:11px;color:var(--muted)">Normales E-Mail-Passwort reicht</span>
+              </div>
+              <div>
+                <strong>IONOS</strong><br>
+                <a href="https://www.ionos.de/hilfe/email/allgemeine-themen-zu-e-mail/postausgangsserver-smtp/" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">→ IONOS SMTP-Einstellungen</a><br>
+                <span style="font-size:11px;color:var(--muted)">Normales E-Mail-Passwort reicht</span>
+              </div>
+            </div>
+            <hr class="divider">
+            <h4>🛡️ VirusTotal (kostenlos)</h4>
+            <p style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px">
+              Der kostenlose Plan bietet <strong style="color:var(--text)">500 API-Anfragen/Tag</strong> – mehr als ausreichend für die meisten Bot-Installationen.
+            </p>
+            <a href="https://www.virustotal.com/gui/join-us" target="_blank" class="info-link">🔑 Kostenlosen API-Key holen</a>
+            <hr class="divider">
+            <h4>🔌 Weitere API-Keys</h4>
+            <div class="other-list">
+              <div>📅 <strong>Cal.com</strong> – Terminbuchungen</div>
+              <div>💳 <strong>Stripe</strong> – Zahlungen</div>
+              <div>📝 <strong>Notion</strong> – Datenbank & Notizen</div>
+              <div>🔗 <strong>Zapier / Make</strong> – Webhooks</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── JSON (gesperrt + Blur) ── -->
+    <div class="tab-content" id="tab-raw">
+      <div class="warn-banner">
+        <span class="warn-icon">⚠️</span>
+        <div>
+          <strong>Direkter JSON-Zugriff – nur für Experten!</strong>
+          Syntaxfehler können FluxBot unbrauchbar machen. Erstelle vor Änderungen immer eine Sicherungskopie.
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📄 config.json (direkter Zugriff)</div>
+        <div class="blur-wrap" id="json-wrap">
+          <div class="blur-overlay" id="json-overlay" onclick="requestEdit('json')">
+            <div class="blur-hint">
+              <span class="lock-icon">🔒</span>
+              <strong>Zum Bearbeiten klicken</strong>
+              <p>Direkter Zugriff auf die Konfigurationsdatei</p>
+              <span class="click-btn">Entsperren &amp; Bearbeiten</span>
+            </div>
+          </div>
+          <textarea class="config-editor blurred" id="raw-config" spellcheck="false"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div id="config-notice" style="display:none;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:10px;background:rgba(62,207,142,0.12);border:1px solid rgba(62,207,142,0.35);color:var(--green)">
+      ✅ Konfiguration gespeichert – Hot-Reload aktiv, keine weiteren Schritte nötig.
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="saveConfig()">💾 Speichern</button>
+      <button class="btn btn-secondary" onclick="loadConfig()">↺ Verwerfen</button>
+    </div>
+  </div>
+
+  <!-- SOUL (gesperrt + Blur) -->
+  <div class="section" id="section-soul">
+    <h2>Persönlichkeit</h2>
+    <p class="subtitle">Fluxys Charakter und Verhalten bearbeiten (SOUL.md)</p>
+    <div class="warn-banner">
+      <span class="warn-icon">⚠️</span>
+      <div>
+        <strong>Persönlichkeit bearbeiten – mit Bedacht!</strong>
+        Diese Datei definiert, wie FluxBot sich in ALLEN Gesprächen verhält. Änderungen sind sofort nach dem nächsten Neustart aktiv.
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🎭 SOUL.md – Persönlichkeit von FluxBot</div>
+      <div class="blur-wrap" id="soul-wrap">
+        <div class="blur-overlay" id="soul-overlay" onclick="requestEdit('soul')">
+          <div class="blur-hint">
+            <span class="lock-icon">🎭</span>
+            <strong>Zum Bearbeiten klicken</strong>
+            <p>Persönlichkeit von FluxBot – beeinflusst alle Gespräche</p>
+            <span class="click-btn">Entsperren &amp; Bearbeiten</span>
+          </div>
+        </div>
+        <textarea class="soul-editor blurred" id="soul-content" spellcheck="false" placeholder="Du bist Fluxy, der KI-Assistent von KI-WERKE...&#10;&#10;Schreibe hier Fluxys Persönlichkeit in natürlicher Sprache."></textarea>
+      </div>
+    </div>
+    <div class="notice" id="soul-notice">
+      ⚠️ Gespeichert – FluxBot muss neu gestartet werden damit die neue Persönlichkeit aktiv wird.
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="saveSoul()">💾 Speichern</button>
+      <button class="btn btn-secondary" onclick="loadSoul()">↺ Verwerfen</button>
+    </div>
+  </div>
+
+  <!-- LOGS -->
+  <div class="section" id="section-logs">
+    <h2>Logs</h2>
+    <p class="subtitle">Terminal-Ausgabe und Audit-Protokoll</p>
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
+      <button class="tab-btn active" id="log-tab-terminal" onclick="switchLogTab('terminal')">🖥️ Terminal</button>
+      <button class="tab-btn" id="log-tab-audit" onclick="switchLogTab('audit')">📋 Audit-Log</button>
+      <button class="btn btn-secondary" style="margin-left:auto" onclick="loadCurrentLogs()">🔄 Aktualisieren</button>
+      <span class="log-filename" id="log-filename" style="font-size:12px;color:var(--muted)">–</span>
+    </div>
+    <div class="log-box" id="log-box">Lade Logs...</div>
+  </div>
+
+  <!-- SYSTEM -->
+  <div class="section" id="section-system">
+    <h2>System</h2>
+    <p class="subtitle">FluxBot neu starten oder neu bauen – passende Befehle für dein System</p>
+
+    <!-- Ebene 1: Haupt-OS -->
+    <div style="font-size:13px;color:var(--muted);margin-bottom:8px">
+      <strong>Schritt 1:</strong> Wie läuft FluxBot bei dir?
+    </div>
+    <div class="os-selector" id="os-main-selector">
+      <span class="os-btn active" onclick="selectMainOS('windows', this)">🪟 Windows</span>
+      <span class="os-btn" onclick="selectMainOS('mac', this)">🍎 Mac</span>
+      <span class="os-btn" onclick="selectMainOS('linux', this)">🐧 Linux</span>
+      <span class="os-btn" onclick="selectMainOS('docker', this)">🐳 Docker</span>
+    </div>
+
+    <!-- Ebene 2: Sub-Auswahl (erscheint je nach Haupt-OS) -->
+    <div id="os-sub-panel" style="display:none;margin-bottom:20px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px">
+        <strong>Schritt 2:</strong> <span id="os-sub-label"></span>
+      </div>
+      <div class="os-selector" id="os-sub-selector"></div>
+    </div>
+
+    <!-- Info-Banner: Was ist der Unterschied? -->
+    <div id="os-info-banner" style="background:rgba(91,141,238,0.07);border:1px solid rgba(91,141,238,0.2);border-radius:10px;padding:14px 18px;margin-bottom:24px;font-size:13px;line-height:1.7;color:var(--muted)"></div>
+
+    <div class="system-tiles">
+      <!-- Restart -->
+      <div class="system-tile">
+        <h3>🔄 Neustart <span class="tile-badge restart">Schnell · ~5 Sek.</span></h3>
+        <p class="tile-desc">Stoppt FluxBot und startet ihn sofort neu. Nutze das wenn du Einstellungen im Dashboard gespeichert hast und sichergehen willst, dass alles übernommen wurde. <strong>Keine Daten gehen verloren.</strong></p>
+        <div id="restart-steps"></div>
+        <div class="howto-box" id="restart-howto"></div>
+      </div>
+
+      <!-- Rebuild -->
+      <div class="system-tile">
+        <h3>🔨 Neu bauen <span class="tile-badge rebuild">Update · ~2 Min.</span></h3>
+        <p class="tile-desc">Lädt den neuesten Code herunter und kompiliert FluxBot komplett neu. Notwendig nach <strong>Updates vom Entwickler</strong> (neue Funktionen, Bugfixes). Dauert etwas länger als ein einfacher Neustart.</p>
+        <div id="rebuild-steps"></div>
+        <div class="howto-box" id="rebuild-howto"></div>
+      </div>
+    </div>
+
+    <div class="cache-hint">
+      <strong>🌐 Browser-Cache leeren nach Rebuild:</strong>
+      Nach einem Neu-Build zeigt der Browser manchmal noch das alte Dashboard.
+      Drücke <kbd>Strg + Shift + R</kbd> (Windows/Linux) oder <kbd>Cmd + Shift + R</kbd> (Mac) – das lädt alles frisch.
+    </div>
+  </div>
+
+  <!-- VIRUSTOTAL -->
+  <div class="section" id="section-virustotal">
+    <h2>🛡️ VirusTotal</h2>
+    <p class="subtitle">Scan-Status, Statistiken und Scan-History in Echtzeit</p>
+
+    <!-- Status + Stats Karten -->
+    <div class="cards" id="vt-cards">
+      <div class="card">
+        <div class="card-label">Status</div>
+        <div id="vt-status-badge" style="margin-top:6px">
+          <span class="vt-status-badge inactive">⏳ Laden…</span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-label">Dateien gescannt</div>
+        <div class="card-value blue" id="vt-stat-files">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">URLs geprüft</div>
+        <div class="card-value blue" id="vt-stat-urls">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Blockiert</div>
+        <div class="card-value" id="vt-stat-blocked" style="color:var(--red)">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Cache-Hits</div>
+        <div class="card-value" style="color:var(--muted)" id="vt-stat-cache">–</div>
+      </div>
+    </div>
+
+    <!-- Info-Banner wenn VT inaktiv -->
+    <div id="vt-inactive-banner" style="display:none" class="warn-banner">
+      <span class="warn-icon">⚠️</span>
+      <div>
+        <strong>VirusTotal nicht aktiv</strong>
+        Kein API-Key konfiguriert. Trage <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px">VIRUSTOTAL_API_KEY</code> im Vault ein (Konfiguration → Integrationen) um den Scan zu aktivieren.<br>
+        <a href="https://www.virustotal.com/gui/join-us" target="_blank" style="color:var(--accent);font-size:12px;margin-top:4px;display:inline-block">→ Kostenloser VirusTotal API-Key</a>
+      </div>
+    </div>
+
+    <!-- History Tabelle -->
+    <div class="panel">
+      <div class="panel-title" style="justify-content:space-between">
+        <span>📋 Scan-History</span>
+        <div style="display:flex;gap:10px;align-items:center">
+          <span id="vt-history-count" style="font-size:12px;color:var(--muted);font-weight:400">–</span>
+          <button class="btn btn-secondary" onclick="loadVTData()" style="padding:5px 12px;font-size:12px">🔄 Aktualisieren</button>
+          <button class="btn btn-danger" onclick="clearVTHistory()" style="padding:5px 12px;font-size:12px" id="vt-clear-btn">🗑 Leeren</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="vt-table">
+          <thead>
+            <tr>
+              <th>Zeit</th>
+              <th>Typ</th>
+              <th>Ziel (Hash / URL)</th>
+              <th>Ergebnis</th>
+            </tr>
+          </thead>
+          <tbody id="vt-history-body">
+            <tr><td colspan="4" class="vt-empty">Noch keine Scans seit dem letzten Start.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Info-Box unten -->
+    <div class="howto-box" style="margin-top:4px">
+      <strong>ℹ️ Hinweise zur Scan-History:</strong><br>
+      Die History wird im Arbeitsspeicher gespeichert und beim Neustart von FluxBot zurückgesetzt (max. 100 Einträge).<br>
+      <strong>Cache-Hits</strong> bedeuten: der Hash wurde bereits früher gescannt und das Ergebnis war gecacht (kein neuer API-Call).<br>
+      Unbekannte Dateien (nicht in der VT-Datenbank) gelten als <span style="color:var(--green)">sicher</span>.
+    </div>
+  </div>
+
+  <!-- HILFE -->
+  <div class="section" id="section-help">
+    <h2>❓ Hilfe & Dokumentation</h2>
+    <p class="subtitle">Schnellreferenz für alle Dashboard-Bereiche, Konzepte und häufige Fehler</p>
+
+    <input class="help-search" type="text" placeholder="🔍 Hilfe durchsuchen…" oninput="helpSearch(this.value)" id="help-search-input">
+
+    <div class="help-accordion" id="help-accordion">
+
+      <!-- 1. Dashboard-Überblick -->
+      <div class="help-item" data-keywords="dashboard status konfiguration logs system virustotal persönlichkeit übersicht bereiche">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">📊 Dashboard-Überblick – alle Bereiche auf einen Blick</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <table class="help-table">
+            <thead><tr><th>Bereich</th><th>Was macht er?</th></tr></thead>
+            <tbody>
+              <tr><td>📊 Status</td><td>Zeigt ob FluxBot läuft, Uptime und welche Kanäle aktiv sind.</td></tr>
+              <tr><td>⚙️ Konfiguration</td><td>Alle Einstellungen: Kanäle, AI-Provider, Bild-/Videogenerierung, Voice, Integrationen und JSON-Direktzugriff.</td></tr>
+              <tr><td>🎭 Persönlichkeit</td><td>Bearbeite <code class="help-code">SOUL.md</code> – legt Charakter, Ton und Verhalten von FluxBot fest. Neustart nötig nach Änderung.</td></tr>
+              <tr><td>📋 Logs</td><td>Terminal-Ausgabe (fluxbot.log) und Audit-Logs (Gesprächs-Protokolle je Kanal). Letzte 100–200 Zeilen.</td></tr>
+              <tr><td>🔧 System</td><td>Copy-paste-fertige Befehle zum Neustarten oder Neu-Bauen, angepasst an Windows / Mac / Linux / Docker.</td></tr>
+              <tr><td>🛡️ VirusTotal</td><td>Echtzeit-Statistiken und Scan-History aller geprüften Dateien und Links (max. 100 Einträge im RAM).</td></tr>
+              <tr><td>❓ Hilfe</td><td>Diese Seite – Konzepte, Token-Namen und häufige Fehler.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 2. Vault & Sicherheit -->
+      <div class="help-item" data-keywords="vault sicherheit aes verschlüsselung secret key passwort hot reload">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">🔒 Vault & Sicherheit – wie Secrets gespeichert werden</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <p>FluxBot speichert alle sensiblen Werte (API-Keys, Tokens, Passwörter) in einem <strong style="color:var(--text)">AES-256-GCM verschlüsselten Vault</strong> – nie im Klartext in <code class="help-code">config.json</code>.</p>
+          <table class="help-table" style="margin-top:14px">
+            <thead><tr><th>Konzept</th><th>Erklärung</th></tr></thead>
+            <tbody>
+              <tr><td>🗝️ Vault-Schlüssel</td><td>Liegt in <code class="help-code">.vaultkey</code> (chmod 600). Alternativ als Env-Variable <code class="help-code">FLUXBOT_VAULT_KEY</code>.</td></tr>
+              <tr><td>📁 Vault-Datei</td><td><code class="help-code">workspace/.secrets.vault</code> – AES-256-GCM verschlüsselt, binär.</td></tr>
+              <tr><td>⚡ Hot-Reload</td><td>Secrets werden nach dem Speichern im Dashboard sofort aktiv – kein Neustart nötig.</td></tr>
+              <tr><td>🐳 Docker</td><td>Vault + Schlüssel liegen im <code class="help-code">workspace/</code>-Volume → bleiben beim Neustart erhalten.</td></tr>
+              <tr><td>🔑 Keyring</td><td>Lokal (ohne Docker): Vault-Schlüssel wird im System-Keyring gespeichert (Windows Credential Manager / macOS Keychain).</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:14px;color:var(--muted)">
+            <strong style="color:var(--text)">Tipp:</strong> Das Dashboard-Passwort und alle API-Keys werden über <em>Konfiguration → Integrationen</em> bzw. die jeweiligen Tabs gesetzt – nicht direkt in Dateien.
+          </p>
+        </div>
+      </div>
+
+      <!-- 3. Weitere Integrationen -->
+      <div class="help-item" data-keywords="integration skill weitere api key wert verbinden eigener service">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">🔌 Weitere Integrationen – eigene Services verbinden</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <p>Bekannte Services wie Cal.com oder VirusTotal haben eigene Bereiche im Integrationen-Tab – einfach die Felder ausfüllen und speichern.</p>
+          <p style="margin-top:10px">Für <strong>andere Services</strong> (z.B. Stripe, eigene APIs) gibt es den Bereich „Weitere Integrationen". Dort trägst du einen <strong>Namen</strong> und den <strong>Wert</strong> ein – FluxBot verbindet beides automatisch mit dem passenden Skill.</p>
+
+          <p style="margin-top:14px;font-weight:600;color:var(--text)">Wie der Name aussehen soll:</p>
+          <p style="color:var(--muted);font-size:13px">Der Name ist frei wählbar – er muss nur mit dem übereinstimmen, was der Skill erwartet. Meist steht das in der Skill-Beschreibung. Großbuchstaben und Unterstriche, z.B. <code class="help-code">STRIPE_SECRET</code> oder <code class="help-code">MEIN_API_KEY</code>.</p>
+
+          <p style="margin-top:14px;font-weight:600;color:var(--text)">Beispiele:</p>
+          <table class="help-table" style="margin-top:8px">
+            <thead><tr><th>Name</th><th>Wert (Beispiel)</th><th>Wofür</th></tr></thead>
+            <tbody>
+              <tr><td><code class="help-code">STRIPE_SECRET</code></td><td><code class="help-code">sk_live_abc123</code></td><td>Stripe-Zahlungen</td></tr>
+              <tr><td><code class="help-code">WEATHER_API_KEY</code></td><td><code class="help-code">a1b2c3d4e5</code></td><td>Wetter-Skill</td></tr>
+              <tr><td><code class="help-code">MY_SHOP_URL</code></td><td><code class="help-code">https://meinshop.at/api</code></td><td>Eigener Shop-Skill</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:12px;color:var(--muted);font-size:13px">
+            🔒 Alle Werte werden verschlüsselt gespeichert – kein Klartext in Dateien.
+          </p>
+        </div>
+      </div>
+
+      <!-- 4. Skill-Signatur-Workflow -->
+      <div class="help-item" data-keywords="skill signatur hmac sha256 neu signieren sig datei sicherheit">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">📝 Skill-Signatur-Workflow – wann und wie neu signieren</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <p>Jede Skill-Datei (<code class="help-code">workspace/skills/*.md</code>) hat eine zugehörige Signatur-Datei (<code class="help-code">*.sig</code>). FluxBot prüft beim Laden ob die Signatur mit dem <code class="help-code">SKILL_SECRET</code> übereinstimmt – manipulierte Skill-Dateien werden abgelehnt.</p>
+          <p><strong style="color:var(--text)">Wann musst du neu signieren?</strong> Immer wenn du den Inhalt einer Skill-Datei bearbeitest.</p>
+          <p><strong style="color:var(--text)">So signierst du neu</strong> (ersetze die Platzhalter):</p>
+          <div style="background:#080c14;border:1px solid var(--border);border-radius:8px;padding:12px 16px;font-family:monospace;font-size:12px;color:#a8c0d6;margin:10px 0;line-height:1.8">
+            python3 -c "<br>
+            &nbsp;import hmac, hashlib<br>
+            &nbsp;secret = 'SKILL_SECRET_AUS_VAULT'<br>
+            &nbsp;path = 'workspace/skills/DEIN_SKILL.md'<br>
+            &nbsp;with open(path, 'rb') as f: data = f.read()<br>
+            &nbsp;sig = hmac.new(secret.encode(), data, hashlib.sha256).hexdigest()<br>
+            &nbsp;with open(path + '.sig', 'w') as f: f.write(sig)<br>
+            "
+          </div>
+          <p>Das <code class="help-code">SKILL_SECRET</code> findest du im Vault (Dashboard → Konfiguration → JSON oder per API). Es wird beim ersten Start automatisch generiert.</p>
+        </div>
+      </div>
+
+      <!-- 5. Kanäle & Token-Namen -->
+      <div class="help-item" data-keywords="telegram discord slack matrix whatsapp token kanal vault key name">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">📡 Kanäle & Vault-Schlüssel – welcher Token wohin gehört</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <p>Alle Kanal-Tokens werden im Vault gespeichert, nie in <code class="help-code">config.json</code>. Hier die Schlüsselnamen je Kanal:</p>
+          <table class="help-table" style="margin-top:12px">
+            <thead><tr><th>Kanal</th><th>Vault-Schlüssel</th><th>Woher bekommst du ihn?</th></tr></thead>
+            <tbody>
+              <tr><td>🔵 Telegram</td><td><code class="help-code">TELEGRAM_TOKEN</code></td><td><a href="https://t.me/BotFather" target="_blank" style="color:var(--accent)">@BotFather</a> auf Telegram</td></tr>
+              <tr><td>🟣 Discord</td><td><code class="help-code">DISCORD_TOKEN</code></td><td><a href="https://discord.com/developers/applications" target="_blank" style="color:var(--accent)">discord.com/developers</a> → Bot → Token</td></tr>
+              <tr><td>🟢 Slack</td><td><code class="help-code">SLACK_BOT_TOKEN</code><br><code class="help-code">SLACK_SIGNING_SECRET</code></td><td><a href="https://api.slack.com/apps" target="_blank" style="color:var(--accent)">api.slack.com/apps</a> → deine App</td></tr>
+              <tr><td>🔷 Matrix</td><td><code class="help-code">MATRIX_TOKEN</code></td><td>Login-Token aus Matrix-Server (Element → Einstellungen → Hilfe)</td></tr>
+              <tr><td>🟩 WhatsApp</td><td><code class="help-code">WHATSAPP_API_KEY</code></td><td><a href="https://developers.facebook.com/" target="_blank" style="color:var(--accent)">Meta for Developers</a> → WhatsApp Business API</td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:14px">Diese Keys werden im Dashboard unter <em>Konfiguration → Kanäle</em> eingetragen und automatisch im Vault gespeichert.</p>
+        </div>
+      </div>
+
+      <!-- 6. Häufige Fehler -->
+      <div class="help-item" data-keywords="fehler error hmac crlf hook virustotal api key neustart rebuild problem lösung">
+        <div class="help-item-header" onclick="helpToggle(this.parentElement)">
+          <span class="help-item-title">🚨 Häufige Fehler & Lösungen</span>
+          <span class="help-item-arrow">▼</span>
+        </div>
+        <div class="help-item-body">
+          <table class="help-table">
+            <thead><tr><th>Fehlerbild</th><th>Ursache & Lösung</th></tr></thead>
+            <tbody>
+              <tr>
+                <td>Dashboard zeigt<br>„Ungültige Signatur"</td>
+                <td><code class="help-code">HMAC_SECRET</code> fehlt oder stimmt nicht überein. Trage es im Vault ein (Vault-Key: <code class="help-code">HMAC_SECRET</code>) oder als Env-Variable <code class="help-code">FLUXBOT_HMAC_SECRET</code>. Danach Hot-Reload auslösen.</td>
+              </tr>
+              <tr>
+                <td>Pre-Commit Hook schlägt fehl<br>„bad interpreter"</td>
+                <td>Windows-Zeilenenden (CRLF) im Hook. Fix:<br><code class="help-code">sed -i 's/\r//' .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit</code></td>
+              </tr>
+              <tr>
+                <td>VirusTotal scannt nichts,<br>kein Fehler</td>
+                <td>API-Key fehlt. Trage <code class="help-code">VIRUSTOTAL_API_KEY</code> im Vault ein (<em>Konfiguration → Integrationen</em>). Kostenloser Key auf <a href="https://www.virustotal.com/gui/join-us" target="_blank" style="color:var(--accent)">virustotal.com</a>.</td>
+              </tr>
+              <tr>
+                <td>Bot antwortet nicht<br>nach Config-Änderung</td>
+                <td>Manche Änderungen erfordern einen Neustart (z.B. neue Kanäle aktivieren). Nutze <em>System → Neustart</em>. Secrets hingegen werden per Hot-Reload sofort aktiv.</td>
+              </tr>
+              <tr>
+                <td>Dashboard zeigt altes<br>Layout nach Rebuild</td>
+                <td>Browser-Cache leeren: <kbd>Strg+Shift+R</kbd> (Windows/Linux) oder <kbd>Cmd+Shift+R</kbd> (Mac).</td>
+              </tr>
+              <tr>
+                <td>Skill wird abgelehnt<br>„Signatur ungültig"</td>
+                <td>Skill-Datei wurde bearbeitet ohne neue Signatur. Signatur neu generieren (siehe <em>Skill-Signatur-Workflow</em> oben).</td>
+              </tr>
+              <tr>
+                <td><code class="help-code">git push</code> schlägt fehl</td>
+                <td>Token in Remote-URL prüfen: <code class="help-code">git remote -v</code> – URL muss das Token enthalten. Ggf. neu setzen: <code class="help-code">git remote set-url origin https://TOKEN@github.com/org/repo.git</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /help-accordion -->
+    <div class="help-no-result" id="help-no-result">Keine Treffer für deine Suche.</div>
+  </div>
+
+</div><!-- /main -->
+
+<div id="info-tooltip"></div>
+
+<!-- ── Confirmation Modal ── -->
+<div class="modal-overlay" id="edit-modal" style="display:none" onclick="closeModalBg(event)">
+  <div class="modal">
+    <h3 id="modal-title">⚠️ Direkte Bearbeitung</h3>
+    <p id="modal-text1"></p>
+    <p id="modal-text2"></p>
+    <p class="modal-confirm-text">Bist du sicher, dass du fortfahren möchtest?</p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+      <button class="btn btn-danger" onclick="confirmEditDo()">✏️ Ja, bearbeiten</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+let configData = null;
+let secretsData = {}; // Vault-Secrets (API-Keys, Tokens, Passwörter)
+let pendingEditTarget = null;
+
+// ── Eye-Toggle ─────────────────────────────────────────────────────────────
+function toggleEye(btn) {
+  const inp = btn.previousElementSibling;
+  if (!inp) return;
+  inp.type = (inp.type === 'password') ? 'text' : 'password';
+  btn.textContent = (inp.type === 'password') ? '👁' : '🙈';
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function showSection(name, el) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (name === 'status')     loadStatus();
+  if (name === 'config')     loadConfig();
+  if (name === 'soul')       loadSoul();
+  if (name === 'logs')       loadCurrentLogs();
+  if (name === 'system')     updateSystemCmds();
+  if (name === 'virustotal') loadVTData();
+  if (name === 'help') {
+    document.getElementById('help-search-input').value = '';
+    helpSearch('');
+  }
+}
+
+function showTab(name, el) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (el) el.classList.add('active');
+  if (name === 'raw' && configData) {
+    document.getElementById('raw-config').value = JSON.stringify(configData, null, 2);
+    // Immer mit Blur starten wenn Tab geöffnet wird
+    reBlur('json');
+  }
+}
+
+// ── Blur / Confirm ─────────────────────────────────────────────────────────
+function reBlur(target) {
+  const overlay = document.getElementById(target + '-overlay');
+  const ta = document.getElementById(target === 'json' ? 'raw-config' : 'soul-content');
+  if (overlay) overlay.style.display = 'flex';
+  if (ta) ta.classList.add('blurred');
+}
+
+function requestEdit(target) {
+  pendingEditTarget = target;
+  const cfg = {
+    json: {
+      title: '⚠️ JSON direkt bearbeiten',
+      t1:    'Du bearbeitest die Konfigurationsdatei (config.json) direkt.',
+      t2:    'Syntaxfehler oder falsche Werte können FluxBot unbrauchbar machen. Erstelle vorher eine Sicherungskopie (Inhalt kopieren).'
+    },
+    soul: {
+      title: '⚠️ Persönlichkeit bearbeiten',
+      t1:    'Du bearbeitest SOUL.md – die Persönlichkeit von FluxBot.',
+      t2:    'Änderungen beeinflussen das Verhalten in ALLEN Gesprächen. Nach dem Speichern muss FluxBot neu gestartet werden.'
+    }
+  };
+  const c = cfg[target] || cfg.json;
+  document.getElementById('modal-title').textContent  = c.title;
+  document.getElementById('modal-text1').textContent  = c.t1;
+  document.getElementById('modal-text2').textContent  = c.t2;
+  document.getElementById('edit-modal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('edit-modal').style.display = 'none';
+  pendingEditTarget = null;
+}
+
+function closeModalBg(e) {
+  if (e.target.id === 'edit-modal') closeModal();
+}
+
+function confirmEditDo() {
+  if (!pendingEditTarget) return;
+  const overlay = document.getElementById(pendingEditTarget + '-overlay');
+  const ta = document.getElementById(pendingEditTarget === 'json' ? 'raw-config' : 'soul-content');
+  if (overlay) overlay.style.display = 'none';
+  if (ta) { ta.classList.remove('blurred'); ta.focus(); }
+  closeModal();
+}
+
+// ── Provider-Hilfsfunktionen (LLM) ────────────────────────────────────────
+const dashProviderMeta = {
+  openrouter: { ph: 'sk-or-v1-...',  label: 'API Key', hint: 'Zugang zu Claude, GPT-4, Gemini, Perplexity und mehr.', link: 'https://openrouter.ai/keys', linkText: 'openrouter.ai' },
+  anthropic:  { ph: 'sk-ant-...',    label: 'API Key', hint: 'Direkter Zugang zu Claude Sonnet und Claude Opus.',     link: 'https://console.anthropic.com/settings/keys', linkText: 'console.anthropic.com' },
+  openai:     { ph: 'sk-...',        label: 'API Key', hint: 'Direkter Zugang zu GPT-4o, o1, o3.',                    link: 'https://platform.openai.com/api-keys', linkText: 'platform.openai.com' },
+  google:     { ph: 'AIza...',       label: 'API Key', hint: 'Gemini 2.0 Flash, Gemini 1.5 Pro.',                     link: 'https://aistudio.google.com/app/apikey', linkText: 'aistudio.google.com' },
+  xai:        { ph: 'xai-...',       label: 'API Key', hint: 'Grok 2 und Grok 3 von xAI.',                            link: 'https://console.x.ai/', linkText: 'console.x.ai' },
+  groq:       { ph: 'gsk_...',       label: 'API Key', hint: 'Kostenloser Tier. Llama 3.3 70B, sehr schnell.',        link: 'https://console.groq.com/keys', linkText: 'console.groq.com' },
+  mistral:    { ph: '...',           label: 'API Key', hint: 'Mistral Large, Mistral Small, Codestral.',               link: 'https://console.mistral.ai/api-keys/', linkText: 'console.mistral.ai' },
+  together:   { ph: '...',           label: 'API Key', hint: 'Llama, Qwen, Gemma und viele Open-Source-Modelle.',     link: 'https://api.together.ai/settings/api-keys', linkText: 'api.together.ai' },
+  deepseek:   { ph: 'sk-...',        label: 'API Key', hint: 'DeepSeek V3 und DeepSeek R1.',                          link: 'https://platform.deepseek.com/api_keys', linkText: 'platform.deepseek.com' },
+  perplexity: { ph: 'pplx-...',      label: 'API Key', hint: 'Sonar Pro mit Echtzeit-Websuche.',                      link: 'https://www.perplexity.ai/settings/api', linkText: 'perplexity.ai' },
+  cohere:     { ph: '...',           label: 'API Key', hint: 'Command R+ – spezialisiert auf RAG.',                    link: 'https://dashboard.cohere.com/api-keys', linkText: 'dashboard.cohere.com' },
+  fireworks:  { ph: 'fw_...',        label: 'API Key', hint: 'Schnelle Inference für Open-Source-Modelle.',           link: 'https://fireworks.ai/account/api-keys', linkText: 'fireworks.ai' },
+  novita:     { ph: '...',           label: 'API Key', hint: 'Günstiger Zugang zu Open-Source-Modellen.',             link: 'https://novita.ai/settings?tab=key-management', linkText: 'novita.ai' },
+  deepinfra:  { ph: '...',           label: 'API Key', hint: 'Kosteneffiziente Inference.',                            link: 'https://deepinfra.com/dash/api_keys', linkText: 'deepinfra.com' },
+  cerebras:   { ph: '...',           label: 'API Key', hint: 'Extrem schnelle Inference auf Cerebras-Hardware.',      link: 'https://cloud.cerebras.ai/', linkText: 'cloud.cerebras.ai' },
+  lepton:     { ph: '...',           label: 'API Key', hint: 'Einfache Inference-API.',                               link: 'https://dashboard.lepton.ai/', linkText: 'dashboard.lepton.ai' },
+  anyscale:   { ph: 'esecret_...',   label: 'API Key', hint: 'Skalierbare Modell-Deployments.',                       link: 'https://app.endpoints.anyscale.com/', linkText: 'endpoints.anyscale.com' },
+  replicate:  { ph: 'r8_...',        label: 'API Token', hint: 'Tausende Modelle auf Replicate.',                     link: 'https://replicate.com/account/api-tokens', linkText: 'replicate.com' },
+  ollama:     { ph: '(kein Key)',    label: 'API Key (nicht nötig)', hint: 'Lokale Modelle – kein API-Key, keine Kosten.', link: 'https://ollama.ai', linkText: 'ollama.ai' },
+  custom:     { ph: '...',           label: 'API Key', hint: 'Jede OpenAI-kompatible API.', link: '', linkText: '' },
+};
+
+function onDashProviderChange() {
+  const p = document.getElementById('ai-provider').value;
+  const m = dashProviderMeta[p] || dashProviderMeta.custom;
+  document.getElementById('ai-apikey').placeholder = m.ph;
+  document.getElementById('dash-apikey-label').textContent = m.label;
+  document.getElementById('dash-provider-hint').innerHTML =
+    m.hint + (m.link ? ' → <a href="' + m.link + '" target="_blank">' + m.linkText + '</a>' : '');
+  document.getElementById('dash-custom-url-row').style.display = (p === 'custom') ? 'block' : 'none';
+  document.getElementById('dash-ollama-row').style.display  = (p === 'ollama') ? 'block' : 'none';
+  // Ollama braucht keinen API-Key → Eingabefeld ausblenden
+  document.getElementById('ai-apikey').closest('.field').style.display = (p === 'ollama') ? 'none' : '';
+}
+
+function getDashProviderKey(p, name) {
+  const keyMap = {
+    openrouter: p.openrouter?.apiKey, anthropic: p.anthropic?.apiKey, openai: p.openai?.apiKey,
+    google: p.google?.apiKey, xai: p.xai?.apiKey, groq: p.groq?.apiKey, mistral: p.mistral?.apiKey,
+    together: p.together?.apiKey, deepseek: p.deepseek?.apiKey, perplexity: p.perplexity?.apiKey,
+    cohere: p.cohere?.apiKey, fireworks: p.fireworks?.apiKey, ollama: '', custom: p.custom?.apiKey,
+  };
+  return keyMap[name] || '';
+}
+
+function setDashProviderKey(providers, name, key) {
+  const fieldMap = {
+    openrouter: 'openrouter', anthropic: 'anthropic', openai: 'openai', google: 'google',
+    xai: 'xai', groq: 'groq', mistral: 'mistral', together: 'together', deepseek: 'deepseek',
+    perplexity: 'perplexity', cohere: 'cohere', fireworks: 'fireworks', custom: 'custom',
+  };
+  const field = fieldMap[name];
+  if (field) { providers[field] = providers[field] || {}; providers[field].apiKey = key; }
+}
+
+// ── ImageGen Provider ─────────────────────────────────────────────────────
+const imgProviderHints = {
+  '':                  '',
+  'openrouter-shared': 'Nutzt den OpenRouter-Key aus dem Provider-Tab. Kein zusätzlicher Key nötig.',
+  'openrouter':        'Separater OpenRouter-Key für Bildgenerierung. → <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai</a>',
+  'fal':               'FLUX Pro Ultra, Recraft, Ideogram u.v.m. → <a href="https://fal.ai/dashboard/keys" target="_blank">fal.ai/dashboard</a>',
+  'openai':            'DALL-E 3 von OpenAI. → <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com</a>',
+  'stability':         'Stable Diffusion 3.5 Large. → <a href="https://platform.stability.ai/" target="_blank">platform.stability.ai</a>',
+  'together':          'FLUX.1 Schnell kostenlos. → <a href="https://api.together.ai/settings/api-keys" target="_blank">api.together.ai</a>',
+  'replicate':         'Tausende Bild-Modelle. → <a href="https://replicate.com/account/api-tokens" target="_blank">replicate.com</a>',
+};
+const imgProviderRows = ['openrouter', 'fal', 'openai', 'stability', 'together', 'replicate'];
+
+function onImgProviderChange() {
+  const sel = document.getElementById('img-default').value;
+  document.getElementById('img-provider-hint').innerHTML = imgProviderHints[sel] || '';
+  imgProviderRows.forEach(p => {
+    document.getElementById('img-' + p + '-row').style.display = (sel === p) ? 'block' : 'none';
+  });
+}
+
+// ── VideoGen Provider ─────────────────────────────────────────────────────
+const vidProviderHints = {
+  '':       '',
+  'runway': 'Runway Gen-4 – Marktführer für KI-Videos. → <a href="https://app.runwayml.com/" target="_blank">app.runwayml.com</a>',
+  'kling':  'Kling AI 2.0 von Kuaishou. → <a href="https://klingai.com/" target="_blank">klingai.com</a>',
+  'luma':   'Luma Dream Machine – realistische Videos. → <a href="https://lumalabs.ai/" target="_blank">lumalabs.ai</a>',
+  'pika':   'Pika Labs 2.0 – kreative Videoeffekte. → <a href="https://pika.art/" target="_blank">pika.art</a>',
+  'hailuo': 'HailuoAI (Minimax) – hochauflösende Videos. → <a href="https://hailuoai.com/" target="_blank">hailuoai.com</a>',
+  'sora':   'OpenAI Sora – hochwertige KI-Videos. → <a href="https://sora.com/" target="_blank">sora.com</a>',
+  'veo':    'Google Veo 3 – realistisches Videoverständnis. → <a href="https://deepmind.google/technologies/veo/" target="_blank">deepmind.google</a>',
+};
+const vidProviderRows = ['runway', 'kling', 'luma', 'pika', 'hailuo', 'sora', 'veo'];
+
+function onVidProviderChange() {
+  const sel = document.getElementById('vid-default').value;
+  document.getElementById('vid-provider-hint').innerHTML = vidProviderHints[sel] || '';
+  vidProviderRows.forEach(p => {
+    document.getElementById('vid-' + p + '-row').style.display = (sel === p) ? 'block' : 'none';
+  });
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = isError ? 'error show' : 'show';
+  setTimeout(() => { t.className = ''; }, 3500);
+}
+
+// ── HMAC Request-Signing ──────────────────────────────────────────────────
+// hmacCryptoKey wird beim Init geladen (null = HMAC deaktiviert)
+let hmacCryptoKey = null;
+
+// Lädt das HMAC-Secret vom Server und importiert es als CryptoKey.
+// Wird einmalig beim Start aufgerufen – schlägt lautlos fehl wenn deaktiviert.
+async function initHMAC() {
+  try {
+    const resp = await fetch('/api/hmac-token');
+    if (!resp.ok) return;
+    const data = await resp.json();
+    if (!data.enabled || !data.secret) return;
+    const enc = new TextEncoder();
+    hmacCryptoKey = await crypto.subtle.importKey(
+      'raw',
+      enc.encode(data.secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+    console.log('[HMAC] Dashboard Request-Signing aktiv ✅');
+  } catch (e) {
+    console.warn('[HMAC] Initialisierung fehlgeschlagen (optional):', e);
+  }
+}
+
+// Berechnet HMAC-SHA256("{timestamp}.{body}", key) → Hex-String
+async function signPayload(timestamp, bodyStr) {
+  if (!hmacCryptoKey) return null;
+  const enc = new TextEncoder();
+  const payload = `${timestamp}.${bodyStr}`;
+  const sigBuf = await crypto.subtle.sign('HMAC', hmacCryptoKey, enc.encode(payload));
+  return Array.from(new Uint8Array(sigBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── API Helpers ────────────────────────────────────────────────────────────
+async function api(url, method = 'GET', body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const bodyStr = body ? JSON.stringify(body) : '';
+  if (bodyStr) opts.body = bodyStr;
+
+  // HMAC-Signierung für schreibende Requests (POST, PUT, DELETE)
+  const mutating = ['POST', 'PUT', 'DELETE'].includes((method || 'GET').toUpperCase());
+  if (mutating && hmacCryptoKey) {
+    const timestamp = Math.floor(Date.now() / 1000).toString();
+    const sig = await signPayload(timestamp, bodyStr);
+    if (sig) {
+      opts.headers['X-Timestamp'] = timestamp;
+      opts.headers['X-Signature'] = sig;
+    }
+  }
+
+  const resp = await fetch(url, opts);
+  return resp.json();
+}
+
+// ── STATUS ─────────────────────────────────────────────────────────────────
+async function loadStatus() {
+  const [data, backendData] = await Promise.all([
+    api('/api/status'),
+    api('/api/secrets/backend').catch(() => null),
+  ]);
+
+  document.getElementById('status-text').textContent = data.status === 'running' ? '✅ Online' : '❌ Offline';
+  document.getElementById('status-uptime').textContent = data.uptime || '–';
+  const channels = data.channels || [];
+  document.getElementById('status-channel-count').textContent = channels.length;
+  const list = document.getElementById('status-channels');
+  list.innerHTML = channels.length === 0
+    ? '<span style="color:var(--muted)">Keine aktiven Kanäle</span>'
+    : channels.map(c => `<span class="channel-tag">📡 ${c}</span>`).join('');
+
+  // Secret-Backend-Badge aktualisieren
+  if (backendData) {
+    const badge = document.getElementById('secret-backend-badge');
+    const mode  = document.getElementById('secret-backend-mode');
+    const name  = backendData.backend || 'unbekannt';
+    const isDocker = backendData.isDocker || false;
+
+    // Icon + Farbe je Backend
+    let icon = '🔐', color = 'var(--accent)', bg = 'rgba(91,141,238,0.12)', border = 'rgba(91,141,238,0.3)';
+    if (name.includes('Credential Manager')) {
+      icon = '🗝️'; color = 'var(--green)'; bg = 'rgba(62,207,142,0.12)'; border = 'rgba(62,207,142,0.3)';
+    } else if (name.includes('Vault') || name.includes('AES')) {
+      icon = '🏦'; color = 'var(--blue)'; bg = 'rgba(91,141,238,0.12)'; border = 'rgba(91,141,238,0.3)';
+    } else if (name.includes('nicht verfügbar')) {
+      icon = '⚠️'; color = 'var(--yellow)'; bg = 'rgba(245,166,35,0.1)'; border = 'rgba(245,166,35,0.3)';
+    }
+
+    badge.style.cssText = `display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:${bg};color:${color};border:1px solid ${border}`;
+    badge.textContent = `${icon} ${name}`;
+    mode.textContent  = isDocker ? '(Docker-Modus)' : '(Lokaler Modus)';
+  }
+}
+
+// ── CONFIG: Laden ──────────────────────────────────────────────────────────
+async function loadConfig() {
+  // Config (nicht-sensitiv) + Secrets (sensitiv) parallel laden
+  [configData, secretsData] = await Promise.all([
+    api('/api/config'),
+    api('/api/secrets').catch(() => ({}))
+  ]);
+  secretsData = secretsData || {};
+
+  const c   = configData.channels  || {};
+  const p   = configData.providers || {};
+  const v   = configData.voice     || {};
+  const img = configData.imageGen  || {};
+  const vid = configData.videoGen  || {};
+
+  // ── Kanäle (Token/Keys kommen aus Vault) ────────────────────────────────
+  setVal('tg-enabled',       c.telegram?.enabled,    'toggle');
+  setVal('tg-token',         secretsData['TELEGRAM_TOKEN']       || '');
+  setVal('tg-allowfrom',     (c.telegram?.allowFrom  || []).join(', '));
+  setVal('dc-enabled',       c.discord?.enabled,     'toggle');
+  setVal('dc-token',         secretsData['DISCORD_TOKEN']        || '');
+  setVal('slack-enabled',    c.slack?.enabled,       'toggle');
+  setVal('slack-bot-token',  secretsData['SLACK_BOT_TOKEN']      || '');
+  setVal('slack-signing',    secretsData['SLACK_SIGNING_SECRET'] || '');
+  setVal('matrix-enabled',   c.matrix?.enabled,      'toggle');
+  setVal('matrix-homeserver',c.matrix?.homeServer    || '');
+  setVal('matrix-token',     secretsData['MATRIX_TOKEN']         || '');
+  setVal('wa-enabled',       c.whatsapp?.enabled,    'toggle');
+  setVal('wa-phoneid',       c.whatsapp?.phoneNumberId || '');
+  setVal('wa-token',         secretsData['WHATSAPP_API_KEY']     || '');
+
+  // ── AI Provider (API-Key aus Vault) ──────────────────────────────────────
+  const activeProvider = p.default || 'openrouter';
+  setVal('ai-provider', activeProvider, 'select');
+  document.getElementById('ai-apikey').value =
+    secretsData['PROVIDER_' + activeProvider.toUpperCase()] || '';
+  setVal('ai-custom-url',   p.custom?.baseUrl         || '');
+  setVal('ai-custom-name',  p.custom?.name            || '');
+  setVal('ai-custom-model', p.custom?.models?.default || '');
+  // Ollama-spezifische Felder (URL aus Vault, Modell aus config.json)
+  setVal('ai-ollama-url',   secretsData['OLLAMA_BASE_URL'] || 'http://localhost:11434');
+  setVal('ai-ollama-model', p.ollama?.models?.default || '');
+  onDashProviderChange();
+
+  // ── Bild-Generierung (Keys aus Vault) ────────────────────────────────────
+  setVal('img-default',          img.default            || 'disabled', 'select');
+  setVal('img-openrouter-key',   secretsData['IMG_OPENROUTER'] || '');
+  setVal('img-openrouter-models',(img.openrouter?.models || []).join(', '));
+  setVal('img-fal-key',          secretsData['IMG_FAL']        || '');
+  setVal('img-fal-models',       (img.fal?.models       || []).join(', '));
+  setVal('img-openai-key',       secretsData['IMG_OPENAI']     || '');
+  setVal('img-quality',          img.quality            || 'standard', 'select');
+  setVal('img-stability-key',    secretsData['IMG_STABILITY']  || '');
+  setVal('img-stability-models', (img.stability?.models || []).join(', '));
+  setVal('img-together-key',     secretsData['IMG_TOGETHER']   || '');
+  setVal('img-together-models',  (img.together?.models  || []).join(', '));
+  setVal('img-replicate-key',    secretsData['IMG_REPLICATE']  || '');
+  setVal('img-replicate-models', (img.replicate?.models || []).join(', '));
+  onImgProviderChange();
+
+  // ── Video-Generierung (Keys aus Vault) ───────────────────────────────────
+  setVal('vid-default',      vid.default || '',   'select');
+  ['runway','kling','luma','pika','hailuo','sora','veo'].forEach(pv => {
+    setVal('vid-' + pv + '-key',   secretsData['VID_' + pv.toUpperCase()] || '');
+    setVal('vid-' + pv + '-model', vid[pv]?.model  || '');
+  });
+  onVidProviderChange();
+
+  // ── Voice (API-Key aus Vault) ────────────────────────────────────────────
+  setVal('voice-enabled',  v.enabled,           'toggle');
+  setVal('voice-provider', v.provider || 'groq', 'select');
+  setVal('voice-lang',     v.language || 'de',   'select');
+  setVal('voice-apikey',   secretsData['VOICE_API_KEY'] || '');
+
+  // JSON-Tab immer mit Blur starten
+  reBlur('json');
+
+  // ── VirusTotal API-Key (direkt im Vault, nicht INTEG_*) ─────────────────
+  const vtKey = secretsData['VIRUSTOTAL_API_KEY'] || '';
+  setVal('vt-apikey', vtKey);
+  updateVTIntegBadge(vtKey);
+
+  // ── Cal.com (Werte direkt aus Vault) ─────────────────────────────────────
+  setVal('calcom-base-url',    secretsData['CALCOM_BASE_URL']    || '');
+  setVal('calcom-api-key',     secretsData['CALCOM_API_KEY']     || '');
+  setVal('calcom-owner-email',     secretsData['CALCOM_OWNER_EMAIL']     || '');
+  setVal('calcom-event-type-id', secretsData['CALCOM_EVENT_TYPE_ID'] || '');
+  updateCalcomBadge();
+
+  // Google Workspace
+  setVal('google-client-id',      secretsData['GOOGLE_CLIENT_ID']      || '');
+  setVal('google-client-secret',  secretsData['GOOGLE_CLIENT_SECRET']  || '');
+  setVal('google-refresh-token',  secretsData['GOOGLE_REFRESH_TOKEN']  || '');
+  updateGoogleBadge();
+
+  // Integrationen laden (Werte kommen aus Vault)
+  renderIntegrations(configData.integrations || []);
+}
+
+function setVal(id, val, type = 'text') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (type === 'toggle') el.checked = !!val;
+  else el.value = val || '';
+}
+
+function getVal(id, type = 'text') {
+  const el = document.getElementById(id);
+  if (!el) return type === 'toggle' ? false : '';
+  if (type === 'toggle') return el.checked;
+  return el.value;
+}
+
+// ── CONFIG: Speichern ──────────────────────────────────────────────────────
+async function saveConfig() {
+  const rawTab = document.getElementById('tab-raw').classList.contains('active');
+  let newConfig;
+  const secretsPatch = {}; // Vault-Secrets – gehen an /api/secrets
+
+  if (rawTab) {
+    // Raw-JSON-Tab: nur config.json, keine Secrets (Sicherheit)
+    const ta = document.getElementById('raw-config');
+    if (ta.classList.contains('blurred')) {
+      toast('JSON-Editor ist noch gesperrt. Bitte erst entsperren.', true);
+      return;
+    }
+    try { newConfig = JSON.parse(ta.value); }
+    catch(e) { toast('Ungültiges JSON: ' + e.message, true); return; }
+    setTimeout(() => reBlur('json'), 500);
+  } else {
+    newConfig = JSON.parse(JSON.stringify(configData));
+
+    // ── Kanäle (Tokens → Vault, Rest → config.json) ──────────────────────
+    const ch = newConfig.channels = newConfig.channels || {};
+    ch.telegram = ch.telegram || {};
+    ch.telegram.enabled   = getVal('tg-enabled', 'toggle');
+    ch.telegram.token     = '';  // im Vault, nicht in config.json
+    ch.telegram.allowFrom = getVal('tg-allowfrom').split(',').map(s=>s.trim()).filter(Boolean);
+    ch.discord = ch.discord || {};
+    ch.discord.enabled = getVal('dc-enabled', 'toggle');
+    ch.discord.token   = '';  // im Vault
+    ch.slack = ch.slack || {};
+    ch.slack.enabled       = getVal('slack-enabled', 'toggle');
+    ch.slack.botToken      = '';  // im Vault
+    ch.slack.signingSecret = '';  // im Vault
+    ch.matrix = ch.matrix || {};
+    ch.matrix.enabled    = getVal('matrix-enabled', 'toggle');
+    ch.matrix.homeServer = getVal('matrix-homeserver');
+    ch.matrix.token      = '';  // im Vault
+    ch.whatsapp = ch.whatsapp || {};
+    ch.whatsapp.enabled       = getVal('wa-enabled', 'toggle');
+    ch.whatsapp.phoneNumberId = getVal('wa-phoneid');
+    ch.whatsapp.apiKey        = '';  // im Vault
+
+    // Vault-Patch für Kanäle
+    secretsPatch['TELEGRAM_TOKEN']       = getVal('tg-token');
+    secretsPatch['DISCORD_TOKEN']        = getVal('dc-token');
+    secretsPatch['SLACK_BOT_TOKEN']      = getVal('slack-bot-token');
+    secretsPatch['SLACK_SIGNING_SECRET'] = getVal('slack-signing');
+    secretsPatch['MATRIX_TOKEN']         = getVal('matrix-token');
+    secretsPatch['WHATSAPP_API_KEY']     = getVal('wa-token');
+
+    // ── AI Provider (Key → Vault) ─────────────────────────────────────────
+    const selProvider = getVal('ai-provider', 'select');
+    const selKey      = getVal('ai-apikey');
+    newConfig.providers = newConfig.providers || {};
+    newConfig.providers.default = selProvider;
+    // API-Key geht in den Vault, NICHT in config.json
+    secretsPatch['PROVIDER_' + selProvider.toUpperCase()] = selKey;
+    if (selProvider === 'custom') {
+      newConfig.providers.custom = newConfig.providers.custom || {};
+      newConfig.providers.custom.baseUrl = getVal('ai-custom-url');
+      newConfig.providers.custom.name    = getVal('ai-custom-name');
+      const m = getVal('ai-custom-model');
+      if (m) newConfig.providers.custom.models = { default: m, opus: m };
+      newConfig.providers.custom.apiKey = '';  // im Vault
+    }
+    if (selProvider === 'ollama') {
+      // Ollama Endpoint-URL → Vault (kein Klartext in config.json)
+      secretsPatch['OLLAMA_BASE_URL'] = getVal('ai-ollama-url') || 'http://localhost:11434';
+      newConfig.providers.ollama = newConfig.providers.ollama || {};
+      newConfig.providers.ollama.apiKey = '';  // Bearer-Token aus Vault (PROVIDER_OLLAMA)
+      const om = getVal('ai-ollama-model');
+      if (om) newConfig.providers.ollama.models = { default: om, opus: om, image: om, search: om, ocr: om };
+    }
+
+    // Hilfsfunktion: kommagetrennte Eingabe → Array
+    const toModels = id => getVal(id).split(',').map(s=>s.trim()).filter(Boolean);
+
+    // ── Bild-Generierung (Keys → Vault) ──────────────────────────────────
+    newConfig.imageGen = newConfig.imageGen || {};
+    newConfig.imageGen.default = getVal('img-default', 'select');
+    newConfig.imageGen.openrouter = newConfig.imageGen.openrouter || {};
+    newConfig.imageGen.openrouter.apiKey  = '';  // im Vault
+    newConfig.imageGen.openrouter.models  = toModels('img-openrouter-models');
+    newConfig.imageGen.fal = newConfig.imageGen.fal || {};
+    newConfig.imageGen.fal.apiKey  = '';  // im Vault
+    newConfig.imageGen.fal.models  = toModels('img-fal-models');
+    newConfig.imageGen.openai = newConfig.imageGen.openai || {};
+    newConfig.imageGen.openai.apiKey = '';  // im Vault
+    newConfig.imageGen.stability = newConfig.imageGen.stability || {};
+    newConfig.imageGen.stability.apiKey  = '';  // im Vault
+    newConfig.imageGen.stability.models  = toModels('img-stability-models');
+    newConfig.imageGen.together = newConfig.imageGen.together || {};
+    newConfig.imageGen.together.apiKey  = '';  // im Vault
+    newConfig.imageGen.together.models  = toModels('img-together-models');
+    newConfig.imageGen.replicate = newConfig.imageGen.replicate || {};
+    newConfig.imageGen.replicate.apiKey  = '';  // im Vault
+    newConfig.imageGen.replicate.models  = toModels('img-replicate-models');
+    newConfig.imageGen.quality = getVal('img-quality', 'select');
+
+    // Vault-Patch für Bild-Keys
+    secretsPatch['IMG_OPENROUTER'] = getVal('img-openrouter-key');
+    secretsPatch['IMG_FAL']        = getVal('img-fal-key');
+    secretsPatch['IMG_OPENAI']     = getVal('img-openai-key');
+    secretsPatch['IMG_STABILITY']  = getVal('img-stability-key');
+    secretsPatch['IMG_TOGETHER']   = getVal('img-together-key');
+    secretsPatch['IMG_REPLICATE']  = getVal('img-replicate-key');
+
+    // ── Video-Generierung (Keys → Vault) ─────────────────────────────────
+    newConfig.videoGen = newConfig.videoGen || {};
+    newConfig.videoGen.default = getVal('vid-default', 'select');
+    ['runway','kling','luma','pika','hailuo','sora','veo'].forEach(pv => {
+      newConfig.videoGen[pv] = newConfig.videoGen[pv] || {};
+      newConfig.videoGen[pv].apiKey = '';  // im Vault
+      newConfig.videoGen[pv].model  = getVal('vid-' + pv + '-model');
+      secretsPatch['VID_' + pv.toUpperCase()] = getVal('vid-' + pv + '-key');
+    });
+
+    // ── Voice (API-Key → Vault) ───────────────────────────────────────────
+    newConfig.voice = newConfig.voice || {};
+    newConfig.voice.enabled  = getVal('voice-enabled',  'toggle');
+    newConfig.voice.provider = getVal('voice-provider', 'select');
+    newConfig.voice.language = getVal('voice-lang',     'select');
+    newConfig.voice.apiKey   = '';  // im Vault
+    secretsPatch['VOICE_API_KEY'] = getVal('voice-apikey');
+
+    // ── VirusTotal API-Key → Vault ────────────────────────────────────────
+    secretsPatch['VIRUSTOTAL_API_KEY'] = getVal('vt-apikey');
+
+    // ── Cal.com → Vault ───────────────────────────────────────────────────
+    secretsPatch['CALCOM_BASE_URL']    = getVal('calcom-base-url');
+    secretsPatch['CALCOM_API_KEY']     = getVal('calcom-api-key');
+    secretsPatch['CALCOM_OWNER_EMAIL']     = getVal('calcom-owner-email');
+    const calcomEventTypeId = getVal('calcom-event-type-id');
+    if (calcomEventTypeId) secretsPatch['CALCOM_EVENT_TYPE_ID'] = calcomEventTypeId;
+
+    // ── Google Workspace → Vault ──────────────────────────────────────────
+    const gClientId     = getVal('google-client-id');
+    const gClientSecret = getVal('google-client-secret');
+    const gRefreshToken = getVal('google-refresh-token');
+    if (gClientId)     secretsPatch['GOOGLE_CLIENT_ID']      = gClientId;
+    if (gClientSecret) secretsPatch['GOOGLE_CLIENT_SECRET']  = gClientSecret;
+    if (gRefreshToken) secretsPatch['GOOGLE_REFRESH_TOKEN']  = gRefreshToken;
+
+    // ── Integrationen (Values → Vault, Name+Desc → config.json) ──────────
+    const { configList, secretsMap } = collectIntegrations();
+    newConfig.integrations = configList;
+    Object.assign(secretsPatch, secretsMap);
+  }
+
+  // 1. Nicht-sensitive Config → config.json
+  const result = await api('/api/config', 'PUT', newConfig);
+  if (result.error) { toast('Fehler (Config): ' + result.error, true); return; }
+
+  // 2. Sensitive Secrets → Vault (sofort aktiv per Hot-Reload)
+  const secResult = await api('/api/secrets', 'POST', secretsPatch);
+  if (secResult && secResult.error) {
+    toast('Fehler (Secrets): ' + secResult.error, true); return;
+  }
+
+  configData = newConfig;
+  secretsData = Object.assign({}, secretsData, secretsPatch);
+  // Badges im Integrationen-Panel aktualisieren
+  updateVTIntegBadge(secretsData['VIRUSTOTAL_API_KEY'] || '');
+  updateCalcomBadge();
+  updateGoogleBadge();
+  const n = document.getElementById('config-notice');
+  n.style.display = 'block';
+  setTimeout(() => { n.style.display = 'none'; }, 4000);
+}
+
+// ── SOUL ───────────────────────────────────────────────────────────────────
+async function loadSoul() {
+  const data = await api('/api/soul');
+  document.getElementById('soul-content').value = data.content || '';
+  reBlur('soul');
+}
+
+async function saveSoul() {
+  const ta = document.getElementById('soul-content');
+  if (ta.classList.contains('blurred')) {
+    toast('Editor ist gesperrt. Bitte erst entsperren.', true);
+    return;
+  }
+  const content = ta.value;
+  const result = await api('/api/soul', 'PUT', { content });
+  if (result.error) { toast('Fehler: ' + result.error, true); return; }
+  toast('✅ Persönlichkeit gespeichert');
+  document.getElementById('soul-notice').classList.add('show');
+  setTimeout(() => reBlur('soul'), 500);
+}
+
+// ── LOGS ───────────────────────────────────────────────────────────────────
+let currentLogTab = 'terminal';
+
+function switchLogTab(tab) {
+  currentLogTab = tab;
+  document.getElementById('log-tab-terminal').classList.toggle('active', tab === 'terminal');
+  document.getElementById('log-tab-audit').classList.toggle('active', tab === 'audit');
+  loadCurrentLogs();
+}
+
+async function loadCurrentLogs() {
+  if (currentLogTab === 'terminal') await loadTerminalLogs();
+  else await loadLogs();
+}
+
+async function loadTerminalLogs() {
+  const data = await api('/api/logs/terminal');
+  document.getElementById('log-filename').textContent = data.file || '–';
+  const box = document.getElementById('log-box');
+  if (!data.lines || data.lines.length === 0) { box.textContent = 'Keine Terminal-Logs gefunden.'; return; }
+  // Farbkodierung: Fehler rot, Warnungen gelb, Erfolg grün
+  box.innerHTML = data.lines.map(l => {
+    const esc = escHtml(l);
+    if (l.includes('❌') || l.toLowerCase().includes('error') || l.toLowerCase().includes('fehler')) {
+      return `<span class="log-line" style="color:#f08080">${esc}</span>`;
+    } else if (l.includes('⚠️') || l.toLowerCase().includes('warn')) {
+      return `<span class="log-line" style="color:#f5a623">${esc}</span>`;
+    } else if (l.includes('✅')) {
+      return `<span class="log-line" style="color:#68d391">${esc}</span>`;
+    }
+    return `<span class="log-line">${esc}</span>`;
+  }).join('\n');
+  box.scrollTop = box.scrollHeight;
+}
+
+async function loadLogs() {
+  const data = await api('/api/logs');
+  document.getElementById('log-filename').textContent = data.file || '–';
+  const box = document.getElementById('log-box');
+  if (!data.lines || data.lines.length === 0) { box.textContent = 'Keine Audit-Logs gefunden.'; return; }
+  box.innerHTML = data.lines.map(l => `<span class="log-line">${escHtml(l)}</span>`).join('\n');
+  box.scrollTop = box.scrollHeight;
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── SYSTEM: OS-Befehle ─────────────────────────────────────────────────────
+// restartSteps / rebuildSteps = Array von Strings → jeder Eintrag = ein Befehl (eigene Box + Kopieren-Button)
+// Ein einzelner String = ein Befehl in einer Box
+const osCmds = {
+
+  // ── Windows PowerShell ────────────────────────────────────────────────────
+  // In Windows PowerShell 5.1 (vorinstalliert) funktioniert && NICHT.
+  // Deshalb werden mehrere Befehle als einzelne Schritte angezeigt.
+  win_ps: {
+    info: '⚠️ <strong>Wichtig für PowerShell:</strong> In Windows PowerShell funktioniert <code>&&</code> <em>nicht</em>. Führe deshalb jeden Befehl einzeln nacheinander aus – warte jeweils bis der vorherige fertig ist (kein blinkendes Cursor mehr).',
+    restartSteps: [
+      'Stop-Process -Name "fluxbot" -Force -ErrorAction SilentlyContinue',
+      'Start-Sleep -Seconds 2',
+      'Start-Process -FilePath ".\\fluxbot.exe"'
+    ],
+    rebuildSteps: [
+      'git pull',
+      'go build -o fluxbot.exe .\\cmd\\fluxbot\\',
+      'Stop-Process -Name "fluxbot" -Force -ErrorAction SilentlyContinue',
+      'Start-Sleep -Seconds 2',
+      'Start-Process -FilePath ".\\fluxbot.exe"'
+    ],
+    restartHowto: '📂 <strong>So öffnest du PowerShell im richtigen Ordner:</strong><br><span class="step-num">1</span> Öffne den FluxBot-Ordner im Windows Explorer<br><span class="step-num">2</span> Halte <kbd>Shift</kbd> gedrückt und klicke mit <strong>rechter Maustaste</strong> in einen leeren Bereich<br><span class="step-num">3</span> Wähle <em>"PowerShell-Fenster hier öffnen"</em> (oder "Terminal hier öffnen")<br><span class="step-num">4</span> Befehle einzeln kopieren → <kbd>Strg</kbd>+<kbd>V</kbd> → <kbd>Enter</kbd> → warten → nächsten',
+    rebuildHowto: '📦 <strong>Voraussetzung: Git & Go müssen installiert sein</strong><br>Git: <a href="https://git-scm.com/download/win" target="_blank" style="color:var(--accent)">git-scm.com/download/win</a><br>Go: <a href="https://go.dev/dl/" target="_blank" style="color:var(--accent)">go.dev/dl</a><br><br>Befehle einzeln der Reihe nach ausführen. Nach Schritt 1 (<code>git pull</code>) siehst du welche Dateien aktualisiert wurden.'
+  },
+
+  // ── Windows Eingabeaufforderung (CMD) ─────────────────────────────────────
+  win_cmd: {
+    info: '✅ <strong>Eingabeaufforderung (CMD):</strong> Hier funktioniert <code>&</code> als Trennzeichen (ein kaufmännisches Und – nicht zwei). Die Befehle laufen nacheinander ab.',
+    restartSteps: [
+      'taskkill /F /IM fluxbot.exe 2>nul & timeout /t 2 /nobreak > nul & start fluxbot.exe'
+    ],
+    rebuildSteps: [
+      'git pull',
+      'go build -o fluxbot.exe .\\cmd\\fluxbot\\',
+      'taskkill /F /IM fluxbot.exe 2>nul & timeout /t 2 /nobreak > nul & start fluxbot.exe'
+    ],
+    restartHowto: '📂 <strong>So öffnest du CMD im richtigen Ordner:</strong><br><span class="step-num">1</span> Öffne den FluxBot-Ordner im Windows Explorer<br><span class="step-num">2</span> Klicke in die <strong>Adressleiste</strong> oben (wo der Ordnerpfad steht)<br><span class="step-num">3</span> Tippe <code>cmd</code> und drücke <kbd>Enter</kbd><br><span class="step-num">4</span> Befehl kopieren → rechte Maustaste im CMD-Fenster (fügt ein) → <kbd>Enter</kbd>',
+    rebuildHowto: '📦 <strong>Voraussetzung: Git & Go müssen installiert sein</strong><br>Git: <a href="https://git-scm.com/download/win" target="_blank" style="color:var(--accent)">git-scm.com/download/win</a><br>Go: <a href="https://go.dev/dl/" target="_blank" style="color:var(--accent)">go.dev/dl</a><br><br>Tipp: In CMD wird mit <kbd>rechter Maustaste</kbd> eingefügt (nicht Strg+V).'
+  },
+
+  // ── Mac Terminal ──────────────────────────────────────────────────────────
+  mac: {
+    info: '✅ <strong>Mac Terminal:</strong> Auf dem Mac funktioniert <code>&&</code> problemlos. Mehrere Befehle können in einer Zeile verkettet werden.',
+    restartSteps: [
+      'pkill -f "fluxbot" 2>/dev/null; sleep 2 && ./fluxbot &'
+    ],
+    rebuildSteps: [
+      'git pull && go build -o fluxbot ./cmd/fluxbot/ && pkill -f "fluxbot" 2>/dev/null; sleep 2 && ./fluxbot &'
+    ],
+    restartHowto: '📂 <strong>Terminal im richtigen Ordner öffnen:</strong><br><span class="step-num">1</span> <kbd>Cmd</kbd> + <kbd>Leertaste</kbd> → "Terminal" tippen → <kbd>Enter</kbd><br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd ~/Pfad/zu/FluxBot</code><br><span class="step-num">3</span> Befehl kopieren → <kbd>Cmd</kbd>+<kbd>V</kbd> → <kbd>Enter</kbd><br><br>💡 Tipp: Ziehe den Ordner aus dem Finder ins Terminal-Fenster – der Pfad wird automatisch eingetippt.',
+    rebuildHowto: '📦 <strong>Voraussetzungen:</strong><br>Git: mit macOS vorinstalliert (Xcode Command Line Tools)<br>Go: <a href="https://go.dev/dl/" target="_blank" style="color:var(--accent)">go.dev/dl</a> → macOS-Paket herunterladen & installieren'
+  },
+
+  // ── Linux Terminal ────────────────────────────────────────────────────────
+  linux: {
+    info: '✅ <strong>Linux Terminal:</strong> <code>&&</code> funktioniert problemlos. Mehrere Befehle können verkettet werden.',
+    restartSteps: [
+      'pkill -f "fluxbot" 2>/dev/null; sleep 2 && ./fluxbot &'
+    ],
+    rebuildSteps: [
+      'git pull && go build -o fluxbot ./cmd/fluxbot/ && pkill -f "fluxbot" 2>/dev/null; sleep 2 && ./fluxbot &'
+    ],
+    restartHowto: '📂 <strong>Terminal öffnen:</strong><br><span class="step-num">1</span> <kbd>Strg</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd> (die meisten Distributionen)<br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd ~/Pfad/zu/FluxBot</code><br><span class="step-num">3</span> Befehl kopieren → <kbd>Strg</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> zum Einfügen → <kbd>Enter</kbd>',
+    rebuildHowto: '📦 <strong>Voraussetzungen installieren:</strong><br>Git: <code>sudo apt install git</code> (Debian/Ubuntu)<br>Go: <code>sudo apt install golang-go</code> oder <a href="https://go.dev/dl/" target="_blank" style="color:var(--accent)">go.dev/dl</a>'
+  },
+
+  // ── Docker auf Linux/Mac (Server oder lokaler Rechner) ────────────────────
+  docker_linux: {
+    info: '🐳 <strong>Docker auf Linux/Mac:</strong> Der häufigste Fall wenn FluxBot auf einem Server oder einem Mac/Linux-Rechner in Docker läuft. <code>&&</code> funktioniert hier problemlos.',
+    restartSteps: [
+      'docker restart fluxbot_ai'
+    ],
+    rebuildSteps: [
+      'git pull',
+      'docker-compose down',
+      'docker-compose up --build -d'
+    ],
+    restartHowto: '🖥️ <strong>Auf dem Server ausführen (SSH):</strong><br><span class="step-num">1</span> SSH-Verbindung öffnen: <code>ssh benutzer@server-ip</code><br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd /pfad/zu/fluxbot</code><br><span class="step-num">3</span> Befehl ausführen<br><br>💡 Lokal auf Mac/Linux: Terminal öffnen, direkt ausführen.',
+    rebuildHowto: '🖥️ <strong>Schritte einzeln ausführen – auf Abschluss warten:</strong><br><span class="step-num">1</span> <code>git pull</code> – lädt neuen Code von GitHub<br><span class="step-num">2</span> <code>docker-compose down</code> – stoppt den Container<br><span class="step-num">3</span> <code>docker-compose up --build -d</code> – baut neu & startet<br><br>Der letzte Befehl kann 1–2 Minuten dauern. Danach <kbd>Strg</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> im Browser.'
+  },
+
+  // ── Docker auf Windows (PowerShell) ──────────────────────────────────────
+  docker_win_ps: {
+    info: '⚠️ <strong>Docker auf Windows (PowerShell):</strong> In PowerShell funktioniert <code>&&</code> nicht. Deshalb jeden Befehl einzeln ausführen – warte bis der vorherige fertig ist.',
+    restartSteps: [
+      'docker restart fluxbot_ai'
+    ],
+    rebuildSteps: [
+      'git pull',
+      'docker-compose down',
+      'docker-compose up --build -d'
+    ],
+    restartHowto: '📂 <strong>PowerShell öffnen:</strong><br><span class="step-num">1</span> Windows-Taste → "PowerShell" tippen<br><span class="step-num">2</span> Rechtsklick → <em>Als Administrator ausführen</em><br><span class="step-num">3</span> In den FluxBot-Ordner: <code>cd C:\\Pfad\\zu\\FluxBot</code><br><span class="step-num">4</span> Befehl kopieren → <kbd>Strg</kbd>+<kbd>V</kbd> → <kbd>Enter</kbd>',
+    rebuildHowto: '⚠️ <strong>Wichtig:</strong> Jeden Befehl einzeln ausführen – NICHT alles auf einmal!<br><span class="step-num">1</span> <code>git pull</code> eingeben → Enter → warten bis fertig<br><span class="step-num">2</span> <code>docker-compose down</code> → Enter → warten bis fertig<br><span class="step-num">3</span> <code>docker-compose up --build -d</code> → Enter → ca. 2 Min. warten<br><br>Danach <kbd>Strg</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> im Browser.'
+  },
+
+  // ── Docker auf Windows (CMD / Eingabeaufforderung) ────────────────────────
+  docker_win_cmd: {
+    info: '✅ <strong>Docker auf Windows (CMD):</strong> In der Eingabeaufforderung (CMD) können Befehle mit <code>&</code> verkettet werden.',
+    restartSteps: [
+      'docker restart fluxbot_ai'
+    ],
+    rebuildSteps: [
+      'git pull & docker-compose down & docker-compose up --build -d'
+    ],
+    restartHowto: '📂 <strong>CMD öffnen:</strong><br><span class="step-num">1</span> Windows-Taste → "cmd" tippen → <kbd>Enter</kbd><br><span class="step-num">2</span> In den FluxBot-Ordner: <code>cd C:\\Pfad\\zu\\FluxBot</code><br><span class="step-num">3</span> Befehl kopieren → <strong>rechte Maustaste</strong> im CMD (fügt ein) → <kbd>Enter</kbd>',
+    rebuildHowto: '✅ <strong>In CMD funktioniert <code>&</code> als Trennzeichen.</strong><br>Alle drei Schritte in einem Befehl – einfach kopieren und ausführen.<br>Dauert ca. 2 Minuten. Danach <kbd>Strg</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> im Browser.'
+  }
+};
+
+// Sub-Optionen je Haupt-OS
+const osSubOptions = {
+  windows: {
+    label: 'Welches Programm öffnest du auf Windows?',
+    options: [
+      { key: 'win_ps',  label: '⚡ PowerShell (Standard · blau)' },
+      { key: 'win_cmd', label: '🖤 Eingabeaufforderung (CMD · schwarz)' }
+    ]
+  },
+  docker: {
+    label: 'Wo läuft Docker?',
+    options: [
+      { key: 'docker_linux',   label: '🐧 Linux/Mac Server oder lokal' },
+      { key: 'docker_win_ps',  label: '🪟 Windows – PowerShell' },
+      { key: 'docker_win_cmd', label: '🪟 Windows – CMD (Eingabeaufforderung)' }
+    ]
+  }
+};
+
+let currentOSKey = 'win_ps';
+let currentMainOS = 'windows';
+
+function selectMainOS(main, el) {
+  currentMainOS = main;
+  document.querySelectorAll('#os-main-selector .os-btn').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  const subPanel = document.getElementById('os-sub-panel');
+  const subSel   = document.getElementById('os-sub-selector');
+  const subLabel = document.getElementById('os-sub-label');
+
+  if (osSubOptions[main]) {
+    const sub = osSubOptions[main];
+    subLabel.textContent = sub.label;
+    subSel.innerHTML = sub.options.map((o, i) =>
+      `<span class="os-btn${i===0?' active':''}" onclick="selectSubOS('${o.key}', this)">${o.label}</span>`
+    ).join('');
+    subPanel.style.display = 'block';
+    currentOSKey = sub.options[0].key;
+  } else {
+    subPanel.style.display = 'none';
+    currentOSKey = main;
+  }
+  renderSystemCmds();
+}
+
+function selectSubOS(key, el) {
+  currentOSKey = key;
+  document.querySelectorAll('#os-sub-selector .os-btn').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderSystemCmds();
+}
+
+function renderSystemCmds() {
+  const cmds = osCmds[currentOSKey];
+  if (!cmds) return;
+
+  // Info-Banner
+  document.getElementById('os-info-banner').innerHTML = cmds.info || '';
+
+  // Schritte rendern
+  renderSteps('restart-steps', cmds.restartSteps || []);
+  renderSteps('rebuild-steps', cmds.rebuildSteps || []);
+  document.getElementById('restart-howto').innerHTML = cmds.restartHowto || '';
+  document.getElementById('rebuild-howto').innerHTML = cmds.rebuildHowto || '';
+}
+
+function renderSteps(containerId, steps) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (steps.length === 1) {
+    // Einzelner Befehl → klassische cmd-box
+    el.innerHTML = `<div class="cmd-box"><code>${escHtml(steps[0])}</code><button class="copy-btn" onclick="copyText('${escHtml(steps[0]).replace(/'/g,"\\'")}')">📋 Kopieren</button></div>`;
+  } else {
+    // Mehrere Schritte → nummerierte Liste
+    el.innerHTML = '<div style="font-size:12px;color:var(--yellow);margin-bottom:8px">⚠️ Jeden Befehl einzeln ausführen – warten bis der vorherige fertig ist:</div>' +
+      steps.map((s, i) => `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="background:rgba(91,141,238,0.2);color:var(--accent);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${i+1}</span>
+          <div class="cmd-box" style="flex:1;margin:0"><code>${escHtml(s)}</code><button class="copy-btn" onclick="copyText('${escHtml(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">📋</button></div>
+        </div>`
+      ).join('');
+  }
+}
+
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast('📋 Befehl kopiert!')).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function updateSystemCmds() { renderSystemCmds(); }
+
+function copyCmd(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const text = el.textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => toast('📋 Befehl kopiert!')).catch(() => fallbackCopy(text));
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); toast('📋 Befehl kopiert!'); }
+  catch(e) { toast('Kopieren fehlgeschlagen – bitte manuell kopieren', true); }
+  document.body.removeChild(ta);
+}
+
+// ── INTEGRATIONEN ──────────────────────────────────────────────────────────
+const SMTP_KEYS = ['SMTP_HOST','SMTP_PORT','SMTP_USER','SMTP_PASSWORD','SMTP_FROM'];
+
+function renderIntegrations(list) {
+  // SMTP-Werte kommen jetzt aus dem Vault (secretsData), nicht aus item.value
+  setVal('smtp-host',     secretsData['INTEG_SMTP_HOST']     || '');
+  setVal('smtp-port',     secretsData['INTEG_SMTP_PORT']     || '587');
+  setVal('smtp-user',     secretsData['INTEG_SMTP_USER']     || '');
+  setVal('smtp-password', secretsData['INTEG_SMTP_PASSWORD'] || '');
+  setVal('smtp-from',     secretsData['INTEG_SMTP_FROM']     || '');
+
+  // Provider-Button aktivieren wenn Host bekannt
+  detectSmtpProvider(secretsData['INTEG_SMTP_HOST'] || '');
+
+  // Nur nicht-SMTP-Einträge in die generische Liste (config speichert nur name+description)
+  const otherList = (list || []).filter(item => !SMTP_KEYS.includes(item.name));
+  const container = document.getElementById('integrations-list');
+  container.innerHTML = '';
+  if (otherList.length === 0) { addIntegration(); return; }
+  // Wert kommt aus Vault: secretsData['INTEG_' + item.name]
+  otherList.forEach(item => addIntegration(
+    item.name, item.description, secretsData['INTEG_' + item.name] || ''
+  ));
+}
+
+// Setzt Host/Port automatisch und zeigt Hinweis-Link für bekannte Anbieter
+const SMTP_PROVIDERS = {
+  gmail:   { host: 'smtp.gmail.com',       port: '587', label: 'Gmail',
+             hint: '🔑 Gmail benötigt ein <strong>App-Passwort</strong> (nicht dein Google-Passwort).<br><a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:var(--accent)">→ App-Passwort erstellen (myaccount.google.com/apppasswords)</a><br><span style="color:var(--muted);font-size:12px">Voraussetzung: 2-Faktor-Authentifizierung muss aktiv sein.</span>' },
+  outlook: { host: 'smtp.office365.com',   port: '587', label: 'Outlook',
+             hint: '🔑 Outlook benötigt ein <strong>App-Kennwort</strong> wenn 2FA aktiv ist.<br><a href="https://account.microsoft.com/security" target="_blank" style="color:var(--accent)">→ account.microsoft.com/security</a> → Sicherheit → Erweitert → App-Kennwörter' },
+  gmx:     { host: 'mail.gmx.net',         port: '587', label: 'GMX',
+             hint: '🔑 GMX: Normales Passwort reicht. Bei aktiver 2FA:<br><a href="https://hilfe.gmx.net/email/sicherheit/app-passwort.html" target="_blank" style="color:var(--accent)">→ GMX App-Passwort erstellen</a>' },
+  webde:   { host: 'smtp.web.de',          port: '587', label: 'Web.de',
+             hint: '🔑 Web.de: Normales Passwort reicht. Bei aktiver 2FA:<br><a href="https://hilfe.web.de/pop-imap-smtp/imap-serverdaten.html" target="_blank" style="color:var(--accent)">→ Web.de SMTP-Einstellungen</a>' },
+  strato:  { host: 'smtp.strato.de',       port: '587', label: 'Strato',
+             hint: '🔑 Strato: Normales E-Mail-Passwort verwenden.<br><a href="https://www.strato.de/faq/e-mail/smtp-und-imap-fuer-verschiedene-e-mail-programme/" target="_blank" style="color:var(--accent)">→ Strato SMTP-Dokumentation</a>' },
+  ionos:   { host: 'smtp.ionos.de',        port: '587', label: 'IONOS',
+             hint: '🔑 IONOS: Normales E-Mail-Passwort verwenden.<br><a href="https://www.ionos.de/hilfe/email/allgemeine-themen-zu-e-mail/postausgangsserver-smtp/" target="_blank" style="color:var(--accent)">→ IONOS SMTP-Einstellungen</a>' },
+  custom:  { host: '',                     port: '587', label: 'Eigener Server',
+             hint: '⚙️ Trage deinen eigenen SMTP-Server ein. Port <strong>587</strong> (STARTTLS) oder <strong>465</strong> (SSL) sind üblich.' },
+};
+
+function setSmtpProvider(key) {
+  const p = SMTP_PROVIDERS[key];
+  if (!p) return;
+  if (p.host) document.getElementById('smtp-host').value = p.host;
+  document.getElementById('smtp-port').value = p.port;
+  // Provider-Button hervorheben
+  document.querySelectorAll('.smtp-prov-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  // Hinweis anzeigen
+  const hint = document.getElementById('smtp-cred-hint');
+  hint.innerHTML = p.hint;
+  hint.style.display = 'block';
+  document.getElementById('smtp-user').focus();
+}
+
+function detectSmtpProvider(host) {
+  // Passenden Provider-Button aktivieren basierend auf gespeichertem Host
+  const hostMap = {
+    'smtp.gmail.com': 'gmail', 'smtp.office365.com': 'outlook',
+    'mail.gmx.net': 'gmx', 'smtp.web.de': 'webde',
+    'smtp.strato.de': 'strato', 'smtp.ionos.de': 'ionos',
+  };
+  const key = hostMap[host];
+  document.querySelectorAll('.smtp-prov-btn').forEach(b => b.classList.remove('active'));
+  if (key) {
+    const btns = document.querySelectorAll('.smtp-prov-btn');
+    btns.forEach(b => { if (b.textContent.toLowerCase().includes(SMTP_PROVIDERS[key]?.label?.toLowerCase().split('/')[0].trim().toLowerCase())) b.classList.add('active'); });
+    const hint = document.getElementById('smtp-cred-hint');
+    hint.innerHTML = SMTP_PROVIDERS[key].hint;
+    hint.style.display = 'block';
+  }
+}
+
+function showIntegrationHelp() {
+  // Direkt zur Hilfe-Sektion navigieren und Platzhalter-Accordion öffnen
+  showSection('help', document.querySelector('.nav-item[onclick*="help"]'));
+  // Platzhalter-Accordion öffnen (3. Panel, Index 2) – via classList wie helpToggle()
+  const accordion = document.getElementById('help-accordion');
+  if (accordion) {
+    const items = accordion.querySelectorAll('.help-item');
+    if (items.length >= 3) {
+      const platzhalterItem = items[2]; // 3. Accordion = Platzhalter-System
+      if (!platzhalterItem.classList.contains('open')) {
+        platzhalterItem.classList.add('open');
+      }
+      setTimeout(() => platzhalterItem.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    }
+  }
+}
+
+function addIntegration(name = '', description = '', value = '') {
+  const container = document.getElementById('integrations-list');
+  const row = document.createElement('div');
+  row.className = 'integration-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;margin-bottom:14px;background:rgba(255,255,255,0.04);padding:14px;border-radius:8px;border:1px solid rgba(255,255,255,0.07)';
+  row.innerHTML = `
+    <div class="field" style="margin:0">
+      <label style="font-size:11px;margin-bottom:4px">Platzhalter-Name
+        <button type="button" onclick="showIntegrationHelp()" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;padding:0 0 0 4px;vertical-align:middle;line-height:1" title="Was ist der Platzhalter-Name?">ⓘ</button>
+      </label>
+      <input type="text" class="int-name" value="${escHtml(name)}" placeholder="MEIN_SERVICE" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9_]/g,'')">
+    </div>
+    <div class="field" style="margin:0">
+      <label style="font-size:11px;margin-bottom:4px">Bezeichnung (optional)</label>
+      <input type="text" class="int-desc" value="${escHtml(description)}" placeholder="z.B. Mein Dienst – API Key">
+    </div>
+    <div class="field" style="margin:0">
+      <label style="font-size:11px;margin-bottom:4px">Wert</label>
+      <div class="input-wrap">
+        <input type="password" class="int-value" value="${escHtml(value)}" placeholder="dein Wert" autocomplete="off">
+        <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
+      </div>
+    </div>
+    <button type="button" onclick="this.closest('.integration-row').remove()" style="background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.3);color:#ff6b6b;border-radius:8px;padding:8px 12px;cursor:pointer;font-size:16px;align-self:end">✕</button>
+  `;
+  container.appendChild(row);
+}
+
+function collectIntegrations() {
+  // Gibt { configList, secretsMap } zurück:
+  //   configList  → geht in config.json  (nur name + description, KEIN value)
+  //   secretsMap  → geht in den Vault    (INTEG_* Keys mit den Werten)
+  const configList = [];
+  const secretsMap = {};
+
+  // SMTP-Felder (nur wenn befüllt)
+  const smtpDefs = [
+    { id: 'smtp-host',     name: 'SMTP_HOST',     desc: 'SMTP-Server' },
+    { id: 'smtp-port',     name: 'SMTP_PORT',     desc: 'SMTP-Port' },
+    { id: 'smtp-user',     name: 'SMTP_USER',     desc: 'E-Mail-Adresse / Benutzername' },
+    { id: 'smtp-password', name: 'SMTP_PASSWORD', desc: 'App-Passwort / Passwort' },
+    { id: 'smtp-from',     name: 'SMTP_FROM',     desc: 'Absender-Adresse' },
+  ];
+  for (const f of smtpDefs) {
+    const val = (document.getElementById(f.id)?.value || '').trim();
+    if (val) {
+      configList.push({ name: f.name, description: f.desc });
+      secretsMap['INTEG_' + f.name] = val;
+    }
+  }
+
+  // Generische Integrationen
+  document.querySelectorAll('.integration-row').forEach(row => {
+    const name  = row.querySelector('.int-name').value.trim();
+    const desc  = row.querySelector('.int-desc').value.trim();
+    const value = row.querySelector('.int-value').value;
+    if (name) {
+      configList.push({ name, description: desc });
+      if (value) secretsMap['INTEG_' + name] = value;
+    }
+  });
+  return { configList, secretsMap };
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Info-Tooltip (ⓘ) ──────────────────────────────────────────────────────
+const _tip = () => document.getElementById('info-tooltip');
+
+function tipShow(btn, text) {
+  const el = _tip();
+  el.textContent = text;
+  el.classList.add('show');
+  // Positionierung: rechts vom Button, vertikal zentriert, ggf. nach links spiegeln
+  const r = btn.getBoundingClientRect();
+  let left = r.right + 10;
+  let top  = r.top + r.height / 2;
+  el.style.left = left + 'px';
+  el.style.top  = top + 'px';
+  el.style.transform = 'translateY(-50%)';
+  // Prüfen ob Tooltip rechts aus dem Viewport läuft
+  requestAnimationFrame(() => {
+    const tw = el.offsetWidth;
+    if (left + tw > window.innerWidth - 12) {
+      el.style.left = (r.left - tw - 10) + 'px';
+    }
+  });
+}
+
+function tipHide() {
+  _tip().classList.remove('show');
+}
+
+// ── HILFE: Accordion & Suche ───────────────────────────────────────────────
+function helpToggle(item) {
+  item.classList.toggle('open');
+}
+
+function helpSearch(query) {
+  const q = query.trim().toLowerCase();
+  const items = document.querySelectorAll('.help-item');
+  let anyVisible = false;
+  items.forEach(item => {
+    if (!q) {
+      item.classList.remove('hidden');
+      anyVisible = true;
+      return;
+    }
+    const kw  = (item.dataset.keywords || '').toLowerCase();
+    const txt = item.textContent.toLowerCase();
+    const match = kw.includes(q) || txt.includes(q);
+    item.classList.toggle('hidden', !match);
+    if (match) {
+      anyVisible = true;
+      item.classList.add('open'); // gefundene Elemente aufklappen
+    }
+  });
+  const noResult = document.getElementById('help-no-result');
+  noResult.style.display = (!anyVisible && q) ? 'block' : 'none';
+}
+
+// ── VIRUSTOTAL Integration Badge ───────────────────────────────────────────
+function updateVTIntegBadge(key) {
+  const badge = document.getElementById('vt-integ-badge');
+  if (!badge) return;
+  if (key && key.trim()) {
+    badge.textContent = '✅ Aktiv';
+    badge.style.background = 'rgba(62,207,142,0.12)';
+    badge.style.color = 'var(--green)';
+    badge.style.borderColor = 'rgba(62,207,142,0.3)';
+  } else {
+    badge.textContent = '⚠️ Inaktiv';
+    badge.style.background = 'rgba(245,166,35,0.12)';
+    badge.style.color = 'var(--yellow)';
+    badge.style.borderColor = 'rgba(245,166,35,0.3)';
+  }
+}
+
+function updateCalcomBadge() {
+  const badge = document.getElementById('calcom-integ-badge');
+  if (!badge) return;
+  const url   = (document.getElementById('calcom-base-url')?.value    || '').trim();
+  const key   = (document.getElementById('calcom-api-key')?.value     || '').trim();
+  const email = (document.getElementById('calcom-owner-email')?.value || '').trim();
+  if (url && key && email) {
+    badge.textContent = '✅ Konfiguriert';
+    badge.style.background = 'rgba(62,207,142,0.12)';
+    badge.style.color = 'var(--green)';
+    badge.style.borderColor = 'rgba(62,207,142,0.3)';
+  } else {
+    badge.textContent = '⚠️ Nicht konfiguriert';
+    badge.style.background = 'rgba(245,166,35,0.12)';
+    badge.style.color = 'var(--yellow)';
+    badge.style.borderColor = 'rgba(245,166,35,0.3)';
+  }
+}
+
+// ── GOOGLE WORKSPACE ────────────────────────────────────────────────────────
+
+function updateGoogleBadge() {
+  const badge = document.getElementById('google-integ-badge');
+  if (!badge) return;
+  const clientId     = (document.getElementById('google-client-id')?.value      || '').trim();
+  const clientSecret = (document.getElementById('google-client-secret')?.value  || '').trim();
+  const refreshToken = (document.getElementById('google-refresh-token')?.value  || '').trim();
+  if (clientId && clientSecret && refreshToken) {
+    badge.textContent = '✅ Verbunden';
+    badge.style.background = 'rgba(62,207,142,0.12)';
+    badge.style.color = 'var(--green)';
+    badge.style.borderColor = 'rgba(62,207,142,0.3)';
+  } else if (clientId && clientSecret) {
+    badge.textContent = '🔗 Autorisierung ausstehend';
+    badge.style.background = 'rgba(91,141,238,0.12)';
+    badge.style.color = 'var(--accent)';
+    badge.style.borderColor = 'rgba(91,141,238,0.3)';
+  } else {
+    badge.textContent = '⚠️ Nicht konfiguriert';
+    badge.style.background = 'rgba(245,166,35,0.12)';
+    badge.style.color = 'var(--yellow)';
+    badge.style.borderColor = 'rgba(245,166,35,0.3)';
+  }
+}
+
+async function googleStartOAuth() {
+  const clientId = (document.getElementById('google-client-id')?.value || '').trim();
+  if (!clientId) {
+    toast('Bitte zuerst Client ID eintragen und speichern.', true);
+    return;
+  }
+  const btn = document.getElementById('google-oauth-btn');
+  const status = document.getElementById('google-oauth-status');
+  btn.disabled = true;
+  status.textContent = 'Lade Autorisierungs-URL…';
+  const result = await api('/api/google/auth-url');
+  btn.disabled = false;
+  if (result.error || !result.url) {
+    status.textContent = '';
+    // Fallback: lokal bauen mit allen Scopes
+    const scopes = [
+      'https://www.googleapis.com/auth/calendar',
+      'https://www.googleapis.com/auth/documents',
+      'https://www.googleapis.com/auth/spreadsheets',
+      'https://www.googleapis.com/auth/drive',
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/gmail.readonly'
+    ].join(' ');
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: window.location.origin + '/api/google/oauth-callback',
+      response_type: 'code',
+      scope: scopes,
+      access_type: 'offline',
+      prompt: 'consent'
+    });
+    const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
+    window.open(url, '_blank', 'width=600,height=700');
+    status.textContent = 'Fenster geöffnet – nach Autorisierung hier neu laden.';
+  } else {
+    window.open(result.url, '_blank', 'width=600,height=700');
+    status.textContent = 'Autorisierungs-Fenster geöffnet – nach Bestätigung wird der Refresh Token automatisch eingetragen.';
+  }
+}
+
+// ── VIRUSTOTAL ─────────────────────────────────────────────────────────────
+
+async function loadVTData() {
+  const [stats, history] = await Promise.all([
+    api('/api/vt/status').catch(() => null),
+    api('/api/vt/history').catch(() => [])
+  ]);
+  if (stats) renderVTStats(stats);
+  renderVTHistory(history || []);
+}
+
+function renderVTStats(stats) {
+  // Status-Badge
+  const badgeEl = document.getElementById('vt-status-badge');
+  const banner  = document.getElementById('vt-inactive-banner');
+  if (stats.enabled) {
+    badgeEl.innerHTML = '<span class="vt-status-badge active">✅ Aktiv</span>';
+    banner.style.display = 'none';
+  } else {
+    badgeEl.innerHTML = '<span class="vt-status-badge inactive">⚠️ Inaktiv – API-Key fehlt</span>';
+    banner.style.display = 'flex';
+  }
+  // Statistik-Karten
+  document.getElementById('vt-stat-files').textContent  = stats.total_files   ?? '–';
+  document.getElementById('vt-stat-urls').textContent   = stats.total_urls    ?? '–';
+  const blocked = (stats.blocked_files || 0) + (stats.blocked_urls || 0);
+  const blockedEl = document.getElementById('vt-stat-blocked');
+  blockedEl.textContent = blocked;
+  blockedEl.style.color = blocked > 0 ? 'var(--red)' : 'var(--green)';
+  document.getElementById('vt-stat-cache').textContent  = stats.cache_hits    ?? '–';
+}
+
+function renderVTHistory(entries) {
+  const tbody = document.getElementById('vt-history-body');
+  const countEl = document.getElementById('vt-history-count');
+  countEl.textContent = entries.length > 0 ? entries.length + ' Einträge' : '';
+
+  if (!entries || entries.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="vt-empty">Noch keine Scans seit dem letzten Start.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const ts = new Date(e.time);
+    const timeStr = ts.toLocaleTimeString('de-AT', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                  + ' ' + ts.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit' });
+
+    const typeIcon = e.type === 'file'
+      ? '<span class="vt-type-file">📄 Datei</span>'
+      : '<span class="vt-type-url">🔗 URL</span>';
+
+    let resultBadge;
+    if (e.cached) {
+      resultBadge = `<span class="vt-badge-cached">💾 Cache</span>`;
+    } else if (e.safe) {
+      resultBadge = `<span class="vt-badge-safe">✅ Sicher</span>`;
+    } else {
+      resultBadge = `<span class="vt-badge-blocked">🚨 Blockiert</span>`;
+    }
+
+    const targetHtml = `<code style="font-size:12px;color:var(--muted);word-break:break-all">${escHtml(e.target || '–')}</code>`;
+
+    return `<tr>
+      <td style="white-space:nowrap;font-size:12px;color:var(--muted)">${escHtml(timeStr)}</td>
+      <td>${typeIcon}</td>
+      <td>${targetHtml}</td>
+      <td>${resultBadge}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function clearVTHistory() {
+  if (!confirm('Scan-History und Statistiken wirklich zurücksetzen?')) return;
+  const result = await api('/api/vt/clear', 'POST', {});
+  if (result && result.error) {
+    toast('Fehler: ' + result.error, true);
+  } else {
+    toast('✅ VT-History zurückgesetzt');
+    loadVTData();
+  }
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+initHMAC(); // HMAC-Secret laden (lautlos falls nicht konfiguriert)
+loadStatus();
+updateSystemCmds();
+</script>
+</body>
+</html>

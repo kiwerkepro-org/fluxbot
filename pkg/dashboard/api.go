@@ -400,6 +400,73 @@ func (s *Server) handleGoogleOAuthCallback(w http.ResponseWriter, r *http.Reques
 </body></html>`)
 }
 
+// ── /api/skills ────────────────────────────────────────────────────────────────
+
+type skillResponse struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+func (s *Server) handleSkills(w http.ResponseWriter, r *http.Request) {
+	if s.skillsLoader == nil {
+		writeJSON(w, map[string]interface{}{"skills": []skillResponse{}})
+		return
+	}
+
+	skillList := s.skillsLoader.ListSkills()
+	result := make([]skillResponse, 0, len(skillList))
+	for _, skill := range skillList {
+		if skill != nil {
+			result = append(result, skillResponse{
+				Name: skill.Name,
+				Path: skill.Path,
+			})
+		}
+	}
+
+	writeJSON(w, map[string]interface{}{"skills": result})
+}
+
+// ── /api/skills/sign ──────────────────────────────────────────────────────────────
+
+type signSkillRequest struct {
+	Skill string `json:"skill"`
+}
+
+func (s *Server) handleSkillsSign(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpError(w, "Nur POST erlaubt", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.skillsLoader == nil {
+		httpError(w, "SkillsLoader nicht verfügbar", http.StatusServiceUnavailable)
+		return
+	}
+
+	var req signSkillRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, "Request-Parse fehlgeschlagen: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if req.Skill == "" {
+		httpError(w, "Skill-Name erforderlich", http.StatusBadRequest)
+		return
+	}
+
+	// Skill neu signieren
+	if err := s.skillsLoader.SignSkill(req.Skill); err != nil {
+		httpError(w, "Signierung fehlgeschlagen: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]interface{}{
+		"success": true,
+		"message": fmt.Sprintf("Skill '%s' erfolgreich signiert", req.Skill),
+	})
+}
+
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
