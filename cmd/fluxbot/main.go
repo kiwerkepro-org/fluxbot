@@ -15,6 +15,7 @@ import (
 
 	"github.com/ki-werke/fluxbot/pkg/agent"
 	"github.com/ki-werke/fluxbot/pkg/channels"
+	cronpkg "github.com/ki-werke/fluxbot/pkg/cron"
 	"github.com/ki-werke/fluxbot/pkg/config"
 	"github.com/ki-werke/fluxbot/pkg/dashboard"
 	"github.com/ki-werke/fluxbot/pkg/email"
@@ -292,6 +293,15 @@ func runBot(ctx context.Context, configPath string) {
 
 	googleClient := buildGoogleClient(cfg, vault)
 
+	// Cron-Manager: sendFn nutzt den Channel-Manager (nach dessen Start)
+	cronStorePath := filepath.Join(cfg.Workspace.Path, "reminders.json")
+	cronSendFn := func(channelID, chatID, text string) {
+		if err := manager.SendTo(channelID, chatID, text); err != nil {
+			log.Printf("[Cron] Fehler beim Senden der Erinnerung an %s/%s: %v", channelID, chatID, err)
+		}
+	}
+	cronMgr := cronpkg.New(cronStorePath, cronSendFn)
+
 	fluxAgent := agent.New(agent.Config{
 		Provider:         aiProvider,
 		Manager:          manager,
@@ -310,6 +320,7 @@ func runBot(ctx context.Context, configPath string) {
 		CalcomOwnerEmail:  getIntegration(cfg, "CALCOM_OWNER_EMAIL"),
 		CalcomEventTypeID: parseIntegrationInt(cfg, "CALCOM_EVENT_TYPE_ID"),
 		GoogleClient:     googleClient,
+		CronManager:      cronMgr,
 		Soul:             soul,
 	})
 
@@ -348,10 +359,13 @@ func runBot(ctx context.Context, configPath string) {
 			)
 			fluxAgent.UpdateGoogleClient(buildGoogleClient(newCfg, vault))
 
-			// Dashboard Hot-Reload: Passwort + HMAC-Secret
+			// Dashboard Hot-Reload: Passwort + Benutzername + HMAC-Secret
 			if dash != nil {
 				if pass, err := vault.Get("DASHBOARD_PASSWORD"); err == nil && pass != "" {
 					dash.UpdatePassword(pass)
+				}
+				if user, err := vault.Get("DASHBOARD_USERNAME"); err == nil && user != "" {
+					dash.UpdateUsername(user)
 				}
 				// HMAC-Secret bei Hot-Reload: Provider (Vault/Keyring) hat Vorrang vor Env
 				if newHMAC, err := vault.Get("HMAC_SECRET"); err == nil && newHMAC != "" {
@@ -380,6 +394,7 @@ func runBot(ctx context.Context, configPath string) {
 			configPath,
 			cfg.Workspace.Path,
 			cfg.Dashboard.Password,
+			cfg.Dashboard.Username,
 			cfg.Dashboard.Port,
 			manager.ActiveChannels,
 			logPath,
@@ -395,6 +410,10 @@ func runBot(ctx context.Context, configPath string) {
 	if err := manager.Start(ctx); err != nil {
 		log.Fatalf("[Main] Fehler beim Starten der Kanäle: %v", err)
 	}
+
+	// Cron-Scheduler starten (nach Channel-Manager, damit SendFn funktioniert)
+	cronMgr.Start()
+	defer cronMgr.Stop()
 
 	log.Println("[Main] FluxBot läuft.")
 	fluxAgent.Run(ctx)
@@ -451,6 +470,7 @@ func extractSecrets(cfg *config.Config) map[string]string {
 	m["SKILL_SECRET"] = cfg.SkillSecret
 	m["VIRUSTOTAL_API_KEY"] = cfg.Security.VirusTotalAPIKey
 	m["DASHBOARD_PASSWORD"] = cfg.Dashboard.Password
+	m["DASHBOARD_USERNAME"] = cfg.Dashboard.Username
 	// Integrationen (dynamisch)
 	for _, integ := range cfg.Integrations {
 		if integ.Value != "" {
@@ -592,6 +612,9 @@ func applySecrets(cfg *config.Config, vault security.SecretProvider) {
 	if v := get("DASHBOARD_PASSWORD"); v != "" {
 		cfg.Dashboard.Password = v
 	}
+	if v := get("DASHBOARD_USERNAME"); v != "" {
+		cfg.Dashboard.Username = v
+	}
 	// Integrationen: Vault-Werte in die Liste einfügen (INTEG_* Prefix-Konvention)
 	for i, integ := range cfg.Integrations {
 		if v := get("INTEG_" + integ.Name); v != "" {
@@ -601,22 +624,27 @@ func applySecrets(cfg *config.Config, vault security.SecretProvider) {
 
 	// Cal.com-Schlüssel: im Vault direkt ohne INTEG_-Prefix gespeichert (eigenes Dashboard-Panel).
 	// Müssen in cfg.Integrations eingefügt werden damit {{CALCOM_...}} im Skill substituiert wird.
-	for _, key := range []string{"CALCOM_BASE_URL", "CALCOM_API_KEY", "CALCOM_OWNER_EMAIL", "CALCOM_EVENT_TYPE_ID"} {
-		v := get(key)
-		if v == "" {
-			continue
-		}
-		found := false
-		for i, integ := range cfg.Integrations {
-			if integ.Name == key {
-				cfg.Integrations[i].Value = v
-				found = true
-				break
+	// Nur injizieren wenn CALCOM_ENABLED != "false" (Dashboard-Toggle).
+	if get("CALCOM_ENABLED") != "false" {
+		for _, key := range []string{"CALCOM_BASE_URL", "CALCOM_API_KEY", "CALCOM_OWNER_EMAIL", "CALCOM_EVENT_TYPE_ID"} {
+			v := get(key)
+			if v == "" {
+				continue
+			}
+			found := false
+			for i, integ := range cfg.Integrations {
+				if integ.Name == key {
+					cfg.Integrations[i].Value = v
+					found = true
+					break
+				}
+			}
+			if !found {
+				cfg.Integrations = append(cfg.Integrations, config.Integration{Name: key, Value: v})
 			}
 		}
-		if !found {
-			cfg.Integrations = append(cfg.Integrations, config.Integration{Name: key, Value: v})
-		}
+	} else {
+		log.Println("[Config] Cal.com deaktiviert (CALCOM_ENABLED=false) – Credentials werden nicht verwendet.")
 	}
 }
 

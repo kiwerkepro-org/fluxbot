@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ki-werke/fluxbot/pkg/channels"
+	cronpkg "github.com/ki-werke/fluxbot/pkg/cron"
 	"github.com/ki-werke/fluxbot/pkg/email"
 	googleapi "github.com/ki-werke/fluxbot/pkg/google"
 	"github.com/ki-werke/fluxbot/pkg/imagegen"
@@ -43,6 +44,7 @@ type Agent struct {
 	calcomEventTypeID int    // Optional: fixe Event Type ID (0 = auto-fetch)
 	googleClient     *googleapi.Client // nil = Google deaktiviert
 	soul              string // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
+	cronManager      *cronpkg.Manager // nil = Cron deaktiviert
 	systemPromptFn   func(session *Session, rules string) string
 }
 
@@ -65,6 +67,7 @@ type Config struct {
 	CalcomOwnerEmail  string // Optional – Standard-E-Mail für Buchungen
 	CalcomEventTypeID int    // Optional – fixe Event Type ID (0 = auto-fetch)
 	GoogleClient     *googleapi.Client // Optional – nil = Google deaktiviert
+	CronManager      *cronpkg.Manager // Optional – nil = Cron deaktiviert
 	Soul              string // Inhalt von SOUL.md + IDENTITY.md (leer = nur Basis-Prompt)
 }
 
@@ -92,6 +95,7 @@ func New(cfg Config) *Agent {
 		calcomOwnerEmail:  cfg.CalcomOwnerEmail,
 		calcomEventTypeID: cfg.CalcomEventTypeID,
 		googleClient:     cfg.GoogleClient,
+		cronManager:      cfg.CronManager,
 		soul:             cfg.Soul,
 	}
 	a.systemPromptFn = a.buildSystemPrompt
@@ -152,6 +156,11 @@ func (a *Agent) UpdateGoogleClient(client *googleapi.Client) {
 	}
 }
 
+// UpdateCronManager setzt den CronManager zur Laufzeit (Hot-Reload-faehig).
+func (a *Agent) UpdateCronManager(m *cronpkg.Manager) {
+	a.cronManager = m
+}
+
 // Run startet den Agent-Loop
 func (a *Agent) Run(ctx context.Context) {
 	voiceStatus := "deaktiviert"
@@ -200,6 +209,8 @@ func (a *Agent) handleMessage(ctx context.Context, msg channels.Message) {
 	switch msg.Type {
 	case channels.MessageTypeVoice:
 		a.handleVoice(ctx, msg, session)
+	case channels.MessageTypeImage:
+		a.handleImageAnalysis(ctx, msg, session)
 	case channels.MessageTypeText:
 		text := msg.Text
 		response := a.processText(ctx, msg, session)
@@ -281,6 +292,84 @@ func (a *Agent) handleVoice(ctx context.Context, msg channels.Message, session *
 	session.AddToHistory("user", text)
 	session.AddToHistory("assistant", response)
 	a.manager.Reply(msg, fmt.Sprintf("🎙️ _%s_\n\n%s", text, response))
+}
+
+// handleImageAnalysis analysiert ein empfangenes Foto via Vision-AI.
+// Das Bild wird aus msg.MediaPath geladen, base64-kodiert und an den AI-Provider gesendet.
+// msg.Text enthaelt optional eine Caption des Users (z.B. "Was siehst du hier?").
+func (a *Agent) handleImageAnalysis(ctx context.Context, msg channels.Message, session *Session) {
+	if msg.MediaPath == "" {
+		a.manager.Reply(msg, "\u274c Foto konnte nicht geladen werden.")
+		return
+	}
+	defer os.Remove(msg.MediaPath) // Temp-Datei nach Verarbeitung loeschen
+
+	// Bild aus Temp-Datei lesen
+	imageData, err := os.ReadFile(msg.MediaPath)
+	if err != nil {
+		log.Printf("[Agent] Fehler beim Lesen des Fotos: %v", err)
+		a.manager.Reply(msg, "\u274c Foto konnte nicht gelesen werden.")
+		return
+	}
+
+	// MIME-Typ anhand der Dateiendung ermitteln
+	imageMIME := "image/jpeg"
+	path := msg.MediaPath
+	if len(path) >= 4 {
+		ext := strings.ToLower(path[len(path)-4:])
+		switch ext {
+		case ".png":
+			imageMIME = "image/png"
+		case ".gif":
+			imageMIME = "image/gif"
+		case ".webp":
+			imageMIME = "image/webp"
+		}
+	}
+
+	// Nutzer-Prompt: Caption nutzen, sonst Default-Frage
+	userPrompt := msg.Text
+	if strings.TrimSpace(userPrompt) == "" {
+		userPrompt = "Was siehst du auf diesem Bild? Beschreibe den Inhalt kurz und praezise."
+	}
+
+	// Schreib-Indikator
+	a.manager.Typing(msg)
+
+	// Vision-Modell waehlen (ocr-Key = Pixtral / GPT-4o / Claude Vision je nach Provider)
+	visionModel := a.models["ocr"]
+	if visionModel == "" {
+		visionModel = a.models["default"]
+	}
+
+	log.Printf("[Agent] Bildanalyse | Modell: %s | MIME: %s | Groesse: %d bytes | Prompt: %.80s",
+		visionModel, imageMIME, len(imageData), userPrompt)
+
+	req := provider.Request{
+		Model:  visionModel,
+		System: a.buildSystemPrompt(session, ""),
+		Messages: []provider.Message{
+			{
+				Role:      "user",
+				Content:   userPrompt,
+				ImageData: imageData,
+				ImageMIME: imageMIME,
+			},
+		},
+	}
+
+	response, err := a.provider.Complete(ctx, req)
+	if err != nil {
+		log.Printf("[Agent] Bildanalyse-Fehler: %v", err)
+		a.manager.Reply(msg, fmt.Sprintf("\u274c Bildanalyse fehlgeschlagen: %v", err))
+		return
+	}
+
+	response = strings.TrimSpace(response)
+	// Gespraechsverlauf speichern
+	session.AddToHistory("user", "[Foto] "+userPrompt)
+	session.AddToHistory("assistant", response)
+	a.manager.Reply(msg, response)
 }
 
 // processText verarbeitet eine Textnachricht
@@ -366,6 +455,10 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 
 func (a *Agent) isForgetCommand(text string) bool {
 	lower := strings.ToLower(text)
+	// Reminder-Befehle explizit ausschliessen (werden vom CronManager verarbeitet)
+	if strings.Contains(lower, "erinnerung") || strings.Contains(lower, "reminder") {
+		return false
+	}
 	return strings.Contains(lower, "vergiss") ||
 		strings.Contains(lower, "vergessen") ||
 		strings.Contains(lower, "lösch") ||
@@ -669,6 +762,21 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 	// Gmail – E-Mails auflisten
 	if strings.Contains(response, "__GMAIL_LIST__") && strings.Contains(response, "__GMAIL_LIST_END__") {
 		return a.handleGmailList(response)
+	}
+
+	// ── Cron-Reminder Marker ──────────────────────────────────────────────────
+
+	// Reminder anlegen
+	if strings.Contains(response, "__REMINDER_CREATE__") && strings.Contains(response, "__REMINDER_CREATE_END__") {
+		return a.handleReminderCreate(msg, response)
+	}
+	// Reminder auflisten
+	if strings.Contains(response, "__REMINDER_LIST__") {
+		return a.handleReminderList(msg)
+	}
+	// Reminder löschen
+	if strings.Contains(response, "__REMINDER_DELETE__") && strings.Contains(response, "__REMINDER_DELETE_END__") {
+		return a.handleReminderDelete(msg, response)
 	}
 
 	return response
@@ -1507,6 +1615,23 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 			"Zeitzone für Kalender: Europe/Vienna. RFC3339-Format: 2026-02-25T10:00:00+01:00\n"
 	}
 
+	cronInstruction := ""
+	if a.cronManager != nil {
+		cronInstruction = "\nERINNERUNGEN (CRON) – HÖCHSTE PRIORITÄT:\n" +
+			"Du kannst für den Nutzer Erinnerungen anlegen, auflisten und löschen.\n" +
+			"WICHTIG: Frage den Nutzer immer nach der Zeitzone (z.B. Europe/Vienna), wenn sie nicht angegeben ist!\n\n" +
+			"Erinnerung anlegen – antworte EXAKT mit:\n" +
+			"__REMINDER_CREATE__\n" +
+			"{\"time_spec\":\"<täglich um 08:00 / montags um 09:30 / stündlich>\",\"timezone\":\"<z.B. Europe/Vienna>\",\"message\":\"<Erinnerungstext>\"}\n" +
+			"__REMINDER_CREATE_END__\n\n" +
+			"Erinnerungen auflisten – antworte NUR mit: __REMINDER_LIST__\n\n" +
+			"Erinnerung löschen – antworte EXAKT mit:\n" +
+			"__REMINDER_DELETE__\n" +
+			"{\"id\":<Nummer>}\n" +
+			"__REMINDER_DELETE_END__\n" +
+			"Unterstützte Zeitspezifikationen: \"täglich um HH:MM\", \"montags um HH:MM\", \"stündlich\".\n"
+	}
+
 	prompt += "ANTWORTREGELN – STRIKTE PFLICHT:\n" +
 		"- Beantworte NUR was gefragt wurde. Nichts mehr.\n" +
 		"- Maximal 2-3 Sätze, außer der Nutzer fragt EXPLIZIT nach einer ausführlichen Antwort.\n" +
@@ -1516,6 +1641,7 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 		calcomInstruction +
 		emailInstruction +
 		googleInstruction +
+		cronInstruction +
 		"\nVIDEO-ERKENNUNG – HÖCHSTE PRIORITÄT:\n" +
 		"Wenn der Nutzer in irgendeiner Form ein Video erstellen, generieren, produzieren, drehen, animieren oder rendern lassen möchte – egal wie er es formuliert, in welcher Sprache oder mit welchen Worten – antworte ausschließlich mit dem exakten Text: __VIDEO_REQUEST__\n" +
 		"Kein weiterer Text, keine Erklärung, nur: __VIDEO_REQUEST__\n" +
@@ -1793,4 +1919,91 @@ func (a *Agent) generateImage(ctx context.Context, msg channels.Message, gen ima
 
 	log.Printf("[Agent] ✅ Bild erfolgreich gesendet | Provider: %s", gen.Name())
 	return ""
+}
+
+// ── Cron-Reminder Handler ─────────────────────────────────────────────────────
+
+// reminderCreatePayload beschreibt die JSON-Daten aus dem __REMINDER_CREATE__-Marker.
+type reminderCreatePayload struct {
+	TimeSpec string `json:"time_spec"` // z.B. "täglich um 06:00"
+	Timezone string `json:"timezone"`  // z.B. "Europe/Vienna"
+	Message  string `json:"message"`   // Erinnerungstext
+}
+
+// handleReminderCreate legt eine neue Erinnerung an.
+func (a *Agent) handleReminderCreate(msg channels.Message, response string) string {
+	if a.cronManager == nil {
+		return "⏰ Erinnerungen sind aktuell nicht aktiviert."
+	}
+	start := strings.Index(response, "__REMINDER_CREATE__")
+	end := strings.Index(response, "__REMINDER_CREATE_END__")
+	if start < 0 || end < 0 || end <= start {
+		return "❌ Interner Fehler beim Verarbeiten der Erinnerung."
+	}
+	jsonStr := strings.TrimSpace(response[start+len("__REMINDER_CREATE__") : end])
+
+	var p reminderCreatePayload
+	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil {
+		log.Printf("[Agent] Reminder-JSON Fehler: %v | Raw: %s", err, jsonStr)
+		return "❌ Erinnerung konnte nicht verarbeitet werden. Bitte nochmals versuchen."
+	}
+
+	cronExpr, timeStr, err := cronpkg.ParseReminderRequest(p.TimeSpec, p.Timezone)
+	if err != nil {
+		return fmt.Sprintf("❌ %v", err)
+	}
+
+	r := &cronpkg.Reminder{
+		UserID:    msg.SenderID,
+		UserName:  msg.UserName,
+		ChannelID: msg.ChannelID,
+		ChatID:    msg.ChatID,
+		CronExpr:  cronExpr,
+		TimeStr:   timeStr,
+		Timezone:  p.Timezone,
+		Message:   p.Message,
+	}
+
+	confirm, err := a.cronManager.AddReminder(r)
+	if err != nil {
+		return fmt.Sprintf("❌ Fehler beim Speichern: %v", err)
+	}
+	return confirm
+}
+
+// handleReminderList listet alle Erinnerungen des Users auf.
+func (a *Agent) handleReminderList(msg channels.Message) string {
+	if a.cronManager == nil {
+		return "⏰ Erinnerungen sind aktuell nicht aktiviert."
+	}
+	return a.cronManager.ListReminders(msg.SenderID)
+}
+
+// reminderDeletePayload beschreibt die JSON-Daten aus dem __REMINDER_DELETE__-Marker.
+type reminderDeletePayload struct {
+	ID int `json:"id"`
+}
+
+// handleReminderDelete löscht eine Erinnerung anhand der ID.
+func (a *Agent) handleReminderDelete(msg channels.Message, response string) string {
+	if a.cronManager == nil {
+		return "⏰ Erinnerungen sind aktuell nicht aktiviert."
+	}
+	start := strings.Index(response, "__REMINDER_DELETE__")
+	end := strings.Index(response, "__REMINDER_DELETE_END__")
+	if start < 0 || end < 0 || end <= start {
+		return "❌ Interner Fehler beim Verarbeiten der Lösch-Anfrage."
+	}
+	jsonStr := strings.TrimSpace(response[start+len("__REMINDER_DELETE__") : end])
+
+	var p reminderDeletePayload
+	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil {
+		return "❌ Lösch-Anfrage konnte nicht verarbeitet werden."
+	}
+
+	confirm, err := a.cronManager.DeleteReminder(p.ID, msg.SenderID)
+	if err != nil {
+		return fmt.Sprintf("❌ %v", err)
+	}
+	return confirm
 }

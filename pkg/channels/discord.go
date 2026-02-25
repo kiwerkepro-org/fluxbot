@@ -132,7 +132,7 @@ func (d *DiscordChannel) onMessage(s *discordgo.Session, m *discordgo.MessageCre
 
 		// Audio-Anhänge als Voice-Nachricht weiterleiten
 		if isDiscordAudio(att) {
-			localPath, err := saveTempFileFromData(data, ".ogg")
+			localPath, err := SaveTempFileFromData(data, ".ogg")
 			if err != nil {
 				log.Printf("[Discord] Temp-Datei konnte nicht erstellt werden: %v", err)
 			}
@@ -254,12 +254,13 @@ func (d *DiscordChannel) downloadFile(url, ext string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return saveTempFileFromData(data, ext)
+	return SaveTempFileFromData(data, ext)
 }
 
-// saveTempFileFromData speichert Bytes in einer temporären Datei und gibt den Pfad zurück.
-func saveTempFileFromData(data []byte, ext string) (string, error) {
-	tmpPath := fmt.Sprintf("/tmp/discord_media_%d%s", time.Now().UnixNano(), ext)
+// SaveTempFileFromData speichert Bytes in einer temporären Datei und gibt den Pfad zurück.
+// Diese Funktion wird von mehreren Channels genutzt.
+func SaveTempFileFromData(data []byte, ext string) (string, error) {
+	tmpPath := fmt.Sprintf("/tmp/fluxbot_media_%d%s", time.Now().UnixNano(), ext)
 	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
 		return "", fmt.Errorf("temp-datei konnte nicht erstellt werden: %w", err)
 	}

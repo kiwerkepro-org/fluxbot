@@ -10,10 +10,11 @@ import (
 
 // Loader lädt alle Skills aus dem Workspace und baut den Skill-Baum auf.
 type Loader struct {
-	workspacePath string
-	skills        map[string]*Skill // name → Skill
-	secret        string            // HMAC-Secret für Signatur-Prüfung (leer = deaktiviert)
-	integrations  map[string]string // Platzhalter-Name → Wert
+	workspacePath  string
+	skills         map[string]*Skill // name → Skill (nur gültig signierte)
+	invalidSkills  map[string]*Skill // name → Skill (ungültige Signatur – nur für Dashboard)
+	secret         string            // HMAC-Secret für Signatur-Prüfung (leer = deaktiviert)
+	integrations   map[string]string // Platzhalter-Name → Wert
 }
 
 // NewLoader erstellt einen neuen Skills-Loader und lädt alle Skills sofort.
@@ -21,6 +22,7 @@ func NewLoader(workspacePath string) *Loader {
 	l := &Loader{
 		workspacePath: workspacePath,
 		skills:        make(map[string]*Skill),
+		invalidSkills: make(map[string]*Skill),
 		integrations:  make(map[string]string),
 	}
 	l.loadAll()
@@ -41,8 +43,9 @@ func (l *Loader) SetIntegrations(integrations map[string]string) {
 // Muss nach SetIntegrations aufgerufen werden damit Platzhalter ersetzt werden.
 func (l *Loader) Reload() {
 	l.skills = make(map[string]*Skill)
+	l.invalidSkills = make(map[string]*Skill)
 	l.loadAll()
-	log.Printf("[Skills] 🔄 Skills neu geladen (%d Skills aktiv)", len(l.skills))
+	log.Printf("[Skills] 🔄 Skills neu geladen (%d aktiv, %d benötigen Neu-Signierung)", len(l.skills), len(l.invalidSkills))
 }
 
 // SaveAndSign speichert einen Skill als .md-Datei, signiert ihn und lädt ihn sofort.
@@ -112,8 +115,18 @@ func (l *Loader) loadAll() {
 		}
 		path := filepath.Join(skillsDir, entry.Name())
 
-		// Signaturprüfung: manipulierte Skills werden übersprungen
-		if !l.verifySkill(path) {
+		// Signaturprüfung: ungültig signierte Skills werden ins Dashboard geladen (NeedsResigning=true),
+		// aber NICHT für den Agenten freigegeben (nur l.invalidSkills, nicht l.skills).
+		sigInvalid := l.isSignatureInvalid(path)
+		if sigInvalid {
+			skill, err := l.parseSkillFile(path)
+			if err != nil {
+				log.Printf("[Skills] Fehler beim Laden von %s: %v", path, err)
+				continue
+			}
+			skill.NeedsResigning = true
+			l.invalidSkills[skill.Name] = skill
+			log.Printf("[Skills] ⚠️ Skill %s benötigt Neu-Signierung (Inhalt geändert)", filepath.Base(path))
 			continue
 		}
 
@@ -141,28 +154,26 @@ func (l *Loader) loadAll() {
 	log.Printf("[Skills] %d Skills geladen", len(l.skills))
 }
 
-// verifySkill prüft die Signatur einer Skill-Datei wenn ein Secret gesetzt ist.
-// Gibt false zurück wenn die Datei manipuliert wurde (Signatur vorhanden aber falsch).
-func (l *Loader) verifySkill(path string) bool {
+// isSignatureInvalid gibt true zurück wenn eine .sig-Datei vorhanden ist aber nicht passt.
+// (= Inhalt wurde nach dem letzten Signieren geändert → Neu-Signierung nötig)
+// Unsignierte Skills (keine .sig) und Skills ohne gesetztem Secret gelten als gültig.
+func (l *Loader) isSignatureInvalid(path string) bool {
 	if l.secret == "" {
-		return true // Signierung deaktiviert → alles erlaubt
+		return false // Signierung deaktiviert → immer gültig
 	}
 	ok, err := VerifyFile(path, l.secret)
 	if err != nil {
 		log.Printf("[Skills] ⚠️ Signaturprüfung Fehler für %s: %v", filepath.Base(path), err)
-		return true // Fehler beim Lesen der .sig = unsigniert → erlaubt
+		return false // Lesefehler → nicht als ungültig markieren
 	}
 	if !ok {
-		// Keine .sig-Datei = unsigniert (erlaubt mit Warnung)
-		// Vorhandene aber falsche .sig = manipuliert (abgelehnt)
 		sigPath := path + ".sig"
 		if _, statErr := os.Stat(sigPath); statErr == nil {
-			log.Printf("[Skills] 🚨 Skill %s wurde manipuliert – wird NICHT geladen!", filepath.Base(path))
-			return false
+			return true // .sig vorhanden aber falsch = ungültig
 		}
 		log.Printf("[Skills] ℹ️ Skill %s ist unsigniert", filepath.Base(path))
 	}
-	return true
+	return false
 }
 
 // substituteIntegrations ersetzt {{PLACEHOLDER}} mit den konfigurierten Integrationswerten.
@@ -296,25 +307,45 @@ func (l *Loader) ResolveDisambiguation(state *DisambiguationState, response stri
 	return matcher.Resolve(state, response)
 }
 
-// ListSkills gibt alle geladenen Skills zurück.
+// ListSkills gibt alle geladenen Skills zurück – gültige + jene die neu signiert werden müssen.
+// Für das Dashboard: ungültige Skills erscheinen mit NeedsResigning=true.
+// Für den Agenten: nur l.skills (gültige) werden für Matching verwendet.
 func (l *Loader) ListSkills() []*Skill {
-	result := make([]*Skill, 0, len(l.skills))
+	result := make([]*Skill, 0, len(l.skills)+len(l.invalidSkills))
 	for _, s := range l.skills {
+		result = append(result, s)
+	}
+	for _, s := range l.invalidSkills {
 		result = append(result, s)
 	}
 	return result
 }
 
-// SignSkill signiert eine Skill-Datei neu.
+// SignSkill signiert eine Skill-Datei neu und verschiebt sie nach dem Signieren in l.skills.
 func (l *Loader) SignSkill(skillName string) error {
-	skill, ok := l.skills[skillName]
-	if !ok {
-		return fmt.Errorf("skill '%s' nicht gefunden", skillName)
-	}
 	if l.secret == "" {
 		return fmt.Errorf("skill-secret nicht gesetzt")
 	}
-	return SignFile(skill.Path, l.secret)
+	// In gültigen Skills suchen
+	skill, ok := l.skills[skillName]
+	if !ok {
+		// In ungültigen Skills suchen (nach Umbenennung o.ä.)
+		skill, ok = l.invalidSkills[skillName]
+		if !ok {
+			return fmt.Errorf("skill '%s' nicht gefunden", skillName)
+		}
+	}
+	if err := SignFile(skill.Path, l.secret); err != nil {
+		return err
+	}
+	// Nach erfolgreichem Signieren: aus invalidSkills entfernen und in skills übernehmen
+	if skill.NeedsResigning {
+		skill.NeedsResigning = false
+		skill.Content = l.substituteIntegrations(skill.Content)
+		delete(l.invalidSkills, skillName)
+		l.skills[skillName] = skill
+	}
+	return nil
 }
 
 // loadDefaultAgents lädt den AGENTS.md-Fallback

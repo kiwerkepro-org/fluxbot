@@ -115,3 +115,15 @@ func (m *Manager) ReplyPhoto(msg Message, imageURL, caption string) error {
 	}
 	return ch.SendPhoto(msg.ChatID, imageURL, caption)
 }
+
+// SendTo sendet eine Textnachricht direkt an einen bestimmten Kanal + Chat.
+// Wird vom Cron-System genutzt um Reminders auszuliefern.
+func (m *Manager) SendTo(channelID, chatID, text string) error {
+	m.mu.RLock()
+	ch, ok := m.channels[channelID]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("channel '%s' nicht gefunden", channelID)
+	}
+	return ch.Send(chatID, text)
+}

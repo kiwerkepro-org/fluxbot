@@ -81,7 +81,7 @@ PROVIDER_DEEPSEEK, PROVIDER_PERPLEXITY, PROVIDER_COHERE, ...
 VOICE_API_KEY
 IMG_OPENROUTER, IMG_FAL, IMG_OPENAI, IMG_STABILITY, IMG_TOGETHER, IMG_REPLICATE
 VID_RUNWAY, VID_KLING, VID_LUMA, VID_PIKA, VID_HAILUO, VID_SORA, VID_VEO
-SKILL_SECRET, VIRUSTOTAL_API_KEY, DASHBOARD_PASSWORD
+SKILL_SECRET, VIRUSTOTAL_API_KEY, DASHBOARD_PASSWORD, DASHBOARD_USERNAME
 HMAC_SECRET
 OLLAMA_BASE_URL  (optional, Default: http://localhost:11434)
 INTEG_{NAME}  z.B. INTEG_CALCOM_API_KEY, INTEG_CALCOM_BASE_URL
@@ -109,6 +109,8 @@ CALCOM_BASE_URL, CALCOM_API_KEY, CALCOM_OWNER_EMAIL
 | `/api/google/oauth-callback` | GET | OAuth2 Callback → Vault |
 | `/api/skills` | GET | Skill-Liste |
 | `/api/skills/sign` | POST | Skill neu signieren (HMAC) |
+| `/api/auth/check` | GET | Credentials prüfen (200/401) |
+| `/api/auth/recover` | GET | Passwort-Wiederherstellung (nur 127.0.0.1) |
 
 ---
 
@@ -153,20 +155,42 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 
 ---
 
-## Aktueller Stand (Session 23 – 2026-02-24)
+## Aktueller Stand (Session 25 – 2026-02-25)
 
-**Letzte abgeschlossene Session:** 22 (P1 Dashboard Redesign erledigt)
-**Aktuelle Session:** 23
+**Letzte abgeschlossene Session:** 25
+**Nächste Session:** 26
+
+**In Session 24 erledigt:**
+- ✅ Docker-Rebuild durchgeführt
+- ✅ **P3 abgeschlossen:**
+  - Lucide Icons CDN in dashboard.html eingebunden (`unpkg.com/lucide@latest`)
+  - Alle 6 Sidebar-Emojis durch Lucide SVG-Icons ersetzt (activity, settings, shield, wrench, flame, help-circle)
+  - `lucide.createIcons()` in `init()` + `loadInitialData()`
+  - `pkg/provider/types.go`: `Message` um `ImageData []byte` + `ImageMIME string` erweitert
+  - `pkg/provider/openrouter.go`: Vision-Content-Array (multimodal) für Bildnachrichten
+  - `pkg/channels/telegram.go`: Caption von Fotos wird als `msg.Text` übergeben
+  - `pkg/agent/agent.go`: `case MessageTypeImage` + `handleImageAnalysis()` implementiert
+- ✅ **P5 (Cronjobs) abgeschlossen:**
+  - `pkg/cron/cron.go`: `Manager`, `ParseReminderRequest()`, `AddReminder()`, `DeleteReminder()`, `ListReminders()`
+  - `pkg/cron/reminder.go`: `Reminder`-Struct, JSON-Persistenz in `workspace/reminders.json`
+  - `pkg/channels/manager.go`: `SendTo(channelID, chatID, text)` für Cron-Trigger
+  - `pkg/agent/agent.go`: `cronManager`-Feld, `__REMINDER_CREATE/LIST/DELETE__`-Marker + Handler
+  - `cmd/fluxbot/main.go`: CronManager Init, `Start()` nach Channel-Start, `defer Stop()`
+  - `go.mod`: `github.com/robfig/cron/v3 v3.0.1` hinzugefügt
+  - `workspace/skills/cron-reminder.md` + `.sig` erstellt
+
+**In Session 25 erledigt:**
+- ✅ **Bugfix: Delete-Kollision mit Gedächtnissystem**
+  - Problem: "Lösch Erinnerung #X" wurde von `isForgetCommand()` abgefangen statt vom CronManager
+  - Fix in `pkg/agent/agent.go`: `isForgetCommand()` gibt `false` zurück wenn Text "erinnerung" oder "reminder" enthält
+  - Getestet + bestätigt ✅
+- ✅ Docker-Rebuild durchgeführt (für isForgetCommand-Fix)
+
+**In Session 25 zusätzlich getestet:**
+- ✅ Cal.com Integration – funktioniert
+- ✅ Google Calendar: Termine auflisten + erstellen – funktioniert
+- ✅ Gmail: E-Mails lesen + senden – funktioniert
 
 **Offen / Nächste Schritte:**
-1. **P2:** System-Testing (Hardcore Test Suite)
-2. **P3:** Lucide Icons einbinden (P8.5 in `memory-md/01-features.md`)
-3. **P4:** Sprachausgabe Brainstorming + Implementierung
-4. **P5:** Cronjobs
-5. Git commit + push nach jeder Priorität
-
-**Erledigt in Session 22:**
-- INBOX.md geleert (Notizen verarbeitet) ✅
-- Fehlerbilder analysiert + Auto-Cleanup-Regel definiert ✅
-- Lucide Icons als P8.5 in `memory-md/01-features.md` dokumentiert ✅
-- CLAUDE.md: Auto-Cleanup-Regel für INBOX.md + Z-FEHLERBILDER hinzugefügt ✅
+1. **Git commit + push** (Git Lock prüfen) – alle Session 24+25 Änderungen committen
+2. **P4:** Sprachausgabe Brainstorming + Implementierung

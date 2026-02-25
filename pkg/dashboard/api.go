@@ -403,8 +403,9 @@ func (s *Server) handleGoogleOAuthCallback(w http.ResponseWriter, r *http.Reques
 // ── /api/skills ────────────────────────────────────────────────────────────────
 
 type skillResponse struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+	Name           string `json:"name"`
+	Path           string `json:"path"`
+	NeedsResigning bool   `json:"needsResigning,omitempty"`
 }
 
 func (s *Server) handleSkills(w http.ResponseWriter, r *http.Request) {
@@ -416,10 +417,12 @@ func (s *Server) handleSkills(w http.ResponseWriter, r *http.Request) {
 	skillList := s.skillsLoader.ListSkills()
 	result := make([]skillResponse, 0, len(skillList))
 	for _, skill := range skillList {
-		if skill != nil {
+		// Filter: Nur .md Skills anzeigen, keine .sig oder andere Dateien
+		if skill != nil && !strings.HasSuffix(skill.Name, ".sig") && !strings.HasPrefix(skill.Name, ".") {
 			result = append(result, skillResponse{
-				Name: skill.Name,
-				Path: skill.Path,
+				Name:           skill.Name,
+				Path:           skill.Path,
+				NeedsResigning: skill.NeedsResigning,
 			})
 		}
 	}
@@ -464,6 +467,28 @@ func (s *Server) handleSkillsSign(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("Skill '%s' erfolgreich signiert", req.Skill),
+	})
+}
+
+// ── /api/skills/reload ────────────────────────────────────────────────────────────
+
+func (s *Server) handleSkillsReload(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpError(w, "Nur POST erlaubt", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.skillsLoader == nil {
+		httpError(w, "SkillsLoader nicht verfügbar", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Alle Skills neu laden
+	s.skillsLoader.Reload()
+
+	writeJSON(w, map[string]interface{}{
+		"success": true,
+		"message": "✅ Alle Skills erfolgreich neu geladen",
 	})
 }
 

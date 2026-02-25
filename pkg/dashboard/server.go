@@ -32,6 +32,8 @@ type Server struct {
 	workspacePath string
 	password      string
 	passwordMu    sync.RWMutex    // schützt Hot-Reload des Passworts
+	username      string
+	usernameMu    sync.RWMutex    // schützt Hot-Reload des Benutzernamens
 	hmacSecret    string
 	hmacSecretMu  sync.RWMutex    // schützt Hot-Reload des HMAC-Secrets
 	port          int
@@ -49,11 +51,15 @@ type Server struct {
 // onReload: wird nach jeder Config- oder Secret-Änderung aufgerufen.
 // hmacSecret: HMAC-Schlüssel für Dashboard-API-Request-Signierung (leer = deaktiviert).
 // skillsLoader: SkillsLoader für Skill-Verwaltung (optional, kann nil sein).
-func New(configPath, workspacePath, password string, port int, getChannels func() []string, logPath string, vault security.SecretProvider, onReload func(), hmacSecret string, skillsLoader *skills.Loader) *Server {
+func New(configPath, workspacePath, password, username string, port int, getChannels func() []string, logPath string, vault security.SecretProvider, onReload func(), hmacSecret string, skillsLoader *skills.Loader) *Server {
+	if username == "" {
+		username = "admin"
+	}
 	return &Server{
 		configPath:    configPath,
 		workspacePath: workspacePath,
 		password:      password,
+		username:      username,
 		hmacSecret:    hmacSecret,
 		port:          port,
 		startTime:     time.Now(),
@@ -85,13 +91,27 @@ func (s *Server) UpdatePassword(pass string) {
 	}
 }
 
+// UpdateUsername aktualisiert den Dashboard-Benutzernamen zur Laufzeit (Hot-Reload).
+func (s *Server) UpdateUsername(user string) {
+	s.usernameMu.Lock()
+	defer s.usernameMu.Unlock()
+	if user != "" {
+		s.username = user
+		log.Println("[Dashboard] Benutzername aktualisiert.")
+	}
+}
+
 // Start startet den Dashboard-HTTP-Server.
 // Blockiert bis ctx abgebrochen wird.
 func (s *Server) Start(ctx context.Context) {
 	mux := http.NewServeMux()
 
-	// ── UI (eingebettetes HTML) ───────────────────────────────────────────────
-	mux.HandleFunc("/", s.auth(s.handleUI))
+	// ── UI (eingebettetes HTML – öffentlich, Auth erfolgt via JS Login-Overlay) ──
+	mux.HandleFunc("/", s.handleUI)
+
+	// ── Auth-Endpunkte ───────────────────────────────────────────────────────
+	mux.HandleFunc("/api/auth/check", s.auth(s.handleAuthCheck))       // Credentials prüfen
+	mux.HandleFunc("/api/auth/recover", s.handleAuthRecover)           // Passwort-Wiederherstellung (nur localhost)
 
 	// ── API-Endpunkte (lesend – kein HMAC erforderlich) ─────────────────────
 	mux.HandleFunc("/api/status", s.auth(s.handleStatus))
@@ -112,7 +132,8 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/secrets", s.auth(s.hmacVerify(s.handleSecrets)))
 	mux.HandleFunc("/api/soul", s.auth(s.hmacVerify(s.handleSoul)))
 	mux.HandleFunc("/api/vt/clear", s.auth(s.hmacVerify(s.handleVTClear)))
-	mux.HandleFunc("/api/skills/sign", s.auth(s.hmacVerify(s.handleSkillsSign)))
+	mux.HandleFunc("/api/skills/sign", s.auth(s.handleSkillsSign))         // Kein HMAC (nur Dashboard-Operation, keine kritischen Daten)
+	mux.HandleFunc("/api/skills/reload", s.auth(s.handleSkillsReload))   // Kein HMAC (nur Reload, kein State-Change)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),
@@ -135,17 +156,22 @@ func (s *Server) Start(ctx context.Context) {
 }
 
 // auth ist HTTP Basic Auth Middleware.
-// Wenn kein Passwort konfiguriert ist, wird kein Auth geprüft.
+// Prüft Benutzername + Passwort. Wenn kein Passwort konfiguriert ist, wird kein Auth geprüft.
 func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		s.passwordMu.RLock()
 		pw := s.password
 		s.passwordMu.RUnlock()
 		if pw != "" {
-			_, pass, ok := r.BasicAuth()
-			if !ok || pass != pw {
-				w.Header().Set("WWW-Authenticate", `Basic realm="FluxBot Dashboard"`)
-				http.Error(w, "Zugriff verweigert", http.StatusUnauthorized)
+			s.usernameMu.RLock()
+			expectedUser := s.username
+			s.usernameMu.RUnlock()
+
+			user, pass, ok := r.BasicAuth()
+			if !ok || pass != pw || (expectedUser != "" && user != expectedUser) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				json.NewEncoder(w).Encode(map[string]string{"error": "Ungültige Anmeldedaten"})
 				return
 			}
 		}
@@ -153,6 +179,35 @@ func (s *Server) auth(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		next(w, r)
 	}
+}
+
+// handleAuthCheck gibt 200 zurück wenn die Credentials korrekt sind (für JS Login-Check).
+func (s *Server) handleAuthCheck(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
+// handleAuthRecover gibt Benutzername + Passwort zurück – NUR von localhost erreichbar.
+// Dient der Passwort-Wiederherstellung ohne Kommandozeile.
+func (s *Server) handleAuthRecover(w http.ResponseWriter, r *http.Request) {
+	// Nur localhost darf diese Route aufrufen
+	ip := r.RemoteAddr
+	if !strings.HasPrefix(ip, "127.0.0.1:") && !strings.HasPrefix(ip, "[::1]:") && ip != "127.0.0.1" && ip != "::1" {
+		http.Error(w, "Nur von localhost erreichbar", http.StatusForbidden)
+		return
+	}
+	s.passwordMu.RLock()
+	pw := s.password
+	s.passwordMu.RUnlock()
+	s.usernameMu.RLock()
+	user := s.username
+	s.usernameMu.RUnlock()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"username": user,
+		"password": pw,
+	})
 }
 
 // hmacVerify ist HMAC-SHA256 Middleware für schreibende API-Requests (POST, PUT, DELETE).

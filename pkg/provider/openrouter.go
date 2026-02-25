@@ -3,6 +3,7 @@ package provider
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,11 +35,11 @@ func (o *OpenRouter) Name() string { return "openrouter" }
 // Direkt portiert aus der alten callOpenRouter-Funktion.
 func (o *OpenRouter) Complete(ctx context.Context, req Request) (string, error) {
 	// Messages für API aufbauen
-	messages := make([]map[string]string, 0, len(req.Messages)+1)
+	messages := make([]interface{}, 0, len(req.Messages)+1)
 
 	// System-Prompt als erste Message
 	if req.System != "" {
-		messages = append(messages, map[string]string{
+		messages = append(messages, map[string]interface{}{
 			"role":    "system",
 			"content": req.System,
 		})
@@ -46,10 +47,31 @@ func (o *OpenRouter) Complete(ctx context.Context, req Request) (string, error) 
 
 	// Benutzer-Nachrichten
 	for _, msg := range req.Messages {
-		messages = append(messages, map[string]string{
-			"role":    msg.Role,
-			"content": msg.Content,
-		})
+		if len(msg.ImageData) > 0 {
+			// Vision-Nachricht: Content als Array (Text + Bild)
+			mime := msg.ImageMIME
+			if mime == "" {
+				mime = "image/jpeg"
+			}
+			dataURL := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(msg.ImageData)
+			contentArr := []map[string]interface{}{
+				{"type": "image_url", "image_url": map[string]string{"url": dataURL}},
+			}
+			if msg.Content != "" {
+				contentArr = append([]map[string]interface{}{
+					{"type": "text", "text": msg.Content},
+				}, contentArr...)
+			}
+			messages = append(messages, map[string]interface{}{
+				"role":    msg.Role,
+				"content": contentArr,
+			})
+		} else {
+			messages = append(messages, map[string]interface{}{
+				"role":    msg.Role,
+				"content": msg.Content,
+			})
+		}
 	}
 
 	reqBody, err := json.Marshal(map[string]interface{}{
