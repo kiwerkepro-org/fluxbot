@@ -35,10 +35,10 @@
 **Dashboard:** http://localhost:9090 (nur via Tailscale oder lokal)
 
 ### Versioning-Konvention
-- **Aktueller Release:** `v1.1.1`
+- **Aktueller Release:** `v1.1.3`
 - **Schema:** `vMAJOR.MINOR.PATCH`
 - **Regel:** Die letzte Ziffer (PATCH) wird bei jedem Release um 1 erhöht, solange JJ nichts anderes angibt.
-- **Nächster Release:** `v1.1.2` (automatisch, außer JJ gibt ein anderes Schema vor)
+- **Nächster Release:** `v1.1.4` (automatisch, außer JJ gibt ein anderes Schema vor)
 - Release-Tag wird nach jedem abgeschlossenen Feature-Block auf GitHub gepusht (`git tag -a vX.Y.Z && git push origin vX.Y.Z`)
 
 ---

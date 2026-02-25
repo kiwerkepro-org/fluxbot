@@ -28,7 +28,7 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/voice"
 )
 
-var version = "dev"
+var version = "v1.1.3"
 
 func main() {
 	configPath := flag.String("config", "./workspace/config.json", "Pfad zur Konfigurationsdatei")
