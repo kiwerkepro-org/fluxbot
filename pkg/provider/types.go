@@ -23,8 +23,10 @@ type Request struct {
 
 // Message ist eine Nachricht im Chatverlauf
 type Message struct {
-	Role    string // "user", "assistant", "system"
-	Content string
+	Role      string // "user", "assistant", "system"
+	Content   string
+	ImageData []byte // Optional: Binärdaten eines Bildes (für Vision-Anfragen)
+	ImageMIME string // Optional: MIME-Typ des Bildes (z.B. "image/jpeg", "image/png")
 }
 
 // RouteModel wählt das passende Modell anhand von Keywords im Benutzer-Input.

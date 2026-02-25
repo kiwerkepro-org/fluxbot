@@ -13,7 +13,8 @@ type Skill struct {
 	Parent                 string   // Name des übergeordneten Skills (z.B. "wordpress")
 
 	// Wird nach dem Laden befüllt
-	SubCategories []*Skill
+	SubCategories  []*Skill
+	NeedsResigning bool // true = .sig vorhanden aber ungültig (Inhalt geändert)
 }
 
 // MatchResult ist das Ergebnis eines Skill-Matching-Vorgangs.

@@ -251,9 +251,66 @@
   /* ── Google Services Grid ── */
   .gsvc-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   .gsvc-item { }
+
+  /* ── Login Overlay ── */
+  #login-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+  #login-overlay.hidden { display: none; }
+  .login-box { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 40px 40px 32px; width: 360px; box-shadow: 0 24px 64px rgba(0,0,0,0.6); }
+  .login-logo { text-align: center; margin-bottom: 28px; }
+  .login-logo h1 { font-size: 22px; font-weight: 700; color: var(--text); }
+  .login-logo span { font-size: 12px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+  .login-field { margin-bottom: 16px; }
+  .login-field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .login-field input { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; transition: border-color 0.15s; }
+  .login-field input:focus { border-color: var(--accent); }
+  .login-btn { width: 100%; padding: 11px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background 0.15s; }
+  .login-btn:hover { background: #4a7de0; }
+  .login-error { color: var(--red); font-size: 13px; text-align: center; margin-top: 10px; min-height: 18px; }
+  .login-forgot { text-align: center; margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .login-forgot a { color: var(--accent); cursor: pointer; }
+  .login-forgot a:hover { color: #8bb4f8; }
+  .recovery-credentials { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin: 14px 0; font-family: monospace; font-size: 13px; }
+  .recovery-credentials div { margin-bottom: 6px; color: var(--muted); }
+  .recovery-credentials span { color: var(--text); font-weight: 600; word-break: break-all; }
 </style>
 </head>
 <body>
+
+<!-- ── Login Overlay ── -->
+<div id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <h1>🤖 FluxBot</h1>
+      <span>KI-WERKE Dashboard</span>
+    </div>
+    <div class="login-field">
+      <label>Benutzername</label>
+      <input type="text" id="login-user" placeholder="admin" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+    </div>
+    <div class="login-field">
+      <label>Passwort</label>
+      <input type="password" id="login-pass" placeholder="●●●●●●●●" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="login-btn" onclick="doLogin()">Anmelden</button>
+    <div class="login-error" id="login-error"></div>
+    <div class="login-forgot"><a onclick="showRecovery()">Passwort vergessen?</a></div>
+  </div>
+</div>
+
+<!-- ── Recovery Modal ── -->
+<div class="modal-overlay" id="recovery-modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal" style="max-width:480px">
+    <h3>🔑 Zugangsdaten wiederherstellen</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:4px">Da du lokal (localhost) verbunden bist, können die Zugangsdaten sicher abgerufen werden.</p>
+    <div class="recovery-credentials" id="recovery-content">
+      <div style="text-align:center;color:var(--muted)">Lade...</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="document.getElementById('recovery-modal').style.display='none'">Schließen</button>
+      <button class="btn btn-primary" onclick="applyRecovery()">Mit diesen Daten anmelden</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Sidebar ── -->
 <div class="sidebar">
@@ -262,29 +319,32 @@
     <span>Dashboard</span>
   </div>
   <div class="nav-item active" onclick="showSection('status', this)">
-    <span class="nav-icon">📊</span> Status
+    <span class="nav-icon"><i data-lucide="activity"></i></span> Status
     <button class="info-btn" onmouseenter="tipShow(this,'Laufzeit, Uptime und aktive Kanäle auf einen Blick.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('config', this)">
-    <span class="nav-icon">⚙️</span> Konfiguration
+    <span class="nav-icon"><i data-lucide="settings"></i></span> Konfiguration
     <button class="info-btn" onmouseenter="tipShow(this,'API-Keys, Kanäle, AI-Provider, Bild-/Videogenerierung, Voice und Integrationen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('virustotal', this)">
-    <span class="nav-icon">🛡️</span> VirusTotal
+    <span class="nav-icon"><i data-lucide="shield"></i></span> VirusTotal
     <button class="info-btn" onmouseenter="tipShow(this,'Malware-Scan-History und Statistiken. Erfordert API-Key in Danger Zone.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('system', this)">
-    <span class="nav-icon">🔧</span> System
+    <span class="nav-icon"><i data-lucide="wrench"></i></span> System
     <button class="info-btn" onmouseenter="tipShow(this,'Befehle für Neustart und Neu-Bauen – angepasst an dein Betriebssystem.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('danger', this)">
-    <span class="nav-icon">🔥</span> Danger Zone
+    <span class="nav-icon"><i data-lucide="flame"></i></span> Danger Zone
     <button class="info-btn" onmouseenter="tipShow(this,'Sicherheits-Schlüssel, Persönlichkeit und direkte Konfiguration.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('help', this)">
-    <span class="nav-icon">❓</span> Hilfe
+    <span class="nav-icon"><i data-lucide="help-circle"></i></span> Hilfe
   </div>
-  <div class="sidebar-footer">KI-WERKE · FluxBot v1.1.1</div>
+  <div class="sidebar-footer">
+    <div style="margin-bottom:8px">KI-WERKE · FluxBot v1.1.1</div>
+    <button onclick="doLogout()" style="width:100%;padding:6px 10px;background:rgba(226,93,93,0.1);border:1px solid rgba(226,93,93,0.25);border-radius:6px;color:var(--red);font-size:12px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.background='rgba(226,93,93,0.2)'" onmouseout="this.style.background='rgba(226,93,93,0.1)'">⎋ Abmelden</button>
+  </div>
 </div>
 
 <!-- ── Main ── -->
@@ -970,7 +1030,13 @@
           <div class="panel" style="margin-bottom:0" id="calcom-integ-panel">
             <div class="panel-title" style="justify-content:space-between">
               <span>📅 Cal.com – Kalender & Termine</span>
-              <span id="calcom-integ-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Nicht konfiguriert</span>
+              <div style="display:flex;align-items:center;gap:10px">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--muted)">
+                  <input type="checkbox" id="calcom-enabled" onchange="updateCalcomBadge();toggleCalcomFields()" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">
+                  Aktiviert
+                </label>
+                <span id="calcom-integ-badge" style="font-size:12px;padding:3px 10px;border-radius:12px;font-weight:600;background:rgba(245,166,35,0.12);color:var(--yellow);border:1px solid rgba(245,166,35,0.3)">⚠️ Nicht konfiguriert</span>
+              </div>
             </div>
             <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
               Damit FluxBot Kalendereinträge für dich erstellen kann, trage hier deine Zugangsdaten ein.<br>
@@ -1131,13 +1197,15 @@
         <div class="panel-title">📝 Skill-Verwaltung</div>
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
           <div class="field" style="flex:1;margin:0;min-width:200px">
-            <label>Skill auswählen</label>
-            <select id="skill-select" onchange="onSkillSelect()">
-              <option value="">– Skill wählen –</option>
+            <label>Skills auswählen <span style="font-weight:400;font-size:11px;opacity:0.6">(Strg+Klick = Mehrfachauswahl)</span></label>
+            <select id="skill-select" multiple size="6" onchange="onSkillSelect()" style="height:auto">
             </select>
           </div>
-          <button id="skill-sign-btn" class="btn btn-secondary" onclick="signSkill()" disabled style="opacity:0.5">🔏 Signieren</button>
-          <button class="btn btn-secondary" onclick="loadSkillsList()">🔄 Alle Skills neu laden</button>
+          <div style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end">
+            <button id="skill-sign-btn" class="btn btn-secondary" onclick="signSkill()" disabled style="opacity:0.5">🔏 Ausgewählte signieren</button>
+            <button class="btn btn-secondary" onclick="selectAllSkills()">☑️ Alle auswählen</button>
+            <button class="btn btn-secondary" onclick="reloadSkills()">🔄 Neu laden</button>
+          </div>
         </div>
         <div id="skill-sign-result" style="display:none"></div>
         <div class="howto-box">
@@ -1433,6 +1501,10 @@
         <div class="field"><label>HMAC Secret</label>
           <div class="input-wrap"><input id="hmac-secret-input" type="password" placeholder="hex-string..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
         </div>
+        <div class="field"><label>Dashboard-Benutzername</label>
+          <div class="input-wrap"><input id="dashboard-user-input" type="text" placeholder="admin" autocomplete="off"></div>
+          <span style="font-size:11px;color:var(--muted);margin-top:4px;display:block">Standard: admin – wird beim nächsten Login benötigt</span>
+        </div>
         <div class="field"><label>Dashboard-Passwort</label>
           <div class="input-wrap"><input id="dashboard-pw-input" type="password" placeholder="dein-passwort..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
         </div>
@@ -1723,6 +1795,78 @@ function toast(msg, isError = false) {
   setTimeout(() => { t.className = ''; }, 3500);
 }
 
+// ── Auth (Basic Auth – Credentials im Memory) ────────────────────────────
+let authUser = '';
+let authPass = '';
+let recoveryData = null;
+
+function getAuthHeader() {
+  if (!authUser && !authPass) return null;
+  return 'Basic ' + btoa(unescape(encodeURIComponent(authUser + ':' + authPass)));
+}
+
+async function doLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!user || !pass) { errEl.textContent = 'Bitte Benutzername und Passwort eingeben.'; return; }
+  const resp = await fetch('/api/auth/check', {
+    headers: { 'Authorization': 'Basic ' + btoa(unescape(encodeURIComponent(user + ':' + pass))) }
+  });
+  if (resp.ok) {
+    authUser = user;
+    authPass = pass;
+    document.getElementById('login-overlay').classList.add('hidden');
+    await initHMAC();
+    await loadInitialData();
+  } else {
+    errEl.textContent = 'Ungültige Anmeldedaten. Bitte erneut versuchen.';
+    document.getElementById('login-pass').value = '';
+    document.getElementById('login-pass').focus();
+  }
+}
+
+async function showRecovery() {
+  document.getElementById('recovery-modal').style.display = 'flex';
+  const content = document.getElementById('recovery-content');
+  content.innerHTML = '<div style="text-align:center;color:var(--muted)">Lade...</div>';
+  try {
+    const resp = await fetch('/api/auth/recover');
+    if (resp.status === 403) {
+      content.innerHTML = '<div style="color:var(--red)">⚠️ Nur von localhost erreichbar. Bitte öffne das Dashboard direkt auf dem Host-Rechner (nicht via Tailscale).</div>';
+      return;
+    }
+    const data = await resp.json();
+    recoveryData = data;
+    content.innerHTML = `
+      <div>Benutzername: <span>${escHtml(data.username || 'admin')}</span></div>
+      <div>Passwort: <span>${escHtml(data.password || '(nicht gesetzt)')}</span></div>`;
+  } catch(e) {
+    content.innerHTML = '<div style="color:var(--red)">Fehler beim Abrufen der Zugangsdaten.</div>';
+  }
+}
+
+function applyRecovery() {
+  if (!recoveryData) return;
+  document.getElementById('login-user').value = recoveryData.username || 'admin';
+  document.getElementById('login-pass').value = recoveryData.password || '';
+  document.getElementById('recovery-modal').style.display = 'none';
+  doLogin();
+}
+
+function doLogout() {
+  authUser = '';
+  authPass = '';
+  hmacCryptoKey = null;
+  recoveryData = null;
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').textContent = '';
+  document.getElementById('login-overlay').classList.remove('hidden');
+  document.getElementById('login-user').focus();
+}
+
 // ── HMAC Request-Signing ──────────────────────────────────────────────────
 // hmacCryptoKey wird beim Init geladen (null = HMAC deaktiviert)
 let hmacCryptoKey = null;
@@ -1731,7 +1875,10 @@ let hmacCryptoKey = null;
 // Wird einmalig beim Start aufgerufen – schlägt lautlos fehl wenn deaktiviert.
 async function initHMAC() {
   try {
-    const resp = await fetch('/api/hmac-token');
+    const headers = {};
+    const authHdr = getAuthHeader();
+    if (authHdr) headers['Authorization'] = authHdr;
+    const resp = await fetch('/api/hmac-token', { headers });
     if (!resp.ok) return;
     const data = await resp.json();
     if (!data.enabled || !data.secret) return;
@@ -1764,6 +1911,10 @@ async function api(url, method = 'GET', body = null) {
   const bodyStr = body ? JSON.stringify(body) : '';
   if (bodyStr) opts.body = bodyStr;
 
+  // Basic Auth Header hinzufügen
+  const authHdr = getAuthHeader();
+  if (authHdr) opts.headers['Authorization'] = authHdr;
+
   // HMAC-Signierung für schreibende Requests (POST, PUT, DELETE)
   const mutating = ['POST', 'PUT', 'DELETE'].includes((method || 'GET').toUpperCase());
   if (mutating && hmacCryptoKey) {
@@ -1776,6 +1927,14 @@ async function api(url, method = 'GET', body = null) {
   }
 
   const resp = await fetch(url, opts);
+  // Bei 401: Login-Overlay wieder anzeigen
+  if (resp.status === 401) {
+    authUser = '';
+    authPass = '';
+    document.getElementById('login-overlay').classList.remove('hidden');
+    document.getElementById('login-error').textContent = 'Sitzung abgelaufen – bitte erneut anmelden.';
+    throw new Error('Unauthorized');
+  }
   return resp.json();
 }
 
@@ -1899,10 +2058,13 @@ async function loadConfig() {
   reBlur('json');
 
   // ── Cal.com (Werte direkt aus Vault) ─────────────────────────────────────
-  setVal('calcom-base-url',    secretsData['CALCOM_BASE_URL']    || '');
-  setVal('calcom-api-key',     secretsData['CALCOM_API_KEY']     || '');
-  setVal('calcom-owner-email',     secretsData['CALCOM_OWNER_EMAIL']     || '');
+  const calcomEnabledEl = document.getElementById('calcom-enabled');
+  if (calcomEnabledEl) calcomEnabledEl.checked = secretsData['CALCOM_ENABLED'] !== 'false';
+  setVal('calcom-base-url',      secretsData['CALCOM_BASE_URL']      || '');
+  setVal('calcom-api-key',       secretsData['CALCOM_API_KEY']       || '');
+  setVal('calcom-owner-email',   secretsData['CALCOM_OWNER_EMAIL']   || '');
   setVal('calcom-event-type-id', secretsData['CALCOM_EVENT_TYPE_ID'] || '');
+  toggleCalcomFields();
   updateCalcomBadge();
 
   // Google Workspace
@@ -2073,9 +2235,10 @@ async function saveConfig() {
     secretsPatch['YOUTUBE_API_KEY'] = getVal('youtube-apikey');
 
     // ── Cal.com → Vault ───────────────────────────────────────────────────
+    secretsPatch['CALCOM_ENABLED']     = document.getElementById('calcom-enabled')?.checked ? 'true' : 'false';
     secretsPatch['CALCOM_BASE_URL']    = getVal('calcom-base-url');
     secretsPatch['CALCOM_API_KEY']     = getVal('calcom-api-key');
-    secretsPatch['CALCOM_OWNER_EMAIL']     = getVal('calcom-owner-email');
+    secretsPatch['CALCOM_OWNER_EMAIL'] = getVal('calcom-owner-email');
     const calcomEventTypeId = getVal('calcom-event-type-id');
     if (calcomEventTypeId) secretsPatch['CALCOM_EVENT_TYPE_ID'] = calcomEventTypeId;
 
@@ -2638,6 +2801,14 @@ function helpSearch(query) {
 function updateCalcomBadge() {
   const badge = document.getElementById('calcom-integ-badge');
   if (!badge) return;
+  const enabled = document.getElementById('calcom-enabled')?.checked ?? true;
+  if (!enabled) {
+    badge.textContent = '⛔ Deaktiviert';
+    badge.style.background = 'rgba(120,120,140,0.12)';
+    badge.style.color = 'var(--muted)';
+    badge.style.borderColor = 'rgba(120,120,140,0.3)';
+    return;
+  }
   const url   = (document.getElementById('calcom-base-url')?.value    || '').trim();
   const key   = (document.getElementById('calcom-api-key')?.value     || '').trim();
   const email = (document.getElementById('calcom-owner-email')?.value || '').trim();
@@ -2651,6 +2822,24 @@ function updateCalcomBadge() {
     badge.style.background = 'rgba(245,166,35,0.12)';
     badge.style.color = 'var(--yellow)';
     badge.style.borderColor = 'rgba(245,166,35,0.3)';
+  }
+}
+
+function toggleCalcomFields() {
+  const enabled = document.getElementById('calcom-enabled')?.checked ?? true;
+  const ids = ['calcom-base-url', 'calcom-api-key', 'calcom-owner-email', 'calcom-event-type-id'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.disabled = !enabled;
+    el.style.opacity = enabled ? '1' : '0.4';
+    el.style.cursor = enabled ? '' : 'not-allowed';
+  });
+  // Eye-Button für API-Key ebenfalls sperren
+  const eyeBtn = document.querySelector('#calcom-integ-panel .eye-btn');
+  if (eyeBtn) {
+    eyeBtn.disabled = !enabled;
+    eyeBtn.style.opacity = enabled ? '1' : '0.4';
   }
 }
 
@@ -2815,9 +3004,10 @@ async function loadDangerKeys() {
     api('/api/secrets/backend').catch(() => null)
   ]);
   secretsData = Object.assign(secretsData, secrets || {});
-  setVal('hmac-secret-input',   secrets['HMAC_SECRET']          || '');
-  setVal('dashboard-pw-input',  secrets['DASHBOARD_PASSWORD']   || '');
-  setVal('skill-secret-input',  secrets['SKILL_SECRET']         || '');
+  setVal('hmac-secret-input',    secrets['HMAC_SECRET']          || '');
+  setVal('dashboard-user-input', secrets['DASHBOARD_USERNAME']  || '');
+  setVal('dashboard-pw-input',   secrets['DASHBOARD_PASSWORD']  || '');
+  setVal('skill-secret-input',   secrets['SKILL_SECRET']        || '');
   setVal('vt-apikey',           secrets['VIRUSTOTAL_API_KEY']   || '');
   updateVTDangerBadge(secrets['VIRUSTOTAL_API_KEY'] || '');
   if (backendData) {
@@ -2836,9 +3026,10 @@ async function loadDangerKeys() {
 
 async function saveDangerKeys() {
   const patch = {};
-  const h  = getVal('hmac-secret-input');  if (h)  patch['HMAC_SECRET']          = h;
-  const dp = getVal('dashboard-pw-input'); if (dp) patch['DASHBOARD_PASSWORD']   = dp;
-  const sk = getVal('skill-secret-input'); if (sk) patch['SKILL_SECRET']         = sk;
+  const h  = getVal('hmac-secret-input');   if (h)  patch['HMAC_SECRET']         = h;
+  const du = getVal('dashboard-user-input');if (du) patch['DASHBOARD_USERNAME']  = du;
+  const dp = getVal('dashboard-pw-input');  if (dp) patch['DASHBOARD_PASSWORD']  = dp;
+  const sk = getVal('skill-secret-input');  if (sk) patch['SKILL_SECRET']        = sk;
   const vt = getVal('vt-apikey');          if (vt) patch['VIRUSTOTAL_API_KEY']   = vt;
   const result = await api('/api/secrets', 'POST', patch);
   if (result?.error) { toast('Fehler: '+result.error, true); return; }
@@ -2884,18 +3075,37 @@ function initChannelAccordions() {
 }
 
 // ── SKILLS ──────────────────────────────────────────────────────────────
+
+// Nur die aktuelle In-Memory-Liste vom Server holen und Liste aktualisieren
 async function loadSkillsList() {
   try {
     const data = await api('/api/skills');
     const sel = document.getElementById('skill-select');
     if (!sel) return;
     const skills = Array.isArray(data) ? data : (data.skills || []);
-    sel.innerHTML = '<option value="">– Skill wählen –</option>' +
-      skills.map(s => `<option value="${escHtml(s.name||s)}">${escHtml(s.name||s)}</option>`).join('');
+    sel.innerHTML = skills.map(s => {
+      const name = s.name || s;
+      const label = s.needsResigning ? `⚠️ ${escHtml(name)} (neu signieren!)` : escHtml(name);
+      return `<option value="${escHtml(name)}">${label}</option>`;
+    }).join('');
     onSkillSelect();
+    return skills;
   } catch(e) {
     const sel = document.getElementById('skill-select');
-    if (sel) sel.innerHTML = '<option value="">API /api/skills nicht verfügbar</option>';
+    if (sel) sel.innerHTML = '';
+    toast('❌ Skills laden fehlgeschlagen: ' + e.message, true);
+  }
+}
+
+// Disk-Reload auslösen (liest Dateien neu → neue Namen, Inhalte etc.) + Dropdown aktualisieren
+async function reloadSkills() {
+  try {
+    await api('/api/skills/reload', 'POST', {});
+    const skills = await loadSkillsList();
+    const count = skills ? skills.length : '?';
+    toast('✅ Skills neu geladen: ' + count + ' aktiv');
+  } catch(e) {
+    toast('❌ Skills-Reload fehlgeschlagen: ' + e.message, true);
   }
 }
 
@@ -2903,27 +3113,44 @@ function onSkillSelect() {
   const sel = document.getElementById('skill-select');
   const btn = document.getElementById('skill-sign-btn');
   if (!sel || !btn) return;
-  const has = sel.value !== '';
+  const has = sel.selectedOptions.length > 0;
   btn.disabled = !has;
   btn.className = 'btn ' + (has ? 'btn-success' : 'btn-secondary');
   btn.style.opacity = has ? '1' : '0.5';
+  const count = sel.selectedOptions.length;
+  btn.textContent = count > 1 ? `🔏 ${count} Skills signieren` : '🔏 Ausgewählte signieren';
+}
+
+function selectAllSkills() {
+  const sel = document.getElementById('skill-select');
+  if (!sel) return;
+  Array.from(sel.options).forEach(o => o.selected = true);
+  onSkillSelect();
 }
 
 async function signSkill() {
   const sel = document.getElementById('skill-select');
-  if (!sel?.value) { toast('Bitte erst einen Skill auswählen.', true); return; }
+  const selected = Array.from(sel?.selectedOptions || []).map(o => o.value).filter(Boolean);
+  if (selected.length === 0) { toast('Bitte erst einen oder mehrere Skills auswählen.', true); return; }
   const btn = document.getElementById('skill-sign-btn');
   btn.disabled = true;
-  try {
-    const result = await api('/api/skills/sign', 'POST', { skill: sel.value });
-    const res = document.getElementById('skill-sign-result');
-    if (result?.error) {
-      toast('Fehler: ' + result.error, true);
-    } else {
-      toast('✅ Skill "' + sel.value + '" signiert');
-      if (res) { res.style.display='block'; res.innerHTML=`<div style="background:rgba(62,207,142,0.1);border:1px solid rgba(62,207,142,0.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--green)">✅ <strong>${escHtml(sel.value)}</strong> wurde neu signiert.</div>`; }
-    }
-  } catch(e) { toast('Fehler: '+e.message, true); }
+  const errors = [];
+  const ok = [];
+  for (const skillName of selected) {
+    try {
+      const result = await api('/api/skills/sign', 'POST', { skill: skillName });
+      if (result?.error) { errors.push(skillName + ': ' + result.error); }
+      else { ok.push(skillName); }
+    } catch(e) { errors.push(skillName + ': ' + e.message); }
+  }
+  const res = document.getElementById('skill-sign-result');
+  if (errors.length === 0) {
+    toast(`✅ ${ok.length} Skill(s) signiert`);
+    if (res) { res.style.display='block'; res.innerHTML=`<div style="background:rgba(62,207,142,0.1);border:1px solid rgba(62,207,142,0.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--green)">✅ Signiert: <strong>${ok.map(escHtml).join(', ')}</strong></div>`; }
+  } else {
+    toast(`⚠️ ${ok.length} ok, ${errors.length} Fehler`, true);
+    if (res) { res.style.display='block'; res.innerHTML=`<div style="background:rgba(255,100,100,0.1);border:1px solid rgba(255,100,100,0.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--red)">${errors.map(escHtml).join('<br>')}</div>`; }
+  }
   btn.disabled = false; onSkillSelect();
 }
 
@@ -2932,10 +3159,19 @@ function updateYoutubeKeyRow() {
   if (row) row.style.display = document.getElementById('gsvc-youtube')?.checked ? 'block' : 'none';
 }
 
+// ── loadInitialData (nach erfolgreichem Login) ────────────────────────
+async function loadInitialData() {
+  showSection('status', document.querySelector('.nav-item'));
+  // Lucide Icons rendern
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
 // ── Init ──────────────────────────────────────────────────────────────
 (async function init() {
-  await initHmac();
-  showSection('status', document.querySelector('.nav-item'));
+  // Lucide Icons rendern (Sidebar ist schon im DOM)
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+  // Login-Overlay ist standardmäßig sichtbar – Fokus auf Username-Feld
+  document.getElementById('login-user').focus();
 })();
 
 </script>

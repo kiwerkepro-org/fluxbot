@@ -66,7 +66,7 @@ func (t *TelegramChannel) Start(ctx context.Context, input chan<- Message) error
 
 			blocked := false
 
-			// ── URL-Scan bei Textnachrichten ───────────────────────────────────
+			// URL-Scan bei Textnachrichten
 			if update.Message.Text != "" {
 				isSafe, badURL, err := security.ScanURLsInText(update.Message.Text)
 				if err != nil {
@@ -79,7 +79,7 @@ func (t *TelegramChannel) Start(ctx context.Context, input chan<- Message) error
 				}
 			}
 
-			// ── Sprachnachrichten ──────────────────────────────────────────────
+			// Sprachnachrichten
 			if update.Message.Voice != nil {
 				data, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.Voice.FileID, "Voice")
 				if wasBlocked {
@@ -90,7 +90,7 @@ func (t *TelegramChannel) Start(ctx context.Context, input chan<- Message) error
 				}
 			}
 
-			// ── Audiodateien (MP3, AAC, etc.) ─────────────────────────────────
+			// Audiodateien (MP3, AAC, etc.)
 			if !blocked && update.Message.Audio != nil {
 				_, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.Audio.FileID, "Audio")
 				if wasBlocked {
@@ -98,36 +98,90 @@ func (t *TelegramChannel) Start(ctx context.Context, input chan<- Message) error
 				}
 			}
 
-			// ── Dokumente (PDF, Office, ZIP, EXE, etc.) ───────────────────────
+			// Dokumente (PDF, Office, ZIP, EXE, etc.) - VT-Scan + Weitergabe
 			if !blocked && update.Message.Document != nil {
-				_, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.Document.FileID, "Dokument")
+				data, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.Document.FileID, "Dokument")
 				if wasBlocked {
 					blocked = true
+				} else if data != nil {
+					// Sichere Datei: Speichere lokal und leite weiter
+					filename := update.Message.Document.FileName
+					if filename == "" {
+						filename = "document.pdf"
+					}
+					// Bestimme Dateiendung
+					ext := ".pdf"
+					if len(filename) > 4 {
+						ext = filename[len(filename)-4:]
+					}
+					localPath, err := saveTempFile(data, ext)
+					if err != nil {
+						log.Printf("[Telegram] Fehler beim Speichern des Dokuments: %v", err)
+						// Fallback: Agent erhält nur Log, kein Crash
+						continue
+					}
+					msg.Type = MessageTypeVoice // Nutze Voice-Handler mit MediaPath
+					msg.MediaPath = localPath
+					log.Printf("[Telegram] Dokument akzeptiert: %s (%d bytes) von %s → MediaPath: %s", filename, len(data), senderID, localPath)
 				}
 			}
 
-			// ── Fotos (größtes verfügbares Format scannen) ────────────────────
+			// Fotos (größtes verfügbares Format scannen)
 			if !blocked && update.Message.Photo != nil && len(update.Message.Photo) > 0 {
 				largest := update.Message.Photo[len(update.Message.Photo)-1]
-				_, wasBlocked := t.downloadAndScanFile(chatID, senderID, largest.FileID, "Foto")
+				data, wasBlocked := t.downloadAndScanFile(chatID, senderID, largest.FileID, "Foto")
 				if wasBlocked {
 					blocked = true
+				} else if data != nil {
+					// Sichere Datei: Speichere lokal und leite weiter
+					localPath, err := saveTempFile(data, ".jpg")
+					if err != nil {
+						log.Printf("[Telegram] Fehler beim Speichern des Fotos: %v", err)
+						continue
+					}
+					msg.Type = MessageTypeImage
+					msg.MediaPath = localPath
+					// Caption des Fotos als Nutzer-Prompt übernehmen
+					if update.Message.Caption != "" {
+						msg.Text = update.Message.Caption
+					}
+					log.Printf("[Telegram] Foto akzeptiert (%d bytes) von %s → MediaPath: %s | Caption: %q", len(data), senderID, localPath, msg.Text)
 				}
 			}
 
-			// ── Videos ────────────────────────────────────────────────────────
+			// Videos
 			if !blocked && update.Message.Video != nil {
-				_, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.Video.FileID, "Video")
+				data, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.Video.FileID, "Video")
 				if wasBlocked {
 					blocked = true
+				} else if data != nil {
+					// Sichere Datei: Speichere lokal und leite weiter
+					localPath, err := saveTempFile(data, ".mp4")
+					if err != nil {
+						log.Printf("[Telegram] Fehler beim Speichern des Videos: %v", err)
+						continue
+					}
+					msg.Type = MessageTypeVoice
+					msg.MediaPath = localPath
+					log.Printf("[Telegram] Video akzeptiert (%d bytes) von %s → MediaPath: %s", len(data), senderID, localPath)
 				}
 			}
 
-			// ── VideoNote (Rundvideo) ─────────────────────────────────────────
+			// VideoNote (Rundvideo)
 			if !blocked && update.Message.VideoNote != nil {
-				_, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.VideoNote.FileID, "VideoNote")
+				data, wasBlocked := t.downloadAndScanFile(chatID, senderID, update.Message.VideoNote.FileID, "VideoNote")
 				if wasBlocked {
 					blocked = true
+				} else if data != nil {
+					// Sichere Datei: Speichere lokal und leite weiter
+					localPath, err := saveTempFile(data, ".mp4")
+					if err != nil {
+						log.Printf("[Telegram] Fehler beim Speichern des VideoNote: %v", err)
+						continue
+					}
+					msg.Type = MessageTypeVoice
+					msg.MediaPath = localPath
+					log.Printf("[Telegram] VideoNote akzeptiert (%d bytes) von %s → MediaPath: %s", len(data), senderID, localPath)
 				}
 			}
 
@@ -166,6 +220,7 @@ func (t *TelegramChannel) downloadAndScanFile(chatID, senderID, fileID, fileType
 	log.Printf("[Telegram/Security] ✅ %s von User %s sicher", fileType, senderID)
 	return data, false
 }
+
 
 func (t *TelegramChannel) Send(chatID, text string) error {
 	id := int64(0)

@@ -3,6 +3,9 @@ FROM golang:1.22-alpine AS builder
 
 WORKDIR /build
 
+# Installiere Build-Abhängigkeiten (git für go mod download)
+RUN apk add --no-cache git
+
 # Abhängigkeiten zuerst cachen (besseres Layer-Caching)
 COPY go.mod go.sum ./
 RUN go mod download
@@ -11,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Kompiliere den Bot
-RUN CGO_ENABLED=0 GOOS=linux go build -o fluxbot ./cmd/fluxbot
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -o fluxbot ./cmd/fluxbot
 
 # --- STAGE 2: FINAL IMAGE ---
 FROM alpine:latest
