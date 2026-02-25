@@ -8,7 +8,7 @@
 <td align="center" valign="middle">
   <img src="assets/fluxion-logo.png" alt="FluxBot Logo" width="210"/><br/>
   <h1>FluxBot</h1>
-  <strong>powered by <a href="https://kiwerkepro.com">KI-WERKE</a></strong>
+  <strong>powered by KI-WERKE</strong>
 </td>
 <td align="center" valign="middle" width="140">
   <img src="assets/bitwarden-logo.png" width="72" alt="Bitwarden"/><br/>
@@ -102,15 +102,17 @@ Datei starten → Der Einrichtungsassistent öffnet sich automatisch im Browser.
 
 **Windows (PowerShell):**
 ```powershell
-irm https://fluxbot.kiwerke.com/install.ps1 | iex
+# Installer-Skript von der Release-Seite herunterladen
 ```
 
 **Linux / macOS (Terminal):**
 ```bash
-curl -fsSL https://fluxbot.kiwerke.com/install.sh | bash
+# Installer-Skript von der Release-Seite herunterladen
 ```
 
-Das Skript erledigt alles automatisch: Docker-Check → Verzeichnis anlegen → Image ziehen → Container starten → Dashboard öffnen (`http://localhost:9090`).
+Die Installer-Skripte erledigen alles automatisch: Docker-Check → Verzeichnis anlegen → Image ziehen → Container starten → Dashboard öffnen (`http://localhost:9090`).
+
+Lade sie von der [Releases-Seite](https://github.com/kiwerkepro-org/fluxbot/releases) herunter.
 
 Deine Konfiguration und alle Daten werden dauerhaft in `~/FluxBot/fluxbot-data` gespeichert und bleiben auch nach Updates erhalten.
 
@@ -321,9 +323,8 @@ Du darfst FluxBot frei verwenden, verändern und weitergeben – auch kommerziel
 ---
 
 <div align="center">
-<img src="assets/kiwerke-logo.png" alt="KI-WERKE Logo" width="48"/>
 <br/><br/>
-<strong>Gebaut mit ❤️ von <a href="https://kiwerkepro.com">KI-WERKE</a></strong>
+<strong>Gebaut mit ❤️ von KI-WERKE</strong>
 <br/>
-<sub>Fragen? Issues? Pull Requests? Immer willkommen.</sub>
+<sub>Fragen? Issues? Pull Requests? Kontakt: kiwerke@gmail.com</sub>
 </div>
