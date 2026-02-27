@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -45,6 +46,9 @@ type Agent struct {
 	googleClient     *googleapi.Client // nil = Google deaktiviert
 	soul              string // Inhalt von SOUL.md + IDENTITY.md (Persönlichkeit)
 	cronManager      *cronpkg.Manager // nil = Cron deaktiviert
+	ttsSpeaker       voice.TTSSpeaker // nil = TTS deaktiviert
+	ttsVoice         string           // Stimmen-Name, z.B. "alloy", "nova"
+	ttsMode          string           // "voice", "always", "keyword"
 	systemPromptFn   func(session *Session, rules string) string
 }
 
@@ -69,6 +73,9 @@ type Config struct {
 	GoogleClient     *googleapi.Client // Optional – nil = Google deaktiviert
 	CronManager      *cronpkg.Manager // Optional – nil = Cron deaktiviert
 	Soul              string // Inhalt von SOUL.md + IDENTITY.md (leer = nur Basis-Prompt)
+	TTSSpeaker       voice.TTSSpeaker // Optional – nil = TTS deaktiviert
+	TTSVoice         string           // Stimmen-Name, z.B. "alloy", "nova"
+	TTSMode          string           // "voice", "always", "keyword"
 }
 
 // New erstellt einen neuen Agent
@@ -97,6 +104,9 @@ func New(cfg Config) *Agent {
 		googleClient:     cfg.GoogleClient,
 		cronManager:      cfg.CronManager,
 		soul:             cfg.Soul,
+		ttsSpeaker:       cfg.TTSSpeaker,
+		ttsVoice:         cfg.TTSVoice,
+		ttsMode:          cfg.TTSMode,
 	}
 	a.systemPromptFn = a.buildSystemPrompt
 	return a
@@ -161,6 +171,24 @@ func (a *Agent) UpdateCronManager(m *cronpkg.Manager) {
 	a.cronManager = m
 }
 
+// UpdateTTSSpeaker ersetzt den TTS-Speaker zur Laufzeit (Hot-Reload).
+// Wird aufgerufen wenn im Dashboard ein TTS-API-Key gespeichert oder entfernt wird.
+// speaker == nil → TTS wird deaktiviert.
+func (a *Agent) UpdateTTSSpeaker(speaker voice.TTSSpeaker, voiceName, mode string) {
+	a.ttsSpeaker = speaker
+	if voiceName != "" {
+		a.ttsVoice = voiceName
+	}
+	if mode != "" {
+		a.ttsMode = mode
+	}
+	if speaker == nil {
+		log.Println("[Agent] 🔄 TTS deaktiviert (kein API-Key).")
+	} else {
+		log.Printf("[Agent] 🔄 TTS aktiviert: %s | Stimme: %s | Mode: %s", speaker.Name(), a.ttsVoice, a.ttsMode)
+	}
+}
+
 // Run startet den Agent-Loop
 func (a *Agent) Run(ctx context.Context) {
 	voiceStatus := "deaktiviert"
@@ -171,7 +199,11 @@ func (a *Agent) Run(ctx context.Context) {
 	if a.guard != nil {
 		guardStatus = "aktiv"
 	}
-	log.Printf("[Agent] Agent-Loop gestartet | Voice: %s | Security: %s", voiceStatus, guardStatus)
+	ttsStatus := "deaktiviert"
+	if a.ttsSpeaker != nil {
+		ttsStatus = fmt.Sprintf("%s/%s (mode: %s)", a.ttsSpeaker.Name(), a.ttsVoice, a.ttsMode)
+	}
+	log.Printf("[Agent] Agent-Loop gestartet | Voice: %s | TTS: %s | Security: %s", voiceStatus, ttsStatus, guardStatus)
 
 	for {
 		select {
@@ -213,6 +245,19 @@ func (a *Agent) handleMessage(ctx context.Context, msg channels.Message) {
 		a.handleImageAnalysis(ctx, msg, session)
 	case channels.MessageTypeText:
 		text := msg.Text
+		ttsTriggered := false
+
+		// TTS-Keyword-Modus: "sprich: ..." oder "/voice ..." → Antwort als Voice
+		if a.ttsSpeaker != nil && a.ttsMode == "keyword" {
+			if stripped, ok := stripTTSKeyword(text); ok {
+				ttsTriggered = true
+				msg.Text = stripped
+				text = stripped
+			}
+		} else if a.ttsSpeaker != nil && a.ttsMode == "always" {
+			ttsTriggered = true
+		}
+
 		response := a.processText(ctx, msg, session)
 		// Leere Antwort = Bild wurde direkt gesendet (kein Text mehr nötig)
 		if response == "" {
@@ -221,8 +266,12 @@ func (a *Agent) handleMessage(ctx context.Context, msg channels.Message) {
 		// Gesprächsverlauf speichern
 		session.AddToHistory("user", text)
 		session.AddToHistory("assistant", response)
-		if err := a.manager.Reply(msg, response); err != nil {
-			log.Printf("[Agent] Fehler beim Senden: %v", err)
+		if ttsTriggered {
+			a.sendTTSReply(ctx, msg, response)
+		} else {
+			if err := a.manager.Reply(msg, response); err != nil {
+				log.Printf("[Agent] Fehler beim Senden: %v", err)
+			}
 		}
 	default:
 		log.Printf("[Agent] Unbekannter Nachrichtentyp: %s", msg.Type)
@@ -291,7 +340,160 @@ func (a *Agent) handleVoice(ctx context.Context, msg channels.Message, session *
 	// Gesprächsverlauf speichern (transkribierter Text als "user"-Turn)
 	session.AddToHistory("user", text)
 	session.AddToHistory("assistant", response)
-	a.manager.Reply(msg, fmt.Sprintf("🎙️ _%s_\n\n%s", text, response))
+
+	// Transkription immer als Text senden (zeigt was der Bot verstanden hat)
+	a.manager.Reply(msg, fmt.Sprintf("🎙️ _%s_", text))
+
+	// TTS: Bei mode "voice" oder "always" → Antwort als Sprachnachricht
+	if a.ttsSpeaker != nil && (a.ttsMode == "voice" || a.ttsMode == "always") {
+		a.sendTTSReply(ctx, msg, response)
+	} else {
+		a.manager.Reply(msg, response)
+	}
+}
+
+// sendTTSReply generiert eine TTS-Sprachnachricht und sendet sie.
+// Fällt automatisch auf Text-Antwort zurück wenn TTS fehlschlägt oder Kanal keine Voice unterstützt.
+// URLs werden nicht vorgelesen – sie werden stattdessen automatisch als separate Text-Nachricht nachgeschickt.
+func (a *Agent) sendTTSReply(ctx context.Context, msg channels.Message, text string) {
+	if a.ttsSpeaker == nil {
+		a.manager.Reply(msg, text)
+		return
+	}
+	log.Printf("[Agent] TTS: Generiere Sprachantwort | Provider: %s | Voice: %s", a.ttsSpeaker.Name(), a.ttsVoice)
+
+	// URLs aus Original-Text extrahieren (vor dem Strippen)
+	urlRe := regexp.MustCompile(`https?://\S+`)
+	rawURLs := urlRe.FindAllString(text, -1)
+	// Deduplizieren
+	seen := make(map[string]bool)
+	var uniqueURLs []string
+	for _, u := range rawURLs {
+		// Trailing Punctuation abschneiden (Komma, Punkt, Klammer etc.)
+		u = strings.TrimRight(u, ".,;:!?)\"'")
+		if u != "" && !seen[u] {
+			seen[u] = true
+			uniqueURLs = append(uniqueURLs, u)
+		}
+	}
+
+	// Entferne Markdown-Formatierung für TTS (Sprachnachrichten)
+	cleanText := stripMarkdownForTTS(text)
+
+	audioData, err := a.ttsSpeaker.Speak(ctx, cleanText, a.ttsVoice)
+	if err != nil {
+		log.Printf("[Agent] TTS Fehler: %v – Fallback auf Text", err)
+		a.manager.Reply(msg, text)
+		return
+	}
+	if err := a.manager.ReplyVoice(msg, audioData); err != nil {
+		log.Printf("[Agent] ReplyVoice Fehler: %v – Fallback auf Text", err)
+		a.manager.Reply(msg, text)
+		return
+	}
+
+	// Links als separate Text-Nachricht nachschicken
+	if len(uniqueURLs) > 0 {
+		var linkLines []string
+		for _, u := range uniqueURLs {
+			linkLines = append(linkLines, "🔗 "+u)
+		}
+		a.manager.Reply(msg, strings.Join(linkLines, "\n"))
+	}
+}
+
+// stripTTSKeyword prüft ob der Text mit einem TTS-Keyword beginnt und gibt den Rest zurück.
+// Unterstützte Prefixe (case-insensitive): "sprich:", "sprich ", "/voice", "/voice:"
+// Gibt ("", false) zurück wenn kein Keyword gefunden.
+func stripTTSKeyword(text string) (string, bool) {
+	lower := strings.ToLower(strings.TrimSpace(text))
+	prefixes := []string{"sprich:", "sprich ", "/voice:", "/voice "}
+	for _, p := range prefixes {
+		if strings.HasPrefix(lower, p) {
+			rest := strings.TrimSpace(text[len(p):])
+			if rest != "" {
+				return rest, true
+			}
+		}
+	}
+	return "", false
+}
+
+// stripMarkdownForTTS entfernt Markdown-Formatierung aus Text vor TTS-Verarbeitung.
+// Nutzt Regex um robustere Matching zu erreichen:
+// - **bold** oder __bold__ → bold
+// - *italic* oder _italic_ → italic
+// - `code` → code
+// - # Heading (und ##, ###, etc.) → Heading
+// - [Link](url) → Link
+// - ~~strikethrough~~ → strikethrough
+// - > blockquote → blockquote
+// - - list oder * list → list
+func stripMarkdownForTTS(text string) string {
+	// **bold** oder __bold__ → bold
+	re := regexp.MustCompile(`\*\*(.+?)\*\*|__(.+?)__`)
+	text = re.ReplaceAllStringFunc(text, func(m string) string {
+		if strings.HasPrefix(m, "**") {
+			return strings.TrimPrefix(strings.TrimSuffix(m, "**"), "**")
+		}
+		return strings.TrimPrefix(strings.TrimSuffix(m, "__"), "__")
+	})
+
+	// *italic* oder _italic_ → italic (aber nicht in Wörtern wie it_works)
+	re = regexp.MustCompile(`\*([^\*]+?)\*|_([^\s_][^_]*?[^\s_]|[^\s_])_`)
+	text = re.ReplaceAllStringFunc(text, func(m string) string {
+		return strings.Trim(m, "*_")
+	})
+
+	// `code` → code
+	text = regexp.MustCompile("`([^`]+?)`").ReplaceAllString(text, "$1")
+
+	// [Link](url) → Link
+	text = regexp.MustCompile(`\[([^\]]+?)\]\([^\)]+?\)`).ReplaceAllString(text, "$1")
+
+	// Bare URLs entfernen (https:// oder http://)
+	text = regexp.MustCompile(`https?://\S+`).ReplaceAllString(text, "")
+
+	// ~~strikethrough~~ → strikethrough
+	text = regexp.MustCompile(`~~(.+?)~~`).ReplaceAllString(text, "$1")
+
+	// # ## ### Headings
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		// Entferne führende # und Leerzeichen
+		for strings.HasPrefix(trimmed, "#") {
+			trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, "#"))
+		}
+		// > blockquote
+		if strings.HasPrefix(trimmed, ">") {
+			trimmed = strings.TrimSpace(strings.TrimPrefix(trimmed, ">"))
+		}
+		// - list oder * list item
+		if (strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ")) && len(trimmed) > 2 {
+			trimmed = strings.TrimSpace(trimmed[2:])
+		}
+		lines[i] = trimmed
+	}
+	text = strings.Join(lines, "\n")
+
+	// Mehrfach-Zeilenumbrüche → einzelne
+	for strings.Contains(text, "\n\n\n") {
+		text = strings.ReplaceAll(text, "\n\n\n", "\n\n")
+	}
+
+	// Entferne alle verbliebenen Sonderzeichen die Markdown sein könnten
+	// aber behalte normale Interpunktion: . , ! ? : ; ' " -
+	text = strings.Map(func(r rune) rune {
+		switch r {
+		case '*', '_', '`', '[', ']', '(', ')', '~', '>':
+			return -1 // entfernen
+		default:
+			return r
+		}
+	}, text)
+
+	return strings.TrimSpace(text)
 }
 
 // handleImageAnalysis analysiert ein empfangenes Foto via Vision-AI.
