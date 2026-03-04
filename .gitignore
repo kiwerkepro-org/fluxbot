@@ -80,3 +80,9 @@ INBOX.md
 
 # Agent-Gedächtnis
 memory-md/
+
+# Fehlerbilder & Debug-Materialien (auto-cleanup, nicht committen)
+Z-FEHLERBILDER/
+
+# Externe Plugins (z.B. WordPress, unbeabsichtigt hinzugefügt)
+plugins/

@@ -20,8 +20,28 @@
 |-------|--------|
 | `memory-md/01-features.md` | Alle implementierten Features (P1–P8) + offene Punkte |
 | `memory-md/02-architektur.md` | Architektur-Entscheidungen + Secret-Strategie + Keyring |
-| `memory-md/03-session-log.md` | Chronologisches Session-Protokoll (Sessions 1–21) |
-| `memory-md/04-redesign-spec.md` | Dashboard Redesign Spezifikation (Session 20, noch offen) |
+| `memory-md/03-session-log.md` | Chronologisches Session-Protokoll (Sessions 1–30) |
+| `memory-md/04-redesign-spec.md` | Dashboard Redesign Spezifikation (Session 20+) |
+| `memory-md/05-bugreports.md` | Bugs & Issues (Session 30+) |
+| `memory-md/06-feature-roadmap.md` | Zukunfts-Features & Ideen (Session 30+) |
+
+---
+
+## Claude-Workflow – Dokumentation nach Änderungen
+
+**Nach jeder durchgeführten Änderung müssen die entsprechenden memory-md Dateien aktualisiert werden:**
+
+| Änderungstyp | Datei | Aktion |
+|-------------|-------|--------|
+| **Neues Feature implementiert** | `01-features.md` | Feature in Offene Punkte als `[x] erledigt` markieren oder neue PRIORITÄT hinzufügen |
+| **Bug gefixt** | `05-bugreports.md` | Bug-Eintrag mit Fix-Details dokumentieren oder abhaken |
+| **Architektur-Änderung** | `02-architektur.md` | Neue Decision / Secret-Key / Integration dokumentieren |
+| **Dashboard UI-Änderung** | `04-redesign-spec.md` | Neuer Punkt (15+) oder bestehender Punkt aktualisieren |
+| **Neue Feature-Idee erkannt** | `06-feature-roadmap.md` | Feature mit PRIORITÄT, Beschreibung, Use-Case hinzufügen |
+| **Session abgeschlossen** | `03-session-log.md` | `## Session XX` mit Highlights, Bugfixes, Implementierungen dokumentieren |
+| **INBOX-Items verarbeitet** | `INBOX.md` | Geleert + Verarbeitungs-Kommentar hinterlassen |
+
+**Automatische Erkennung:** Falls neue memory-md Dateien hinzukommen (z.B. `07-xyz.md`), müssen diese automatisch in der Tabelle oben ("Detaillierte Dokumentation") dokumentiert werden.
 
 ---
 
@@ -35,10 +55,9 @@
 **Dashboard:** http://localhost:9090 (nur via Tailscale oder lokal)
 
 ### Versioning-Konvention
-- **Aktueller Release:** `v1.1.3`
+- **Aktueller Release:** `v1.1.4`
 - **Schema:** `vMAJOR.MINOR.PATCH`
 - **Regel:** Die letzte Ziffer (PATCH) wird bei jedem Release um 1 erhöht, solange JJ nichts anderes angibt.
-- **Nächster Release:** `v1.1.4` (automatisch, außer JJ gibt ein anderes Schema vor)
 - Release-Tag wird nach jedem abgeschlossenen Feature-Block auf GitHub gepusht (`git tag -a vX.Y.Z && git push origin vX.Y.Z`)
 
 ---
@@ -155,42 +174,9 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 
 ---
 
-## Aktueller Stand (Session 25 – 2026-02-25)
+## Aktueller Stand
 
-**Letzte abgeschlossene Session:** 25
-**Nächste Session:** 26
-
-**In Session 24 erledigt:**
-- ✅ Docker-Rebuild durchgeführt
-- ✅ **P3 abgeschlossen:**
-  - Lucide Icons CDN in dashboard.html eingebunden (`unpkg.com/lucide@latest`)
-  - Alle 6 Sidebar-Emojis durch Lucide SVG-Icons ersetzt (activity, settings, shield, wrench, flame, help-circle)
-  - `lucide.createIcons()` in `init()` + `loadInitialData()`
-  - `pkg/provider/types.go`: `Message` um `ImageData []byte` + `ImageMIME string` erweitert
-  - `pkg/provider/openrouter.go`: Vision-Content-Array (multimodal) für Bildnachrichten
-  - `pkg/channels/telegram.go`: Caption von Fotos wird als `msg.Text` übergeben
-  - `pkg/agent/agent.go`: `case MessageTypeImage` + `handleImageAnalysis()` implementiert
-- ✅ **P5 (Cronjobs) abgeschlossen:**
-  - `pkg/cron/cron.go`: `Manager`, `ParseReminderRequest()`, `AddReminder()`, `DeleteReminder()`, `ListReminders()`
-  - `pkg/cron/reminder.go`: `Reminder`-Struct, JSON-Persistenz in `workspace/reminders.json`
-  - `pkg/channels/manager.go`: `SendTo(channelID, chatID, text)` für Cron-Trigger
-  - `pkg/agent/agent.go`: `cronManager`-Feld, `__REMINDER_CREATE/LIST/DELETE__`-Marker + Handler
-  - `cmd/fluxbot/main.go`: CronManager Init, `Start()` nach Channel-Start, `defer Stop()`
-  - `go.mod`: `github.com/robfig/cron/v3 v3.0.1` hinzugefügt
-  - `workspace/skills/cron-reminder.md` + `.sig` erstellt
-
-**In Session 25 erledigt:**
-- ✅ **Bugfix: Delete-Kollision mit Gedächtnissystem**
-  - Problem: "Lösch Erinnerung #X" wurde von `isForgetCommand()` abgefangen statt vom CronManager
-  - Fix in `pkg/agent/agent.go`: `isForgetCommand()` gibt `false` zurück wenn Text "erinnerung" oder "reminder" enthält
-  - Getestet + bestätigt ✅
-- ✅ Docker-Rebuild durchgeführt (für isForgetCommand-Fix)
-
-**In Session 25 zusätzlich getestet:**
-- ✅ Cal.com Integration – funktioniert
-- ✅ Google Calendar: Termine auflisten + erstellen – funktioniert
-- ✅ Gmail: E-Mails lesen + senden – funktioniert
-
-**Offen / Nächste Schritte:**
-1. **Git commit + push** (Git Lock prüfen) – alle Session 24+25 Änderungen committen
-2. **P4:** Sprachausgabe Brainstorming + Implementierung
+- **Letzte Session:** 31 (2026-03-04)
+- **Nächste Session:** 32
+- **Letzter Release:** `v1.1.5` ✅ (Session 31)
+- **Details:** `memory-md/03-session-log.md`

@@ -20,14 +20,19 @@ type AuditLogger struct {
 
 // AuditEntry beschreibt einen Audit-Logeintrag
 type AuditEntry struct {
-	Timestamp   time.Time
-	ChannelID   string
-	UserID      string
-	MessageType string
-	Length      int
-	Injection   bool
-	InjReason   string
-	Blocked     bool
+	Timestamp    time.Time
+	ChannelID    string
+	UserID       string
+	MessageType  string
+	Length       int
+	Injection    bool
+	InjReason    string
+	Blocked      bool
+	// Session 31 Erweiterungen für besseres Debugging:
+	UserIntent   string // Kurze Zusammenfassung: "Kalender-Anfrage", "Bild-Generierung", "E-Mail-Versand"
+	ErrorCode    string // Error-Typ: "API_ERROR", "VALIDATION_ERROR", "RATE_LIMIT", "TIMEOUT", etc.
+	ErrorMessage string // Error-Nachricht für Debugging (z.B. "Google Calendar API: 401 Unauthorized")
+	Duration     int    // Verarbeitungszeit in ms
 }
 
 // NewAuditLogger erstellt einen neuen Audit-Logger
@@ -72,15 +77,28 @@ func (a *AuditLogger) Log(entry AuditEntry) {
 		injInfo = fmt.Sprintf(" [INJECTION: %s]", entry.InjReason)
 	}
 
-	line := fmt.Sprintf("[%s] channel=%s user=%s type=%s len=%d%s%s\n",
+	// Session 31: Erweitertes Format mit Intent, Error-Code, Duration
+	line := fmt.Sprintf("[%s] channel=%s user=%s type=%s len=%d ms=%d intent=%s%s%s",
 		entry.Timestamp.Format("2006-01-02 15:04:05"),
 		entry.ChannelID,
 		entry.UserID,
 		entry.MessageType,
 		entry.Length,
+		entry.Duration,
+		entry.UserIntent,
 		injInfo,
 		blocked,
 	)
+
+	// Fehler-Info hinzufügen (falls vorhanden)
+	if entry.ErrorCode != "" {
+		line += fmt.Sprintf(" [ERROR: %s]", entry.ErrorCode)
+		if entry.ErrorMessage != "" {
+			line += fmt.Sprintf(" (%s)", entry.ErrorMessage)
+		}
+	}
+
+	line += "\n"
 
 	if _, err := a.file.WriteString(line); err != nil {
 		log.Printf("[Security] Fehler beim Schreiben des Audit-Logs: %v", err)

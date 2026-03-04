@@ -18,15 +18,18 @@ import (
 
 // Scopes die FluxBot benötigt (alle optional, werden vom Nutzer gewährt).
 const (
-	ScopeCalendar    = "https://www.googleapis.com/auth/calendar"
-	ScopeDocs        = "https://www.googleapis.com/auth/documents"
-	ScopeSheets      = "https://www.googleapis.com/auth/spreadsheets"
-	ScopeDrive       = "https://www.googleapis.com/auth/drive"
-	ScopeGmailSend   = "https://www.googleapis.com/auth/gmail.send"
-	ScopeGmailRead   = "https://www.googleapis.com/auth/gmail.readonly"
+	ScopeCalendar      = "https://www.googleapis.com/auth/calendar"
+	ScopeDocs          = "https://www.googleapis.com/auth/documents"
+	ScopeSheets        = "https://www.googleapis.com/auth/spreadsheets"
+	ScopeDrive         = "https://www.googleapis.com/auth/drive"
+	ScopeGmailSend     = "https://www.googleapis.com/auth/gmail.send"
+	ScopeGmailRead     = "https://www.googleapis.com/auth/gmail.readonly"
+	ScopeCloudPlatform = "https://www.googleapis.com/auth/cloud-platform" // Google Cloud TTS, Vertex AI
 )
 
 // AllScopes enthält alle benötigten Scopes für FluxBot.
+// Enthält cloud-platform für Google Cloud TTS / Vertex AI TTS.
+// → Nach Scope-Erweiterung: Google-Konto im Dashboard neu verbinden (einmalig).
 var AllScopes = []string{
 	ScopeCalendar,
 	ScopeDocs,
@@ -34,6 +37,7 @@ var AllScopes = []string{
 	ScopeDrive,
 	ScopeGmailSend,
 	ScopeGmailRead,
+	ScopeCloudPlatform,
 }
 
 // Client ist der Google API OAuth2-Client.

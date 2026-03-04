@@ -28,7 +28,7 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/voice"
 )
 
-var version = "v1.1.3"
+var version = "v1.1.5"
 
 func main() {
 	configPath := flag.String("config", "./workspace/config.json", "Pfad zur Konfigurationsdatei")
@@ -227,11 +227,17 @@ func runBot(ctx context.Context, configPath string) {
 			transcriber = voice.NewOllamaTranscriber(cfg.Voice.OllamaURL)
 		}
 		if transcriber != nil {
-			log.Printf("[Main] Voice: %s (Sprache: %s)", transcriber.Name(), cfg.Voice.Language)
+			log.Printf("[Main] Voice STT: %s (Sprache: %s)", transcriber.Name(), cfg.Voice.Language)
 		}
 	} else {
-		log.Println("[Main] Voice: deaktiviert")
+		log.Println("[Main] Voice STT: deaktiviert")
 	}
+
+	// ── TTS (Text-to-Speech / Sprachausgabe) ────────────────────────────────
+	// Aktivierungslogik: TTS startet automatisch sobald ein Key vorhanden ist.
+	// ttsEnabled: false in config.json = explizites Deaktivieren (Override).
+	ttsSpeaker, ttsVoiceEffective := buildTTSSpeaker(cfg, vault)
+	cfg.Voice.TTSVoice = ttsVoiceEffective
 
 	var imageGenerators []imagegen.Generator
 	imageGenerators = buildImageGenerators(cfg)
@@ -322,6 +328,9 @@ func runBot(ctx context.Context, configPath string) {
 		GoogleClient:     googleClient,
 		CronManager:      cronMgr,
 		Soul:             soul,
+		TTSSpeaker:       ttsSpeaker,
+		TTSVoice:         cfg.Voice.TTSVoice,
+		TTSMode:          cfg.Voice.TTSMode,
 	})
 
 	if cfg.Dashboard.Enabled {
@@ -358,6 +367,11 @@ func runBot(ctx context.Context, configPath string) {
 				parseIntegrationInt(newCfg, "CALCOM_EVENT_TYPE_ID"),
 			)
 			fluxAgent.UpdateGoogleClient(buildGoogleClient(newCfg, vault))
+
+			// TTS Hot-Reload: aktiviert sich automatisch wenn VOICE_TTS_API_KEY gesetzt wird,
+			// deaktiviert sich automatisch wenn Key entfernt wird – kein Neustart nötig.
+			newTTSSpeaker, newTTSVoice := buildTTSSpeaker(newCfg, vault)
+			fluxAgent.UpdateTTSSpeaker(newTTSSpeaker, newTTSVoice, newCfg.Voice.TTSMode)
 
 			// Dashboard Hot-Reload: Passwort + Benutzername + HMAC-Secret
 			if dash != nil {
@@ -451,6 +465,7 @@ func extractSecrets(cfg *config.Config) map[string]string {
 	m["PROVIDER_CUSTOM"] = cfg.Providers.Custom.APIKey
 	// Voice
 	m["VOICE_API_KEY"] = cfg.Voice.APIKey
+	m["VOICE_TTS_API_KEY"] = cfg.Voice.TTSAPIKey
 	// Bild-Generierung
 	m["IMG_OPENROUTER"] = cfg.ImageGen.OpenRouter.APIKey
 	m["IMG_FAL"] = cfg.ImageGen.Fal.APIKey
@@ -557,9 +572,12 @@ func applySecrets(cfg *config.Config, vault security.SecretProvider) {
 	if v := get("PROVIDER_CUSTOM"); v != "" {
 		cfg.Providers.Custom.APIKey = v
 	}
-	// Voice
+	// Voice STT + TTS
 	if v := get("VOICE_API_KEY"); v != "" {
 		cfg.Voice.APIKey = v
+	}
+	if v := get("VOICE_TTS_API_KEY"); v != "" {
+		cfg.Voice.TTSAPIKey = v
 	}
 	// Bild-Generierung
 	if v := get("IMG_OPENROUTER"); v != "" {
@@ -673,6 +691,7 @@ func clearSecretsFromConfig(cfg *config.Config) {
 	cfg.Providers.Fireworks.APIKey = ""
 	cfg.Providers.Custom.APIKey = ""
 	cfg.Voice.APIKey = ""
+	cfg.Voice.TTSAPIKey = ""
 	cfg.ImageGen.OpenRouter.APIKey = ""
 	cfg.ImageGen.Fal.APIKey = ""
 	cfg.ImageGen.OpenAI.APIKey = ""
@@ -784,6 +803,85 @@ func buildEmailSender(cfg *config.Config) *email.Sender {
 		return nil
 	}
 	return email.NewSender(host, integMap["SMTP_PORT"], user, pass, integMap["SMTP_FROM"])
+}
+
+// buildTTSSpeaker erstellt einen TTS-Speaker aus der Konfiguration.
+// Gibt (nil, "") zurück wenn nicht konfiguriert oder ttsEnabled explizit false.
+//
+// Aktivierungslogik:
+//   - ttsEnabled: false (Dashboard-Toggle) → immer aus
+//   - Google: OAuth2-Credentials (GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN) haben Vorrang
+//     vor VOICE_TTS_API_KEY. Falls weder OAuth2 noch API Key → aus.
+//   - Azure/OpenAI: VOICE_TTS_API_KEY benötigt
+//   - ttsEnabled: true aber kein Key → Log-Hinweis, kein Fehler
+//
+// Gibt den effektiven Stimmen-Namen zurück (mit Provider-Default falls nicht konfiguriert).
+func buildTTSSpeaker(cfg *config.Config, vault security.SecretProvider) (voice.TTSSpeaker, string) {
+	// Toggle im Dashboard hat Vorrang: ttsEnabled=false → immer aus
+	if !cfg.Voice.TTSEnabled {
+		return nil, ""
+	}
+
+	ttsVoice := cfg.Voice.TTSVoice
+	var speaker voice.TTSSpeaker
+
+	switch cfg.Voice.TTSProvider {
+	case "google":
+		// ── Vertex AI TTS (Chirp 3 HD) via OAuth2 ─────────────────────────────
+		// Google Cloud TTS und Vertex AI TTS unterstützen KEINE API Keys.
+		// Authentifizierung immer über OAuth2 Bearer Token.
+		// Scope benötigt: https://www.googleapis.com/auth/cloud-platform
+		// → Einmalig Google-Konto im Dashboard (Google-Tab) neu verbinden.
+		if vault != nil {
+			clientID, _ := vault.Get("GOOGLE_CLIENT_ID")
+			clientSecret, _ := vault.Get("GOOGLE_CLIENT_SECRET")
+			refreshToken, _ := vault.Get("GOOGLE_REFRESH_TOKEN")
+			if clientID != "" && clientSecret != "" && refreshToken != "" {
+				if ttsVoice == "" {
+					ttsVoice = "de-AT-Chirp3-HD-Aoede" // Chirp 3 HD Default (Österreichisch)
+				}
+				speaker = voice.NewVertexTTSSpeakerOAuth(clientID, clientSecret, refreshToken)
+				log.Printf("[TTS] Aktiviert: google/Vertex AI Chirp 3 HD (OAuth2) | Stimme: %s | Mode: %s", ttsVoice, cfg.Voice.TTSMode)
+				return speaker, ttsVoice
+			}
+		}
+		log.Printf("[TTS] Google TTS: Google-Konto im Dashboard verbinden (Google-Tab → Autorisieren)")
+		return nil, ""
+
+	case "azure":
+		if ttsVoice == "" {
+			ttsVoice = "de-AT-IngridNeural"
+		}
+		ttsAPIKey := cfg.Voice.TTSAPIKey
+		if ttsAPIKey == "" {
+			log.Printf("[TTS] Azure TTS aktiviert aber kein API-Key – VOICE_TTS_API_KEY im Dashboard eintragen")
+			return nil, ""
+		}
+		s, err := voice.NewAzureTTSSpeaker(ttsAPIKey, cfg.Voice.TTSAzureRegion)
+		if err != nil {
+			log.Printf("[TTS] Azure init fehlgeschlagen: %v", err)
+			return nil, ""
+		}
+		speaker = s
+
+	default: // "openai" oder leer
+		if ttsVoice == "" {
+			ttsVoice = "alloy"
+		}
+		ttsAPIKey := cfg.Voice.TTSAPIKey
+		// Fallback auf STT-Key NUR wenn beide denselben Provider nutzen
+		if ttsAPIKey == "" && cfg.Voice.Provider == cfg.Voice.TTSProvider {
+			ttsAPIKey = cfg.Voice.APIKey
+		}
+		if ttsAPIKey == "" {
+			log.Printf("[TTS] OpenAI TTS aktiviert aber kein API-Key – VOICE_TTS_API_KEY im Dashboard eintragen")
+			return nil, ""
+		}
+		speaker = voice.NewOpenAITTSSpeaker(ttsAPIKey)
+	}
+
+	log.Printf("[TTS] Aktiviert: %s | Stimme: %s | Mode: %s", speaker.Name(), ttsVoice, cfg.Voice.TTSMode)
+	return speaker, ttsVoice
 }
 
 func loadSoul(workspacePath string) string {

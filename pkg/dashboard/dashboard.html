@@ -815,8 +815,10 @@
     <!-- ── Voice (Tile-Layout) ── -->
     <div class="tab-content" id="tab-voice">
       <div class="tile-layout">
+
+        <!-- STT Panel -->
         <div class="panel" style="margin-bottom:0">
-          <div class="panel-title">🎙️ Spracherkennung</div>
+          <div class="panel-title">🎙️ Spracherkennung (STT)</div>
           <div class="toggle-row">
             <div><div class="toggle-label">Voice aktivieren</div><div class="toggle-sub">Sprachnachrichten werden transkribiert</div></div>
             <label class="toggle"><input type="checkbox" id="voice-enabled"><span class="toggle-slider"></span></label>
@@ -841,6 +843,8 @@
             <div class="input-wrap"><input type="password" id="voice-apikey" placeholder="gsk_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
           </div>
         </div>
+
+        <!-- STT Info Card -->
         <div>
           <div class="info-card">
             <h4>⭐ Empfehlung: Groq Whisper</h4>
@@ -854,6 +858,78 @@
             </div>
           </div>
         </div>
+
+        <!-- TTS Panel -->
+        <div class="panel" style="margin-bottom:0">
+          <div class="panel-title">🔊 Sprachausgabe (TTS)</div>
+          <div class="toggle-row">
+            <div><div class="toggle-label">TTS aktivieren</div><div class="toggle-sub">Bot antwortet mit Sprache</div></div>
+            <label class="toggle"><input type="checkbox" id="tts-enabled" onchange="ttsToggleChanged()"><span class="toggle-slider"></span></label>
+          </div>
+          <div id="tts-settings" style="display:none;margin-top:16px">
+            <div class="two-col">
+              <div class="field"><label>Provider</label>
+                <select id="tts-provider" onchange="ttsProviderChanged()">
+                  <option value="openai">OpenAI TTS</option>
+                  <option value="google">Google Vertex AI (Chirp 3 HD)</option>
+                  <option value="azure">Microsoft Azure TTS</option>
+                </select>
+              </div>
+              <div class="field"><label>Modus</label>
+                <select id="tts-mode">
+                  <option value="voice">Nur bei Sprachnachricht</option>
+                  <option value="always">Immer (alle Antworten)</option>
+                  <option value="keyword">Nur bei "sprich:" / "/voice"</option>
+                </select>
+              </div>
+            </div>
+            <div class="field"><label>Stimme</label>
+              <select id="tts-voice"></select>
+            </div>
+            <div class="field" id="tts-azure-region-field" style="display:none">
+              <label>Azure Region</label>
+              <select id="tts-azure-region">
+                <option value="westeurope">West Europe (westeurope)</option>
+                <option value="northeurope">North Europe (northeurope)</option>
+                <option value="germanywestcentral">Germany West Central</option>
+                <option value="eastus">East US (eastus)</option>
+                <option value="westus">West US (westus)</option>
+              </select>
+            </div>
+            <div class="field" id="tts-apikey-field">
+              <label>API Key</label>
+              <div class="input-wrap"><input type="password" id="tts-apikey" placeholder="API Key für gewählten TTS Provider" autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+              <div id="tts-apikey-hint" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+            </div>
+            <div id="tts-google-oauth-info" style="display:none;padding:10px 12px;background:rgba(66,133,244,0.08);border:1px solid rgba(66,133,244,0.25);border-radius:8px;font-size:12px;color:var(--text);line-height:1.6">
+              🔐 <strong>Google Vertex AI TTS</strong> nutzt die bestehenden Google OAuth2-Credentials – kein separater API Key nötig.<br>
+              Falls TTS einen 403-Fehler meldet: <strong>Google-Tab → „Google-Konto verbinden / neu verbinden"</strong> klicken (einmalig, für <code>cloud-platform</code> Scope).
+            </div>
+          </div>
+        </div>
+
+        <!-- TTS Info Card -->
+        <div>
+          <div class="info-card">
+            <h4>⭐ Empfehlung: Google Vertex AI (Chirp 3 HD)</h4>
+            <p>Neueste Google-Stimmen – natürlich, emotional, mehrsprachig. API Key direkt aus dem Vertex AI Studio.</p>
+            <a href="https://console.cloud.google.com/vertex-ai/studio/media/speech" target="_blank" class="info-link">→ Vertex AI Studio → Sprache → "API-Schlüssel abrufen"</a>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Andere Optionen</h4>
+            <div class="other-list">
+              <div>🎙️ <strong>Azure TTS</strong> – österreichische Stimmen, 500k Zeichen/Monat gratis</div>
+              <div>🤖 <strong>OpenAI TTS</strong> – solide Qualität, einfacher Key</div>
+            </div>
+            <hr class="divider">
+            <h4 style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">Modi</h4>
+            <div class="other-list">
+              <div>🎙️ <strong>Nur bei Sprachnachricht</strong> – Bot antwortet mit Sprache wenn User Sprachnachricht schickt</div>
+              <div>📢 <strong>Immer</strong> – alle Antworten als Sprachnachricht</div>
+              <div>🔑 <strong>Keyword</strong> – nur bei Präfix <code>sprich:</code> oder <code>/voice</code></div>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -893,9 +969,12 @@
                 <button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button>
               </div>
             </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button class="btn btn-secondary" onclick="googleStartOAuth()" id="google-oauth-btn">🔗 Google-Konto verbinden</button>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-secondary" onclick="googleStartOAuth()" id="google-oauth-btn">🔗 Google-Konto verbinden / neu verbinden</button>
               <span id="google-oauth-status" style="font-size:13px;color:var(--muted);align-self:center"></span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px">
+              ℹ️ Für Google TTS (Vertex AI Chirp 3) bitte einmalig <strong>neu verbinden</strong> – aktiviert den zusätzlichen Scope <code>cloud-platform</code>.
             </div>
           </div>
 
@@ -1617,6 +1696,86 @@ function toggleEye(btn) {
   btn.textContent = (inp.type === 'password') ? '👁' : '🙈';
 }
 
+// ── TTS Provider / Stimmen ──────────────────────────────────────────────────
+const TTS_VOICES = {
+  openai: [
+    { value: 'alloy',   label: 'alloy – neutral, ausgewogen' },
+    { value: 'nova',    label: 'nova – warm, weiblich ⭐' },
+    { value: 'echo',    label: 'echo – männlich, klar' },
+    { value: 'fable',   label: 'fable – britisch, ausdrucksstark' },
+    { value: 'onyx',    label: 'onyx – tief, männlich' },
+    { value: 'shimmer', label: 'shimmer – sanft, weiblich' },
+  ],
+  google: [
+    // ── Vertex AI Chirp 3 HD (mit API Key) ─────────────────────────────────
+    { value: 'de-DE-Chirp3-HD-Aoede',  label: 'de-DE-Chirp3-HD-Aoede – weiblich, warm ⭐ (Chirp 3 HD)' },
+    { value: 'de-DE-Chirp3-HD-Kore',   label: 'de-DE-Chirp3-HD-Kore – weiblich, neutral (Chirp 3 HD)' },
+    { value: 'de-DE-Chirp3-HD-Leda',   label: 'de-DE-Chirp3-HD-Leda – weiblich, hell (Chirp 3 HD)' },
+    { value: 'de-DE-Chirp3-HD-Zephyr', label: 'de-DE-Chirp3-HD-Zephyr – weiblich, dynamisch (Chirp 3 HD)' },
+    { value: 'de-DE-Chirp3-HD-Charon', label: 'de-DE-Chirp3-HD-Charon – männlich, klar (Chirp 3 HD)' },
+    { value: 'de-DE-Chirp3-HD-Fenrir', label: 'de-DE-Chirp3-HD-Fenrir – männlich, tief (Chirp 3 HD)' },
+    { value: 'de-DE-Chirp3-HD-Orus',   label: 'de-DE-Chirp3-HD-Orus – männlich, autoritär (Chirp 3 HD)' },
+    { value: 'de-DE-Chirp3-HD-Puck',   label: 'de-DE-Chirp3-HD-Puck – männlich, jung (Chirp 3 HD)' },
+    { value: 'de-AT-Chirp3-HD-Aoede',  label: 'de-AT-Chirp3-HD-Aoede – Österreichisch, weiblich (Chirp 3 HD)' },
+    { value: 'de-AT-Chirp3-HD-Charon', label: 'de-AT-Chirp3-HD-Charon – Österreichisch, männlich (Chirp 3 HD)' },
+    // ── Cloud TTS Neural2/Wavenet (mit OAuth2 – kein API Key nötig) ─────────
+    { value: 'de-DE-Neural2-C', label: 'de-DE-Neural2-C – weiblich, natürlich (Neural2/OAuth2)' },
+    { value: 'de-DE-Neural2-F', label: 'de-DE-Neural2-F – weiblich, modern (Neural2/OAuth2)' },
+    { value: 'de-DE-Neural2-B', label: 'de-DE-Neural2-B – männlich (Neural2/OAuth2)' },
+    { value: 'de-DE-Wavenet-C', label: 'de-DE-Wavenet-C – weiblich, günstig (Wavenet/OAuth2)' },
+  ],
+  azure: [
+    { value: 'de-AT-IngridNeural',  label: 'de-AT-IngridNeural – Österreichisch, weiblich ⭐' },
+    { value: 'de-AT-JonasNeural',   label: 'de-AT-JonasNeural – Österreichisch, männlich' },
+    { value: 'de-DE-KatjaNeural',   label: 'de-DE-KatjaNeural – Hochdeutsch, weiblich' },
+    { value: 'de-DE-ConradNeural',  label: 'de-DE-ConradNeural – Hochdeutsch, männlich' },
+    { value: 'de-DE-AmalaNeural',   label: 'de-DE-AmalaNeural – Hochdeutsch, weiblich, modern' },
+    { value: 'de-DE-BerndNeural',   label: 'de-DE-BerndNeural – Hochdeutsch, männlich' },
+    { value: 'de-DE-LouisaNeural',  label: 'de-DE-LouisaNeural – Hochdeutsch, weiblich' },
+    { value: 'de-DE-SeraphinaNeural', label: 'de-DE-SeraphinaNeural – Hochdeutsch, weiblich, jung' },
+  ],
+};
+
+function ttsPopulateVoices(provider, selectedVoice) {
+  const sel = document.getElementById('tts-voice');
+  if (!sel) return;
+  const voices = TTS_VOICES[provider] || TTS_VOICES['openai'];
+  sel.innerHTML = voices.map(v =>
+    `<option value="${v.value}"${v.value === selectedVoice ? ' selected' : ''}>${v.label}</option>`
+  ).join('');
+  // Wenn keine Stimme ausgewählt → erste als Default
+  if (!selectedVoice && voices.length > 0) sel.value = voices[0].value;
+}
+
+function ttsToggleChanged() {
+  const enabled = document.getElementById('tts-enabled')?.checked;
+  const settings = document.getElementById('tts-settings');
+  if (settings) settings.style.display = enabled ? '' : 'none';
+}
+
+function ttsProviderChanged() {
+  const provider  = document.getElementById('tts-provider')?.value || 'openai';
+  const curVoice  = document.getElementById('tts-voice')?.value || '';
+  ttsPopulateVoices(provider, curVoice);
+  // Azure-Region nur bei Azure anzeigen
+  const regionField = document.getElementById('tts-azure-region-field');
+  if (regionField) regionField.style.display = (provider === 'azure') ? '' : 'none';
+  // Google: kein API Key – OAuth2 Info anzeigen stattdessen
+  const apikeyField = document.getElementById('tts-apikey-field');
+  const googleOAuthInfo = document.getElementById('tts-google-oauth-info');
+  if (apikeyField) apikeyField.style.display = (provider === 'google') ? 'none' : '';
+  if (googleOAuthInfo) googleOAuthInfo.style.display = (provider === 'google') ? '' : 'none';
+  // API-Key Hint für OpenAI + Azure
+  const hint = document.getElementById('tts-apikey-hint');
+  if (hint) {
+    const hints = {
+      openai: '🔑 OpenAI API Key (platform.openai.com)',
+      azure:  '🔑 Azure Speech Key: <a href="https://portal.azure.com" target="_blank" style="color:var(--accent)">Azure Portal → Speech Service → Keys and Endpoint</a>',
+    };
+    hint.innerHTML = hints[provider] || '';
+  }
+}
+
 // ── Navigation ─────────────────────────────────────────────────────────────
 function showSection(name, el) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -2048,11 +2207,22 @@ async function loadConfig() {
   });
   onVidProviderChange();
 
-  // ── Voice (API-Key aus Vault) ────────────────────────────────────────────
+  // ── Voice STT (API-Key aus Vault) ────────────────────────────────────────
   setVal('voice-enabled',  v.enabled,           'toggle');
   setVal('voice-provider', v.provider || 'groq', 'select');
   setVal('voice-lang',     v.language || 'de',   'select');
   setVal('voice-apikey',   secretsData['VOICE_API_KEY'] || '');
+
+  // ── TTS (Sprachausgabe) ──────────────────────────────────────────────────
+  const ttsProv = v.ttsProvider || 'openai';
+  setVal('tts-enabled',  v.ttsEnabled, 'toggle');
+  setVal('tts-provider', ttsProv, 'select');
+  setVal('tts-mode',     v.ttsMode || 'voice', 'select');
+  setVal('tts-azure-region', v.ttsAzureRegion || 'westeurope', 'select');
+  setVal('tts-apikey',   secretsData['VOICE_TTS_API_KEY'] || '');
+  ttsPopulateVoices(ttsProv, v.ttsVoice || '');
+  ttsProviderChanged();
+  ttsToggleChanged(); // Settings ein-/ausblenden je nach Toggle-Status
 
   // JSON-Tab immer mit Blur starten
   reBlur('json');
@@ -2212,13 +2382,20 @@ async function saveConfig() {
       secretsPatch['VID_' + pv.toUpperCase()] = getVal('vid-' + pv + '-key');
     });
 
-    // ── Voice (API-Key → Vault) ───────────────────────────────────────────
+    // ── Voice STT + TTS (API-Keys → Vault) ──────────────────────────────────
     newConfig.voice = newConfig.voice || {};
-    newConfig.voice.enabled  = getVal('voice-enabled',  'toggle');
-    newConfig.voice.provider = getVal('voice-provider', 'select');
-    newConfig.voice.language = getVal('voice-lang',     'select');
-    newConfig.voice.apiKey   = '';  // im Vault
-    secretsPatch['VOICE_API_KEY'] = getVal('voice-apikey');
+    newConfig.voice.enabled     = getVal('voice-enabled',  'toggle');
+    newConfig.voice.provider    = getVal('voice-provider', 'select');
+    newConfig.voice.language    = getVal('voice-lang',     'select');
+    newConfig.voice.apiKey      = '';  // im Vault
+    newConfig.voice.ttsEnabled     = getVal('tts-enabled',       'toggle');
+    newConfig.voice.ttsProvider    = getVal('tts-provider',      'select');
+    newConfig.voice.ttsMode        = getVal('tts-mode',          'select');
+    newConfig.voice.ttsVoice       = getVal('tts-voice',         'select');
+    newConfig.voice.ttsAzureRegion = getVal('tts-azure-region',  'select');
+    newConfig.voice.ttsApiKey   = '';  // im Vault
+    secretsPatch['VOICE_API_KEY']     = getVal('voice-apikey');
+    secretsPatch['VOICE_TTS_API_KEY'] = getVal('tts-apikey');
 
     // ── Google Services → config.json ─────────────────────────────────
     newConfig.google = newConfig.google || {};
@@ -2865,17 +3042,19 @@ function updateGoogleBadge() {
 async function googleStartOAuth() {
   const clientId = (document.getElementById('google-client-id')?.value || '').trim();
   if (!clientId) {
-    toast('Bitte zuerst Client ID eintragen und speichern.', true);
+    toast('Bitte zuerst Google Client ID im Google-Tab eintragen und speichern.', true);
     return;
   }
   const btn = document.getElementById('google-oauth-btn');
   const status = document.getElementById('google-oauth-status');
+  const ttsStatus = document.getElementById('tts-google-oauth-status');
   btn.disabled = true;
-  status.textContent = 'Lade Autorisierungs-URL…';
+  if (status) status.textContent = 'Lade Autorisierungs-URL…';
+  if (ttsStatus) ttsStatus.textContent = 'Lade…';
   const result = await api('/api/google/auth-url');
   btn.disabled = false;
   if (result.error || !result.url) {
-    status.textContent = '';
+    if (status) status.textContent = '';
     // Fallback: lokal bauen mit allen Scopes
     const scopes = [
       'https://www.googleapis.com/auth/calendar',
@@ -2883,7 +3062,8 @@ async function googleStartOAuth() {
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/gmail.send',
-      'https://www.googleapis.com/auth/gmail.readonly'
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/cloud-platform'  // Für Google TTS (Vertex AI Chirp 3)
     ].join(' ');
     const params = new URLSearchParams({
       client_id: clientId,
@@ -2895,10 +3075,12 @@ async function googleStartOAuth() {
     });
     const url = 'https://accounts.google.com/o/oauth2/v2/auth?' + params;
     window.open(url, '_blank', 'width=600,height=700');
-    status.textContent = 'Fenster geöffnet – nach Autorisierung hier neu laden.';
+    if (status) status.textContent = 'Fenster geöffnet – nach Autorisierung hier neu laden.';
+    if (ttsStatus) ttsStatus.textContent = '✅ Fenster geöffnet';
   } else {
     window.open(result.url, '_blank', 'width=600,height=700');
-    status.textContent = 'Autorisierungs-Fenster geöffnet – nach Bestätigung wird der Refresh Token automatisch eingetragen.';
+    if (status) status.textContent = 'Autorisierungs-Fenster geöffnet – nach Bestätigung wird der Refresh Token automatisch eingetragen.';
+    if (ttsStatus) ttsStatus.textContent = '✅ Fenster geöffnet – nach Bestätigung automatisch aktiv';
   }
 }
 

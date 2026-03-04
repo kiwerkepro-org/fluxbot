@@ -116,6 +116,24 @@ func (m *Manager) ReplyPhoto(msg Message, imageURL, caption string) error {
 	return ch.SendPhoto(msg.ChatID, imageURL, caption)
 }
 
+// ReplyVoice sendet eine Sprachnachricht als Antwort.
+// Prüft per type-assert ob der Kanal VoiceChannel implementiert.
+// Falls nicht (z.B. Discord, Slack), wird ein Fehler zurückgegeben – der Aufrufer
+// kann dann auf Text-Antwort zurückfallen.
+func (m *Manager) ReplyVoice(msg Message, audioData []byte) error {
+	m.mu.RLock()
+	ch, ok := m.channels[msg.ChannelID]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("kanal '%s' nicht gefunden", msg.ChannelID)
+	}
+	vc, ok := ch.(VoiceChannel)
+	if !ok {
+		return fmt.Errorf("kanal '%s' unterstützt keine Sprachnachrichten", msg.ChannelID)
+	}
+	return vc.SendVoice(msg.ChatID, audioData)
+}
+
 // SendTo sendet eine Textnachricht direkt an einen bestimmten Kanal + Chat.
 // Wird vom Cron-System genutzt um Reminders auszuliefern.
 func (m *Manager) SendTo(channelID, chatID, text string) error {
