@@ -250,8 +250,15 @@ type CalendarListEvent struct {
 	Location    string
 }
 
-// CalendarList listet bevorstehende Termine auf.
+// CalendarList listet bevorstehende Termine ab jetzt auf.
 func (c *Client) CalendarList(calendarID string, maxResults int) ([]CalendarListEvent, error) {
+	return c.CalendarListWithRange(calendarID, maxResults, time.Now(), time.Time{})
+}
+
+// CalendarListWithRange listet Termine in einem Zeitbereich auf.
+// timeMin: Startzeit (required). timeMax: Endzeit (optional, zero = kein Limit).
+// Wird verwendet wenn der Nutzer nach einem bestimmten Datum oder Zeitraum fragt.
+func (c *Client) CalendarListWithRange(calendarID string, maxResults int, timeMin, timeMax time.Time) ([]CalendarListEvent, error) {
 	if calendarID == "" {
 		calendarID = "primary"
 	}
@@ -260,7 +267,10 @@ func (c *Client) CalendarList(calendarID string, maxResults int) ([]CalendarList
 	}
 
 	params := url.Values{}
-	params.Set("timeMin", time.Now().UTC().Format(time.RFC3339))
+	params.Set("timeMin", timeMin.UTC().Format(time.RFC3339))
+	if !timeMax.IsZero() {
+		params.Set("timeMax", timeMax.UTC().Format(time.RFC3339))
+	}
 	params.Set("maxResults", fmt.Sprintf("%d", maxResults))
 	params.Set("singleEvents", "true")
 	params.Set("orderBy", "startTime")
