@@ -932,9 +932,9 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 	if strings.Contains(response, "__GOOGLE_CAL_CREATE__") && strings.Contains(response, "__GOOGLE_CAL_CREATE_END__") {
 		return a.handleGoogleCalCreate(session, response)
 	}
-	// Google Calendar – Termine auflisten
+	// Google Calendar – Termine auflisten (optional mit Datumsfilter)
 	if strings.Contains(response, "__GOOGLE_CAL_LIST__") {
-		return a.handleGoogleCalList(session)
+		return a.handleGoogleCalList(session, response)
 	}
 	// Google Docs – neues Dokument erstellen
 	if strings.Contains(response, "__GOOGLE_DOCS_CREATE__") && strings.Contains(response, "__GOOGLE_DOCS_CREATE_END__") {
@@ -1487,18 +1487,75 @@ func (a *Agent) logGoogleAudit(session *Session, intent string, duration int, er
 	a.auditLogger.Log(entry)
 }
 
-// handleGoogleCalList listet bevorstehende Google Calendar-Termine auf.
-// Marker-Format: __GOOGLE_CAL_LIST__
-// BUGFIX (Session 31): Validiere, dass Title nicht-leer ist (filtert Private Events ohne Summary)
-// SESSION 31: Audit-Logging mit Duration, UserIntent, ErrorCode + session-Info implementiert
-func (a *Agent) handleGoogleCalList(session *Session) string {
+// handleGoogleCalList listet Google Calendar-Termine auf.
+// Marker-Format (ohne Datumsfilter):  __GOOGLE_CAL_LIST__
+// Marker-Format (mit Datumsfilter):   __GOOGLE_CAL_LIST__\n{"date":"2026-06-01"}\n__GOOGLE_CAL_LIST_END__
+// Optionale Felder im JSON-Block:
+//
+//	date      – einzelner Tag (YYYY-MM-DD), z.B. "2026-06-01"
+//	dateFrom  – Start eines Zeitraums (YYYY-MM-DD)
+//	dateTo    – Ende eines Zeitraums (YYYY-MM-DD)
+//
+// BUGFIX Session 31: Validiere Title (filtert Private Events ohne Summary)
+// SESSION 31: Audit-Logging mit Duration, UserIntent, ErrorCode + session-Info
+// SESSION 32: Optionaler Datumsfilter via JSON-Block
+func (a *Agent) handleGoogleCalList(session *Session, response string) string {
 	startTime := time.Now()
 
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
 
-	events, err := a.googleClient.CalendarList("primary", 10)
+	// Datumsfilter aus optionalem JSON-Block parsen
+	var timeMin, timeMax time.Time
+	var dateLabel string // für Antworttext, z.B. "am 01.06.2026"
+	const viennaLoc = "Europe/Vienna"
+	loc, _ := time.LoadLocation(viennaLoc)
+	if loc == nil {
+		loc = time.UTC
+	}
+
+	if strings.Contains(response, "__GOOGLE_CAL_LIST_END__") {
+		data, err := parseGoogleMarker(response, "__GOOGLE_CAL_LIST__", "__GOOGLE_CAL_LIST_END__")
+		if err == nil {
+			var filter struct {
+				Date     string `json:"date"`
+				DateFrom string `json:"dateFrom"`
+				DateTo   string `json:"dateTo"`
+			}
+			if json.Unmarshal(data, &filter) == nil {
+				const layout = "2006-01-02"
+				if filter.Date != "" {
+					// Einzelner Tag: 00:00:00 bis 23:59:59 Wiener Zeit
+					if d, err := time.ParseInLocation(layout, filter.Date, loc); err == nil {
+						timeMin = d
+						timeMax = d.Add(24*time.Hour - time.Second)
+						dateLabel = "am " + d.Format("02.01.2006")
+					}
+				} else if filter.DateFrom != "" {
+					if from, err := time.ParseInLocation(layout, filter.DateFrom, loc); err == nil {
+						timeMin = from
+						dateLabel = "ab " + from.Format("02.01.2006")
+					}
+					if filter.DateTo != "" {
+						if to, err := time.ParseInLocation(layout, filter.DateTo, loc); err == nil {
+							timeMax = to.Add(24*time.Hour - time.Second)
+							dateLabel = "von " + timeMin.Format("02.01.2006") + " bis " + to.Format("02.01.2006")
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// API-Aufruf: mit oder ohne Datumsfilter
+	var events []googleapi.CalendarListEvent
+	var err error
+	if !timeMin.IsZero() {
+		events, err = a.googleClient.CalendarListWithRange("primary", 25, timeMin, timeMax)
+	} else {
+		events, err = a.googleClient.CalendarList("primary", 10)
+	}
 	if err != nil {
 		a.logGoogleAudit(session, "Kalender-Anfrage", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Google Calendar: %v", err))
 		log.Printf("[Agent] ❌ Google Calendar List Fehler: %v", err)
@@ -1513,21 +1570,55 @@ func (a *Agent) handleGoogleCalList(session *Session) string {
 		}
 	}
 
+	a.logGoogleAudit(session, "Kalender-Anfrage", int(time.Since(startTime).Milliseconds()), "", "")
+
 	if len(validEvents) == 0 {
-		a.logGoogleAudit(session, "Kalender-Anfrage", int(time.Since(startTime).Milliseconds()), "", "")
-		return "📅 Keine bevorstehenden Termine in Google Calendar."
+		if dateLabel != "" {
+			return fmt.Sprintf("Keine Termine %s in deinem Kalender.", dateLabel)
+		}
+		return "Du hast keine bevorstehenden Termine."
+	}
+
+	// Zeitstrings lesbar formatieren (RFC3339 → "02.01.2006 um 15:04 Uhr")
+	vLoc, _ := time.LoadLocation("Europe/Vienna")
+	if vLoc == nil {
+		vLoc = time.UTC
+	}
+	formatEventTime := func(raw string) string {
+		if t, err := time.ParseInLocation("2006-01-02", raw, vLoc); err == nil {
+			return t.Format("02.01.2006")
+		}
+		if t, err := time.Parse(time.RFC3339, raw); err == nil {
+			return t.In(vLoc).Format("02.01.2006 um 15:04 Uhr")
+		}
+		return raw
 	}
 
 	var sb strings.Builder
-	sb.WriteString("📅 *Deine nächsten Google Calendar Termine:*\n\n")
-	for _, e := range validEvents {
-		sb.WriteString(fmt.Sprintf("• *%s* – %s\n", e.Title, e.Start))
+	if len(validEvents) == 1 {
+		// Einzeltermin: als Satz
+		e := validEvents[0]
+		sb.WriteString(fmt.Sprintf("Du hast einen Termin: *%s* am %s", e.Title, formatEventTime(e.Start)))
 		if e.Location != "" {
-			sb.WriteString(fmt.Sprintf("  📍 %s\n", e.Location))
+			sb.WriteString(fmt.Sprintf(", 📍 %s", e.Location))
+		}
+		sb.WriteString(".")
+	} else {
+		// Mehrere Termine: kompakte Liste ohne Kopfzeile mit "Google Calendar"
+		if dateLabel != "" {
+			sb.WriteString(fmt.Sprintf("Deine Termine %s:\n\n", dateLabel))
+		} else {
+			sb.WriteString("Deine nächsten Termine:\n\n")
+		}
+		for _, e := range validEvents {
+			sb.WriteString(fmt.Sprintf("• *%s* – %s", e.Title, formatEventTime(e.Start)))
+			if e.Location != "" {
+				sb.WriteString(fmt.Sprintf(", 📍 %s", e.Location))
+			}
+			sb.WriteString("\n")
 		}
 	}
 
-	a.logGoogleAudit(session, "Kalender-Anfrage", int(time.Since(startTime).Milliseconds()), "", "")
 	return strings.TrimRight(sb.String(), "\n")
 }
 
