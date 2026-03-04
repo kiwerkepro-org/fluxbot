@@ -47,3 +47,14 @@ type Channel interface {
 	// TypingIndicator zeigt an dass der Bot tippt
 	TypingIndicator(chatID string)
 }
+
+// VoiceChannel erweitert Channel um Sprachausgabe.
+// Nur Kanäle die Voice-Nachrichten unterstützen (z.B. Telegram) implementieren dieses Interface.
+// Manager.ReplyVoice() prüft per type-assert ob der Kanal VoiceChannel implementiert.
+type VoiceChannel interface {
+	Channel
+
+	// SendVoice schickt eine Sprachnachricht (OGG/Opus-Bytes) an einen Chat.
+	// audioData: rohe OGG/Opus-Bytes (direkt von OpenAI TTS lieferbar)
+	SendVoice(chatID string, audioData []byte) error
+}

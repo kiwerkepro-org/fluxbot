@@ -35,6 +35,7 @@ type Agent struct {
 	transcriber     voice.Transcriber
 	voiceLang       string
 	guard           *security.Guard
+	auditLogger     *security.AuditLogger // Session 31: Audit-Logging mit Duration, Intent, Error-Code
 	imageGenerators []imagegen.Generator // Alle verfügbaren Bildgeneratoren (in Auswahl-Reihenfolge)
 	imageSize        string
 	videoDefault     string        // "disabled" oder Provider-Name – steuert Video-Meldung
@@ -108,6 +109,12 @@ func New(cfg Config) *Agent {
 		ttsVoice:         cfg.TTSVoice,
 		ttsMode:          cfg.TTSMode,
 	}
+
+	// Session 31: auditLogger vom Guard extrahieren (falls Guard vorhanden)
+	if a.guard != nil {
+		a.auditLogger = a.guard.GetAuditLogger()
+	}
+
 	a.systemPromptFn = a.buildSystemPrompt
 	return a
 }
@@ -923,39 +930,39 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 
 	// Google Calendar – Termin erstellen
 	if strings.Contains(response, "__GOOGLE_CAL_CREATE__") && strings.Contains(response, "__GOOGLE_CAL_CREATE_END__") {
-		return a.handleGoogleCalCreate(response)
+		return a.handleGoogleCalCreate(session, response)
 	}
 	// Google Calendar – Termine auflisten
 	if strings.Contains(response, "__GOOGLE_CAL_LIST__") {
-		return a.handleGoogleCalList()
+		return a.handleGoogleCalList(session)
 	}
 	// Google Docs – neues Dokument erstellen
 	if strings.Contains(response, "__GOOGLE_DOCS_CREATE__") && strings.Contains(response, "__GOOGLE_DOCS_CREATE_END__") {
-		return a.handleGoogleDocsCreate(response)
+		return a.handleGoogleDocsCreate(session, response)
 	}
 	// Google Docs – Text an Dokument anhängen
 	if strings.Contains(response, "__GOOGLE_DOCS_APPEND__") && strings.Contains(response, "__GOOGLE_DOCS_APPEND_END__") {
-		return a.handleGoogleDocsAppend(response)
+		return a.handleGoogleDocsAppend(session, response)
 	}
 	// Google Docs – Dokument lesen
 	if strings.Contains(response, "__GOOGLE_DOCS_READ__") && strings.Contains(response, "__GOOGLE_DOCS_READ_END__") {
-		return a.handleGoogleDocsRead(response)
+		return a.handleGoogleDocsRead(session, response)
 	}
 	// Google Sheets – Tabelle erstellen
 	if strings.Contains(response, "__GOOGLE_SHEETS_CREATE__") && strings.Contains(response, "__GOOGLE_SHEETS_CREATE_END__") {
-		return a.handleGoogleSheetsCreate(response)
+		return a.handleGoogleSheetsCreate(session, response)
 	}
 	// Google Sheets – Werte lesen
 	if strings.Contains(response, "__GOOGLE_SHEETS_READ__") && strings.Contains(response, "__GOOGLE_SHEETS_READ_END__") {
-		return a.handleGoogleSheetsRead(response)
+		return a.handleGoogleSheetsRead(session, response)
 	}
 	// Google Sheets – Werte schreiben
 	if strings.Contains(response, "__GOOGLE_SHEETS_WRITE__") && strings.Contains(response, "__GOOGLE_SHEETS_WRITE_END__") {
-		return a.handleGoogleSheetsWrite(response)
+		return a.handleGoogleSheetsWrite(session, response)
 	}
 	// Google Drive – Dateien auflisten/suchen
 	if strings.Contains(response, "__GOOGLE_DRIVE_LIST__") && strings.Contains(response, "__GOOGLE_DRIVE_LIST_END__") {
-		return a.handleGoogleDriveList(response)
+		return a.handleGoogleDriveList(session, response)
 	}
 	// Gmail – E-Mail senden
 	if strings.Contains(response, "__GMAIL_SEND__") && strings.Contains(response, "__GMAIL_SEND_END__") {
@@ -1438,7 +1445,7 @@ func parseGoogleMarker(response, startMarker, endMarker string) ([]byte, error) 
 
 // handleGoogleCalCreate erstellt einen Google Calendar-Termin.
 // Marker-Format: __GOOGLE_CAL_CREATE__\n{"title":"...","start":"...","end":"...","description":"...","location":"...","calendarId":"primary"}\n__GOOGLE_CAL_CREATE_END__
-func (a *Agent) handleGoogleCalCreate(response string) string {
+func (a *Agent) handleGoogleCalCreate(session *Session, response string) string {
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1459,34 +1466,74 @@ func (a *Agent) handleGoogleCalCreate(response string) string {
 	return fmt.Sprintf("✅ Termin *%s* wurde in Google Calendar eingetragen!\n🔗 %s", result.Title, result.HtmlURL)
 }
 
+// logGoogleAudit schreibt einen Audit-Eintrag für Google API Aufrufe.
+// Session 31: Zentrale Hilfsmethode – ersetzt verteilte Audit-Calls in den Handlern.
+func (a *Agent) logGoogleAudit(session *Session, intent string, duration int, errCode, errMsg string) {
+	if a.auditLogger == nil {
+		return
+	}
+	entry := security.AuditEntry{
+		Timestamp:   time.Now(),
+		UserIntent:  intent,
+		Duration:    duration,
+		ErrorCode:   errCode,
+		ErrorMessage: errMsg,
+	}
+	if session != nil {
+		entry.ChannelID = session.ChannelID
+		entry.UserID    = session.UserID
+		entry.MessageType = "google-api"
+	}
+	a.auditLogger.Log(entry)
+}
+
 // handleGoogleCalList listet bevorstehende Google Calendar-Termine auf.
 // Marker-Format: __GOOGLE_CAL_LIST__
-func (a *Agent) handleGoogleCalList() string {
+// BUGFIX (Session 31): Validiere, dass Title nicht-leer ist (filtert Private Events ohne Summary)
+// SESSION 31: Audit-Logging mit Duration, UserIntent, ErrorCode + session-Info implementiert
+func (a *Agent) handleGoogleCalList(session *Session) string {
+	startTime := time.Now()
+
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
+
 	events, err := a.googleClient.CalendarList("primary", 10)
 	if err != nil {
+		a.logGoogleAudit(session, "Kalender-Anfrage", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Google Calendar: %v", err))
 		log.Printf("[Agent] ❌ Google Calendar List Fehler: %v", err)
 		return fmt.Sprintf("❌ Google Calendar Fehler: %v", err)
 	}
-	if len(events) == 0 {
+
+	// Filter: nur Events mit Title (ignoriere Private Events ohne Summary)
+	var validEvents []googleapi.CalendarListEvent
+	for _, e := range events {
+		if strings.TrimSpace(e.Title) != "" {
+			validEvents = append(validEvents, e)
+		}
+	}
+
+	if len(validEvents) == 0 {
+		a.logGoogleAudit(session, "Kalender-Anfrage", int(time.Since(startTime).Milliseconds()), "", "")
 		return "📅 Keine bevorstehenden Termine in Google Calendar."
 	}
+
 	var sb strings.Builder
 	sb.WriteString("📅 *Deine nächsten Google Calendar Termine:*\n\n")
-	for _, e := range events {
+	for _, e := range validEvents {
 		sb.WriteString(fmt.Sprintf("• *%s* – %s\n", e.Title, e.Start))
 		if e.Location != "" {
 			sb.WriteString(fmt.Sprintf("  📍 %s\n", e.Location))
 		}
 	}
+
+	a.logGoogleAudit(session, "Kalender-Anfrage", int(time.Since(startTime).Milliseconds()), "", "")
 	return strings.TrimRight(sb.String(), "\n")
 }
 
 // handleGoogleDocsCreate erstellt ein neues Google Docs-Dokument.
 // Marker-Format: __GOOGLE_DOCS_CREATE__\n{"title":"...","content":"..."}\n__GOOGLE_DOCS_CREATE_END__
-func (a *Agent) handleGoogleDocsCreate(response string) string {
+func (a *Agent) handleGoogleDocsCreate(session *Session, response string) string {
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1512,7 +1559,7 @@ func (a *Agent) handleGoogleDocsCreate(response string) string {
 
 // handleGoogleDocsAppend fügt Text an ein bestehendes Google Docs-Dokument an.
 // Marker-Format: __GOOGLE_DOCS_APPEND__\n{"docId":"...","content":"..."}\n__GOOGLE_DOCS_APPEND_END__
-func (a *Agent) handleGoogleDocsAppend(response string) string {
+func (a *Agent) handleGoogleDocsAppend(session *Session, response string) string {
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1537,7 +1584,7 @@ func (a *Agent) handleGoogleDocsAppend(response string) string {
 
 // handleGoogleDocsRead liest den Inhalt eines Google Docs-Dokuments.
 // Marker-Format: __GOOGLE_DOCS_READ__\n{"docId":"..."}\n__GOOGLE_DOCS_READ_END__
-func (a *Agent) handleGoogleDocsRead(response string) string {
+func (a *Agent) handleGoogleDocsRead(session *Session, response string) string {
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1565,7 +1612,7 @@ func (a *Agent) handleGoogleDocsRead(response string) string {
 
 // handleGoogleSheetsCreate erstellt eine neue Google Sheets-Tabelle.
 // Marker-Format: __GOOGLE_SHEETS_CREATE__\n{"title":"..."}\n__GOOGLE_SHEETS_CREATE_END__
-func (a *Agent) handleGoogleSheetsCreate(response string) string {
+func (a *Agent) handleGoogleSheetsCreate(session *Session, response string) string {
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1590,7 +1637,7 @@ func (a *Agent) handleGoogleSheetsCreate(response string) string {
 
 // handleGoogleSheetsRead liest Werte aus einer Google Sheets-Tabelle.
 // Marker-Format: __GOOGLE_SHEETS_READ__\n{"sheetId":"...","range":"A1:Z100"}\n__GOOGLE_SHEETS_READ_END__
-func (a *Agent) handleGoogleSheetsRead(response string) string {
+func (a *Agent) handleGoogleSheetsRead(session *Session, response string) string {
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1632,7 +1679,7 @@ func (a *Agent) handleGoogleSheetsRead(response string) string {
 
 // handleGoogleSheetsWrite schreibt Werte in eine Google Sheets-Tabelle.
 // Marker-Format: __GOOGLE_SHEETS_WRITE__\n{"sheetId":"...","range":"A1","values":[["Name","Wert"],["Test","123"]]}\n__GOOGLE_SHEETS_WRITE_END__
-func (a *Agent) handleGoogleSheetsWrite(response string) string {
+func (a *Agent) handleGoogleSheetsWrite(session *Session, response string) string {
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1669,7 +1716,7 @@ func (a *Agent) handleGoogleSheetsWrite(response string) string {
 
 // handleGoogleDriveList listet Dateien in Google Drive auf.
 // Marker-Format: __GOOGLE_DRIVE_LIST__\n{"query":"name contains 'Report'","maxResults":10}\n__GOOGLE_DRIVE_LIST_END__
-func (a *Agent) handleGoogleDriveList(response string) string {
+func (a *Agent) handleGoogleDriveList(session *Session, response string) string {
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1799,6 +1846,12 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 			"Du hast Zugriff auf Google Calendar, Docs, Sheets, Drive und Gmail.\n" +
 			"Verwende AUSSCHLIESSLICH die folgenden Marker wenn der Nutzer Google-Dienste nutzen möchte:\n\n" +
 			"GOOGLE CALENDAR:\n" +
+			"⚠️ DATUMS-VALIDIERUNG – IMMER ÜBERPRÜFEN:\n" +
+			"  Wenn der Nutzer einen Wochentag + Datum nennt (z.B. \"Donnerstag, 27. Feb\"):\n" +
+			"  1. Überprüfe: Stimmt der Wochentag mit dem Datum überein?\n" +
+			"  2. Falls NEIN → Teile SOFORT mit: \"Moment – 27. Feb. 2026 ist ein FREITAG, nicht DONNERSTAG. Meinst du Donnerstag (26.2.) oder Freitag (27.2.)?\"\n" +
+			"  3. Frage nach Bestätigung BEVOR du die Anfrage verarbeitest.\n" +
+			"  4. Diese Regel gilt für ALLE Kalender-Operationen!\n\n" +
 			"Termin erstellen:\n__GOOGLE_CAL_CREATE__\n{\"title\":\"<Titel>\",\"start\":\"<RFC3339+01:00>\",\"end\":\"<RFC3339+01:00>\",\"description\":\"<optional>\",\"location\":\"<optional>\"}\n__GOOGLE_CAL_CREATE_END__\n" +
 			"Termine auflisten: antworte NUR mit: __GOOGLE_CAL_LIST__\n\n" +
 			"GOOGLE DOCS:\n" +

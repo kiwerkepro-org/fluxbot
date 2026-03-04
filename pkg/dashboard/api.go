@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
 
+	googlepkg "github.com/ki-werke/fluxbot/pkg/google"
 	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
@@ -309,18 +311,11 @@ func (s *Server) handleGoogleAuthURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	redirectURI := "http://localhost:" + fmt.Sprintf("%d", s.port) + "/api/google/oauth-callback"
-	scopes := strings.Join([]string{
-		"https://www.googleapis.com/auth/calendar",
-		"https://www.googleapis.com/auth/documents",
-		"https://www.googleapis.com/auth/spreadsheets",
-		"https://www.googleapis.com/auth/drive",
-		"https://www.googleapis.com/auth/gmail.send",
-		"https://www.googleapis.com/auth/gmail.readonly",
-	}, " ")
+	scopes := strings.Join(googlepkg.AllScopes, " ")
 	params := "client_id=" + clientID +
-		"&redirect_uri=" + http.CanonicalHeaderKey(redirectURI) +
+		"&redirect_uri=" + redirectURI +
 		"&response_type=code" +
-		"&scope=" + strings.ReplaceAll(scopes, " ", "%20") +
+		"&scope=" + url.QueryEscape(scopes) +
 		"&access_type=offline&prompt=consent"
 	writeJSON(w, map[string]string{"url": "https://accounts.google.com/o/oauth2/v2/auth?" + params})
 }

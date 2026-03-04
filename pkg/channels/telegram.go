@@ -272,3 +272,17 @@ func (t *TelegramChannel) SendPhoto(chatID string, imageURL string, caption stri
 	_, err := t.bot.Send(photo)
 	return err
 }
+
+// SendVoice schickt eine Sprachnachricht (OGG/Opus-Bytes) an einen Telegram-Chat.
+// Implementiert das VoiceChannel Interface.
+// audioData: rohe OGG/Opus-Bytes (direkt von OpenAI TTS API geliefert)
+func (t *TelegramChannel) SendVoice(chatID string, audioData []byte) error {
+	id := int64(0)
+	fmt.Sscanf(chatID, "%d", &id)
+	voice := tgbotapi.NewVoice(id, tgbotapi.FileBytes{
+		Name:  "voice.ogg",
+		Bytes: audioData,
+	})
+	_, err := t.bot.Send(voice)
+	return err
+}

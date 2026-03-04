@@ -32,6 +32,14 @@ func NewGuard(cfg GuardConfig) *Guard {
 	}
 }
 
+// GetAuditLogger gibt Zugriff auf den AuditLogger (Session 31: für Agent-Integration)
+func (g *Guard) GetAuditLogger() *AuditLogger {
+	if g == nil {
+		return nil
+	}
+	return g.audit
+}
+
 // CheckResult enthält das Ergebnis der Sicherheitsprüfung
 type CheckResult struct {
 	Allowed   bool

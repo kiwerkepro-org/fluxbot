@@ -147,11 +147,28 @@ type WorkspaceConfig struct {
 
 // VoiceConfig konfiguriert die Sprachverarbeitung (optional)
 type VoiceConfig struct {
+	// ── STT (Speech-to-Text / Transkription) ──────────────────────────────────
 	Enabled   bool   `json:"enabled"`
 	Provider  string `json:"provider"` // groq, openai, ollama
 	APIKey    string `json:"apiKey"`
 	Language  string `json:"language"`  // ISO-639-1 Code, z.B. "de" – leer = auto
 	OllamaURL string `json:"ollamaUrl"` // Ollama API URL, z.B. http://ollama:11434
+
+	// ── TTS (Text-to-Speech / Sprachausgabe) ─────────────────────────────────
+	TTSEnabled  bool   `json:"ttsEnabled"`            // false = nur STT (Default)
+	TTSProvider string `json:"ttsProvider,omitempty"` // "openai", "google", "azure"
+	TTSAPIKey   string `json:"ttsApiKey,omitempty"`   // leer = verwendet apiKey (STT-Key)
+	// TTSVoice: Provider-spezifischer Stimmen-Name
+	//   OpenAI:  "alloy","nova","echo","fable","onyx","shimmer"
+	//   Google:  "de-DE-Neural2-C","de-DE-Neural2-F","de-DE-Wavenet-C","de-DE-Standard-C"
+	//   Azure:   "de-AT-IngridNeural","de-AT-JonasNeural","de-DE-KatjaNeural","de-DE-ConradNeural"
+	TTSVoice       string `json:"ttsVoice,omitempty"`
+	TTSAzureRegion string `json:"ttsAzureRegion,omitempty"` // Azure: Region z.B. "westeurope" (nur für Provider "azure")
+	// TTSMode steuert wann TTS ausgelöst wird:
+	// "voice"   = nur wenn User eine Sprachnachricht schickt (Default)
+	// "always"  = immer (alle Antworten als Voice)
+	// "keyword" = nur bei Präfix "sprich:" oder "/voice"
+	TTSMode string `json:"ttsMode,omitempty"`
 }
 
 // ImageGenConfig konfiguriert die Bild-Generierung.
@@ -283,6 +300,18 @@ func Load(path string) (*Config, error) {
 	if cfg.Voice.OllamaURL == "" {
 		cfg.Voice.OllamaURL = "http://ollama:11434"
 	}
+
+	// TTS Defaults
+	if cfg.Voice.TTSProvider == "" {
+		cfg.Voice.TTSProvider = "openai"
+	}
+	if cfg.Voice.TTSMode == "" {
+		cfg.Voice.TTSMode = "voice" // nur bei eingehenden Sprachnachrichten antworten
+	}
+	if cfg.Voice.TTSAzureRegion == "" {
+		cfg.Voice.TTSAzureRegion = "westeurope"
+	}
+	// TTSVoice Default ist provider-abhängig und wird in main.go gesetzt
 
 	// ── ImageGen Defaults ───────────────────────────────────────────────────
 	if cfg.ImageGen.Size == "" {
