@@ -966,11 +966,11 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 	}
 	// Gmail – E-Mail senden
 	if strings.Contains(response, "__GMAIL_SEND__") && strings.Contains(response, "__GMAIL_SEND_END__") {
-		return a.handleGmailSend(response)
+		return a.handleGmailSend(session, response)
 	}
 	// Gmail – E-Mails auflisten
 	if strings.Contains(response, "__GMAIL_LIST__") && strings.Contains(response, "__GMAIL_LIST_END__") {
-		return a.handleGmailList(response)
+		return a.handleGmailList(session, response)
 	}
 
 	// ── Cron-Reminder Marker ──────────────────────────────────────────────────
@@ -1445,7 +1445,9 @@ func parseGoogleMarker(response, startMarker, endMarker string) ([]byte, error) 
 
 // handleGoogleCalCreate erstellt einen Google Calendar-Termin.
 // Marker-Format: __GOOGLE_CAL_CREATE__\n{"title":"...","start":"...","end":"...","description":"...","location":"...","calendarId":"primary"}\n__GOOGLE_CAL_CREATE_END__
+// SESSION 33: Audit-Logging hinzugefügt
 func (a *Agent) handleGoogleCalCreate(session *Session, response string) string {
+	startTime := time.Now()
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1459,9 +1461,11 @@ func (a *Agent) handleGoogleCalCreate(session *Session, response string) string 
 	}
 	result, err := a.googleClient.CalendarCreate(ev)
 	if err != nil {
+		a.logGoogleAudit(session, "Termin erstellen", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Google Calendar: %v", err))
 		log.Printf("[Agent] ❌ Google Calendar Fehler: %v", err)
 		return fmt.Sprintf("❌ Google Calendar Fehler: %v", err)
 	}
+	a.logGoogleAudit(session, "Termin erstellen", int(time.Since(startTime).Milliseconds()), "", "")
 	log.Printf("[Agent] 📅 Google Calendar Termin erstellt: %s", result.Title)
 	return fmt.Sprintf("✅ Termin *%s* wurde in Google Calendar eingetragen!\n🔗 %s", result.Title, result.HtmlURL)
 }
@@ -1624,7 +1628,9 @@ func (a *Agent) handleGoogleCalList(session *Session, response string) string {
 
 // handleGoogleDocsCreate erstellt ein neues Google Docs-Dokument.
 // Marker-Format: __GOOGLE_DOCS_CREATE__\n{"title":"...","content":"..."}\n__GOOGLE_DOCS_CREATE_END__
+// SESSION 33: Audit-Logging hinzugefügt
 func (a *Agent) handleGoogleDocsCreate(session *Session, response string) string {
+	startTime := time.Now()
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1641,16 +1647,20 @@ func (a *Agent) handleGoogleDocsCreate(session *Session, response string) string
 	}
 	result, err := a.googleClient.DocsCreate(payload.Title, payload.Content)
 	if err != nil {
+		a.logGoogleAudit(session, "Dokument erstellen", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Google Docs: %v", err))
 		log.Printf("[Agent] ❌ Google Docs Fehler: %v", err)
 		return fmt.Sprintf("❌ Google Docs Fehler: %v", err)
 	}
+	a.logGoogleAudit(session, "Dokument erstellen", int(time.Since(startTime).Milliseconds()), "", "")
 	log.Printf("[Agent] 📄 Google Docs Dokument erstellt: %s (%s)", result.Title, result.DocID)
 	return fmt.Sprintf("✅ Dokument *%s* wurde in Google Docs erstellt!\n🔗 %s", result.Title, result.URL)
 }
 
 // handleGoogleDocsAppend fügt Text an ein bestehendes Google Docs-Dokument an.
 // Marker-Format: __GOOGLE_DOCS_APPEND__\n{"docId":"...","content":"..."}\n__GOOGLE_DOCS_APPEND_END__
+// SESSION 33: Audit-Logging hinzugefügt
 func (a *Agent) handleGoogleDocsAppend(session *Session, response string) string {
+	startTime := time.Now()
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1666,16 +1676,20 @@ func (a *Agent) handleGoogleDocsAppend(session *Session, response string) string
 		return fmt.Sprintf("❌ Google Docs: JSON-Fehler: %v", err)
 	}
 	if err := a.googleClient.DocsAppend(payload.DocID, payload.Content); err != nil {
+		a.logGoogleAudit(session, "Dokument bearbeiten", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Google Docs Append: %v", err))
 		log.Printf("[Agent] ❌ Google Docs Append Fehler: %v", err)
 		return fmt.Sprintf("❌ Google Docs Fehler: %v", err)
 	}
+	a.logGoogleAudit(session, "Dokument bearbeiten", int(time.Since(startTime).Milliseconds()), "", "")
 	log.Printf("[Agent] 📄 Google Docs Text angehängt an: %s", payload.DocID)
 	return fmt.Sprintf("✅ Text wurde an das Google Docs-Dokument angehängt.\n🔗 https://docs.google.com/document/d/%s/edit", payload.DocID)
 }
 
 // handleGoogleDocsRead liest den Inhalt eines Google Docs-Dokuments.
 // Marker-Format: __GOOGLE_DOCS_READ__\n{"docId":"..."}\n__GOOGLE_DOCS_READ_END__
+// SESSION 33: Audit-Logging hinzugefügt
 func (a *Agent) handleGoogleDocsRead(session *Session, response string) string {
+	startTime := time.Now()
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1691,9 +1705,11 @@ func (a *Agent) handleGoogleDocsRead(session *Session, response string) string {
 	}
 	title, content, err := a.googleClient.DocsRead(payload.DocID)
 	if err != nil {
+		a.logGoogleAudit(session, "Dokument lesen", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Google Docs Read: %v", err))
 		log.Printf("[Agent] ❌ Google Docs Read Fehler: %v", err)
 		return fmt.Sprintf("❌ Google Docs Fehler: %v", err)
 	}
+	a.logGoogleAudit(session, "Dokument lesen", int(time.Since(startTime).Milliseconds()), "", "")
 	// Inhalt auf sinnvolle Länge kürzen
 	if len(content) > 2000 {
 		content = content[:2000] + "\n\n[... Dokument zu lang, nur Anfang angezeigt]"
@@ -1703,7 +1719,9 @@ func (a *Agent) handleGoogleDocsRead(session *Session, response string) string {
 
 // handleGoogleSheetsCreate erstellt eine neue Google Sheets-Tabelle.
 // Marker-Format: __GOOGLE_SHEETS_CREATE__\n{"title":"..."}\n__GOOGLE_SHEETS_CREATE_END__
+// SESSION 33: Audit-Logging hinzugefügt
 func (a *Agent) handleGoogleSheetsCreate(session *Session, response string) string {
+	startTime := time.Now()
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1719,16 +1737,20 @@ func (a *Agent) handleGoogleSheetsCreate(session *Session, response string) stri
 	}
 	result, err := a.googleClient.SheetsCreate(payload.Title)
 	if err != nil {
+		a.logGoogleAudit(session, "Tabelle erstellen", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Google Sheets: %v", err))
 		log.Printf("[Agent] ❌ Google Sheets Fehler: %v", err)
 		return fmt.Sprintf("❌ Google Sheets Fehler: %v", err)
 	}
+	a.logGoogleAudit(session, "Tabelle erstellen", int(time.Since(startTime).Milliseconds()), "", "")
 	log.Printf("[Agent] 📊 Google Sheets erstellt: %s (%s)", result.Title, result.SheetID)
 	return fmt.Sprintf("✅ Tabelle *%s* wurde in Google Sheets erstellt!\n🔗 %s", result.Title, result.URL)
 }
 
 // handleGoogleSheetsRead liest Werte aus einer Google Sheets-Tabelle.
 // Marker-Format: __GOOGLE_SHEETS_READ__\n{"sheetId":"...","range":"A1:Z100"}\n__GOOGLE_SHEETS_READ_END__
+// SESSION 33: Audit-Logging hinzugefügt
 func (a *Agent) handleGoogleSheetsRead(session *Session, response string) string {
+	startTime := time.Now()
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1745,9 +1767,11 @@ func (a *Agent) handleGoogleSheetsRead(session *Session, response string) string
 	}
 	rows, err := a.googleClient.SheetsRead(payload.SheetID, payload.Range)
 	if err != nil {
+		a.logGoogleAudit(session, "Tabelle lesen", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Google Sheets Read: %v", err))
 		log.Printf("[Agent] ❌ Google Sheets Read Fehler: %v", err)
 		return fmt.Sprintf("❌ Google Sheets Fehler: %v", err)
 	}
+	a.logGoogleAudit(session, "Tabelle lesen", int(time.Since(startTime).Milliseconds()), "", "")
 	if len(rows) == 0 {
 		return "📊 Die Tabelle ist leer (oder der angegebene Bereich enthält keine Daten)."
 	}
@@ -1770,7 +1794,9 @@ func (a *Agent) handleGoogleSheetsRead(session *Session, response string) string
 
 // handleGoogleSheetsWrite schreibt Werte in eine Google Sheets-Tabelle.
 // Marker-Format: __GOOGLE_SHEETS_WRITE__\n{"sheetId":"...","range":"A1","values":[["Name","Wert"],["Test","123"]]}\n__GOOGLE_SHEETS_WRITE_END__
+// SESSION 33: Audit-Logging hinzugefügt
 func (a *Agent) handleGoogleSheetsWrite(session *Session, response string) string {
+	startTime := time.Now()
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1794,9 +1820,11 @@ func (a *Agent) handleGoogleSheetsWrite(session *Session, response string) strin
 		writeErr = a.googleClient.SheetsWrite(payload.SheetID, payload.Range, payload.Values)
 	}
 	if writeErr != nil {
+		a.logGoogleAudit(session, "Tabelle schreiben", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Google Sheets Write: %v", writeErr))
 		log.Printf("[Agent] ❌ Google Sheets Write Fehler: %v", writeErr)
 		return fmt.Sprintf("❌ Google Sheets Fehler: %v", writeErr)
 	}
+	a.logGoogleAudit(session, "Tabelle schreiben", int(time.Since(startTime).Milliseconds()), "", "")
 	action := "geschrieben"
 	if payload.Append {
 		action = "angehängt"
@@ -1807,7 +1835,9 @@ func (a *Agent) handleGoogleSheetsWrite(session *Session, response string) strin
 
 // handleGoogleDriveList listet Dateien in Google Drive auf.
 // Marker-Format: __GOOGLE_DRIVE_LIST__\n{"query":"name contains 'Report'","maxResults":10}\n__GOOGLE_DRIVE_LIST_END__
+// SESSION 33: Audit-Logging hinzugefügt
 func (a *Agent) handleGoogleDriveList(session *Session, response string) string {
+	startTime := time.Now()
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1824,9 +1854,11 @@ func (a *Agent) handleGoogleDriveList(session *Session, response string) string 
 	}
 	files, err := a.googleClient.DriveList(payload.Query, payload.MaxResults)
 	if err != nil {
+		a.logGoogleAudit(session, "Drive-Suche", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Google Drive: %v", err))
 		log.Printf("[Agent] ❌ Google Drive Fehler: %v", err)
 		return fmt.Sprintf("❌ Google Drive Fehler: %v", err)
 	}
+	a.logGoogleAudit(session, "Drive-Suche", int(time.Since(startTime).Milliseconds()), "", "")
 	if len(files) == 0 {
 		return "📁 Keine Dateien in Google Drive gefunden."
 	}
@@ -1840,7 +1872,9 @@ func (a *Agent) handleGoogleDriveList(session *Session, response string) string 
 
 // handleGmailSend sendet eine E-Mail über Gmail.
 // Marker-Format: __GMAIL_SEND__\n{"to":"...","subject":"...","body":"..."}\n__GMAIL_SEND_END__
-func (a *Agent) handleGmailSend(response string) string {
+// SESSION 33: session-Parameter + Audit-Logging hinzugefügt
+func (a *Agent) handleGmailSend(session *Session, response string) string {
+	startTime := time.Now()
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1853,15 +1887,19 @@ func (a *Agent) handleGmailSend(response string) string {
 		return fmt.Sprintf("❌ Gmail: JSON-Fehler: %v", err)
 	}
 	if err := a.googleClient.GmailSend(msg); err != nil {
+		a.logGoogleAudit(session, "E-Mail senden", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Gmail Send: %v", err))
 		log.Printf("[Agent] ❌ Gmail Send Fehler: %v", err)
 		return fmt.Sprintf("❌ Gmail Fehler: %v", err)
 	}
+	a.logGoogleAudit(session, "E-Mail senden", int(time.Since(startTime).Milliseconds()), "", "")
 	return fmt.Sprintf("✅ E-Mail an *%s* wurde über Gmail gesendet!\n📧 Betreff: %s", msg.To, msg.Subject)
 }
 
 // handleGmailList listet E-Mails aus Gmail auf.
 // Marker-Format: __GMAIL_LIST__\n{"query":"is:unread","maxResults":10}\n__GMAIL_LIST_END__
-func (a *Agent) handleGmailList(response string) string {
+// SESSION 33: session-Parameter + Audit-Logging hinzugefügt
+func (a *Agent) handleGmailList(session *Session, response string) string {
+	startTime := time.Now()
 	if a.googleClient == nil || !a.googleClient.IsConfigured() {
 		return a.googleNotConfigured()
 	}
@@ -1878,9 +1916,11 @@ func (a *Agent) handleGmailList(response string) string {
 	}
 	messages, err := a.googleClient.GmailList(payload.Query, payload.MaxResults)
 	if err != nil {
+		a.logGoogleAudit(session, "E-Mails auflisten", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("Gmail List: %v", err))
 		log.Printf("[Agent] ❌ Gmail List Fehler: %v", err)
 		return fmt.Sprintf("❌ Gmail Fehler: %v", err)
 	}
+	a.logGoogleAudit(session, "E-Mails auflisten", int(time.Since(startTime).Milliseconds()), "", "")
 	if len(messages) == 0 {
 		return "📧 Keine E-Mails gefunden."
 	}
