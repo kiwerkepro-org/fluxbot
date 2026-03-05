@@ -58,39 +58,47 @@ jobs:
           CURRENT_TAG: ${{ steps.version.outputs.VERSION }}
           LAST_TAG: ${{ steps.last_tag.outputs.tag }}
         run: |
-          {
-            if [ -z "$LAST_TAG" ]; then
-              echo "### 📝 Changelog"
-              echo ""
-              echo "🎉 **Erstes Release - alle Features!**"
-            else
-              echo "### 📝 Changelog"
-              echo ""
-              echo "Commits seit **$LAST_TAG**:"
-              echo ""
+          # Delimiter für Multiline Output
+          EOF=$(openssl rand -hex 8)
 
-              # Features gruppieren
-              FEATURES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --grep="^feat" 2>/dev/null || true)
-              if [ -n "$FEATURES" ]; then
-                echo "**✨ Features:**"
-                echo "$FEATURES"
-                echo ""
-              fi
+          # Changelog erzeugen und in GITHUB_OUTPUT schreiben
+          echo "changelog<<$EOF" >> $GITHUB_OUTPUT
 
-              # Bugfixes gruppieren
-              BUGFIXES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --grep="^fix" 2>/dev/null || true)
-              if [ -n "$BUGFIXES" ]; then
-                echo "**🐛 Bugfixes:**"
-                echo "$BUGFIXES"
-                echo ""
-              fi
+          if [ -z "$LAST_TAG" ]; then
+            echo "### 📝 Changelog" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "🎉 **Erstes Release - alle Features!**" >> $GITHUB_OUTPUT
+          else
+            echo "### 📝 Changelog" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
+            echo "Commits seit **$LAST_TAG**:" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
 
-              # Andere Commits
-              echo "**📋 Weitere Änderungen:**"
-              git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --invert-grep --grep="^feat\|^fix" 2>/dev/null | head -20 || echo "- Siehe Commit-Historie"
+            # Features gruppieren
+            FEATURES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --grep="^feat" 2>/dev/null || true)
+            if [ -n "$FEATURES" ]; then
+              echo "**✨ Features:**" >> $GITHUB_OUTPUT
+              echo "$FEATURES" >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
             fi
-          } > changelog.txt
-          cat changelog.txt
+
+            # Bugfixes gruppieren
+            BUGFIXES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --grep="^fix" 2>/dev/null || true)
+            if [ -n "$BUGFIXES" ]; then
+              echo "**🐛 Bugfixes:**" >> $GITHUB_OUTPUT
+              echo "$BUGFIXES" >> $GITHUB_OUTPUT
+              echo "" >> $GITHUB_OUTPUT
+            fi
+
+            # Andere Commits
+            echo "**📋 Weitere Änderungen:**" >> $GITHUB_OUTPUT
+            git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --invert-grep --grep="^feat\|^fix" 2>/dev/null | head -20 >> $GITHUB_OUTPUT || echo "- Siehe Commit-Historie" >> $GITHUB_OUTPUT
+          fi
+
+          echo "$EOF" >> $GITHUB_OUTPUT
+
+          # Debug: Ausgabe anzeigen
+          echo "=== Generated Changelog ===" && tail -50 $GITHUB_OUTPUT
 
       # ── Binaries cross-kompilieren ─────────────────────────────────────────
       - name: Binaries bauen
