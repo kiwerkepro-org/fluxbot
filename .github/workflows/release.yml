@@ -48,9 +48,10 @@ jobs:
       - name: Letzten Tag auslesen
         id: last_tag
         run: |
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          # Sortiere Tags nach Version (absteigend) und nimm den VORHERIGEN Tag (nicht den aktuellen)
+          LAST_TAG=$(git tag -l --sort=-version:refname | grep -v "^${GITHUB_REF_NAME}$" | head -1)
           echo "tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
-          echo "Letzter Tag: $LAST_TAG"
+          echo "Aktueller Tag: ${GITHUB_REF_NAME}, Letzter Tag: $LAST_TAG"
 
       - name: Changelog generieren
         id: changelog
