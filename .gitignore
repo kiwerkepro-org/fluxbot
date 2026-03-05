@@ -75,11 +75,16 @@ Thumbs.db
 auth_token.txt
 credentials.json
 /logs/
-# Lokale Session-Notizen
+# Lokale Session-Notizen & Projektgedächtnis (Claude)
 INBOX.md
+CLAUDE.md
 
 # Agent-Gedächtnis
 memory-md/
+
+# Temporäre Dashboard-Backups & -Kopien
+*-Kopie.html
+#*.html
 
 # Fehlerbilder & Debug-Materialien (auto-cleanup, nicht committen)
 Z-FEHLERBILDER/
