@@ -8,7 +8,7 @@
 #  Was dieser Workflow tut:
 #    1. Baut Binaries für Windows, Linux und macOS (amd64 + arm64)
 #    2. Baut das Docker-Image und pusht es auf ghcr.io
-#    3. Erstellt einen GitHub Release mit allen Binaries als Download-Assets
+#    3. Erstellt einen GitHub Release mit Changelog + Downloads
 # ─────────────────────────────────────────────────────────────────────────────
 
 name: Release
@@ -31,6 +31,8 @@ jobs:
     steps:
       - name: Code auschecken
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Vollständige Git-History für Changelog
 
       - name: Go einrichten
         uses: actions/setup-go@v5
@@ -41,6 +43,54 @@ jobs:
       - name: Version aus Tag auslesen
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+
+      # ── Changelog generieren ─────────────────────────────────────────────────
+      - name: Letzten Tag auslesen
+        id: last_tag
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          echo "tag=$LAST_TAG" >> "$GITHUB_OUTPUT"
+          echo "Letzter Tag: $LAST_TAG"
+
+      - name: Changelog generieren
+        id: changelog
+        env:
+          CURRENT_TAG: ${{ steps.version.outputs.VERSION }}
+          LAST_TAG: ${{ steps.last_tag.outputs.tag }}
+        run: |
+          {
+            if [ -z "$LAST_TAG" ]; then
+              echo "### 📝 Changelog"
+              echo ""
+              echo "🎉 **Erstes Release - alle Features!**"
+            else
+              echo "### 📝 Changelog"
+              echo ""
+              echo "Commits seit **$LAST_TAG**:"
+              echo ""
+
+              # Features gruppieren
+              FEATURES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --grep="^feat" 2>/dev/null || true)
+              if [ -n "$FEATURES" ]; then
+                echo "**✨ Features:**"
+                echo "$FEATURES"
+                echo ""
+              fi
+
+              # Bugfixes gruppieren
+              BUGFIXES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --grep="^fix" 2>/dev/null || true)
+              if [ -n "$BUGFIXES" ]; then
+                echo "**🐛 Bugfixes:**"
+                echo "$BUGFIXES"
+                echo ""
+              fi
+
+              # Andere Commits
+              echo "**📋 Weitere Änderungen:**"
+              git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --invert-grep --grep="^feat\|^fix" 2>/dev/null | head -20 || echo "- Siehe Commit-Historie"
+            fi
+          } > changelog.txt
+          cat changelog.txt
 
       # ── Binaries cross-kompilieren ─────────────────────────────────────────
       - name: Binaries bauen
@@ -90,13 +140,15 @@ jobs:
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
-      # ── GitHub Release erstellen ───────────────────────────────────────────
+      # ── GitHub Release erstellen mit Changelog ─────────────────────────────
       - name: GitHub Release erstellen
         uses: softprops/action-gh-release@v2
         with:
           name: "FluxBot ${{ steps.version.outputs.VERSION }}"
           body: |
-            ## FluxBot ${{ steps.version.outputs.VERSION }}
+            ${{ steps.changelog.outputs.changelog }}
+
+            ---
 
             ### 🚀 Installation
 
