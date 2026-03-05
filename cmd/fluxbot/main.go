@@ -21,6 +21,7 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/email"
 	googleapi "github.com/ki-werke/fluxbot/pkg/google"
 	"github.com/ki-werke/fluxbot/pkg/imagegen"
+	"github.com/ki-werke/fluxbot/pkg/pairing"
 	"github.com/ki-werke/fluxbot/pkg/provider"
 	"github.com/ki-werke/fluxbot/pkg/security"
 	"github.com/ki-werke/fluxbot/pkg/setup"
@@ -30,7 +31,7 @@ import (
 
 // version wird per -ldflags="-X main.version=vX.Y.Z" beim Build gesetzt.
 // Lokal / ohne ldflags bleibt der Wert "dev".
-var version = "v1.1.8"
+var version = "v1.1.9"
 
 func main() {
 	configPath := flag.String("config", "./workspace/config.json", "Pfad zur Konfigurationsdatei")
@@ -261,12 +262,25 @@ func runBot(ctx context.Context, configPath string) {
 	log.Println("[Main] Security Guard: aktiv")
 	go guard.CleanOldLogs(90)
 
+	// ── Pairing-Store initialisieren (P9: DM-Pairing Mode) ───────────────────
+	pairingStorePath := filepath.Join(cfg.Workspace.Path, "pairing.json")
+	pairingStore := pairing.New(pairingStorePath)
+	if cfg.Pairing.Enabled {
+		stats := pairingStore.Stats()
+		log.Printf("[Main] DM-Pairing Mode: aktiv (%d gepairt, %d pending, %d blockiert)",
+			stats["approved"], stats["pending"], stats["blocked"])
+	} else {
+		log.Println("[Main] DM-Pairing Mode: deaktiviert")
+	}
+
 	manager := channels.NewManager(100)
 	if cfg.Channels.Telegram.Enabled {
 		manager.Register(channels.NewTelegramChannel(channels.TelegramConfig{
-			Token:     cfg.Channels.Telegram.Token,
-			AllowFrom: cfg.Channels.Telegram.AllowFrom,
-		}))
+			Token:          cfg.Channels.Telegram.Token,
+			AllowFrom:      cfg.Channels.Telegram.AllowFrom,
+			PairingEnabled: cfg.Pairing.Enabled,
+			PairingMessage: cfg.Pairing.Message,
+		}, pairingStore))
 	}
 	if cfg.Channels.Discord.Enabled {
 		manager.Register(channels.NewDiscordChannel(channels.DiscordConfig{
@@ -406,6 +420,11 @@ func runBot(ctx context.Context, configPath string) {
 			log.Printf("[Main] ✅ Config + Secrets + Skills neu geladen.")
 		}
 
+		// sendToChannel-Callback für Dashboard (z.B. Pairing-Bestätigung an User senden)
+		sendToChannel := func(channel, chatID, text string) error {
+			return manager.SendTo(channel, chatID, text)
+		}
+
 		dash = dashboard.New(
 			configPath,
 			cfg.Workspace.Path,
@@ -419,6 +438,8 @@ func runBot(ctx context.Context, configPath string) {
 			dashHMACSecret,
 			skillsLoader,
 			version,
+			pairingStore,
+			sendToChannel,
 		)
 		go dash.Start(ctx)
 	}

@@ -17,9 +17,18 @@ type Config struct {
 	ImageGen     ImageGenConfig  `json:"imageGen"`
 	VideoGen     VideoGenConfig  `json:"videoGen"`
 	Dashboard    DashboardConfig `json:"dashboard"`
+	Pairing      PairingConfig   `json:"pairing"`                // DM-Pairing Mode (P9)
 	Integrations []Integration   `json:"integrations,omitempty"` // externe API-Keys für Skills
 	SkillSecret  string          `json:"skillSecret,omitempty"`  // HMAC-Key für Skill-Signierung
 	Security     SecurityConfig  `json:"security"`               // vt-go Implementierung
+}
+
+// PairingConfig konfiguriert den DM-Pairing Mode (P9).
+// Wenn Enabled=true, müssen unbekannte DM-Sender erst gepairt werden.
+// AllowFrom (pro Channel) hat Vorrang – dort eingetragene IDs sind IMMER erlaubt.
+type PairingConfig struct {
+	Enabled bool   `json:"enabled"` // true = Pairing aktiv (unbekannte DMs werden blockiert)
+	Message string `json:"message"` // Custom-Nachricht für ungepaarte User (leer = Default)
 }
 
 // Integration speichert einen benannten API-Key für externe Dienste.
