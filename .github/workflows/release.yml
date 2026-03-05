@@ -74,25 +74,25 @@ jobs:
             echo "Commits seit **$LAST_TAG**:" >> $GITHUB_OUTPUT
             echo "" >> $GITHUB_OUTPUT
 
-            # Features gruppieren
-            FEATURES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --grep="^feat" 2>/dev/null || true)
+            # Features gruppieren (Shell-Filter statt Git-Grep)
+            FEATURES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" 2>/dev/null | grep "^- feat:" || true)
             if [ -n "$FEATURES" ]; then
               echo "**✨ Features:**" >> $GITHUB_OUTPUT
               echo "$FEATURES" >> $GITHUB_OUTPUT
               echo "" >> $GITHUB_OUTPUT
             fi
 
-            # Bugfixes gruppieren
-            BUGFIXES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --grep="^fix" 2>/dev/null || true)
+            # Bugfixes gruppieren (Shell-Filter statt Git-Grep)
+            BUGFIXES=$(git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" 2>/dev/null | grep "^- fix:" || true)
             if [ -n "$BUGFIXES" ]; then
               echo "**🐛 Bugfixes:**" >> $GITHUB_OUTPUT
               echo "$BUGFIXES" >> $GITHUB_OUTPUT
               echo "" >> $GITHUB_OUTPUT
             fi
 
-            # Andere Commits
+            # Andere Commits (alles außer feat: und fix:)
             echo "**📋 Weitere Änderungen:**" >> $GITHUB_OUTPUT
-            git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" --invert-grep --grep="^feat\|^fix" 2>/dev/null | head -20 >> $GITHUB_OUTPUT || echo "- Siehe Commit-Historie" >> $GITHUB_OUTPUT
+            git log "${LAST_TAG}..HEAD" --pretty=format:"- %s (%an)" 2>/dev/null | grep -v "^- feat:\|^- fix:" | head -20 >> $GITHUB_OUTPUT || echo "- Siehe Commit-Historie" >> $GITHUB_OUTPUT
           fi
 
           echo "$EOF" >> $GITHUB_OUTPUT
