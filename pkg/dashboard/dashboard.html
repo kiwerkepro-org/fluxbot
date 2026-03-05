@@ -342,7 +342,7 @@
     <span class="nav-icon"><i data-lucide="help-circle"></i></span> Hilfe
   </div>
   <div class="sidebar-footer">
-    <div style="margin-bottom:8px">KI-WERKE · FluxBot v1.1.1</div>
+    <div style="margin-bottom:8px">KI-WERKE · FluxBot <span id="footer-version">…</span></div>
     <button onclick="doLogout()" style="width:100%;padding:6px 10px;background:rgba(226,93,93,0.1);border:1px solid rgba(226,93,93,0.25);border-radius:6px;color:var(--red);font-size:12px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.background='rgba(226,93,93,0.2)'" onmouseout="this.style.background='rgba(226,93,93,0.1)'">⎋ Abmelden</button>
   </div>
 </div>
@@ -2109,6 +2109,9 @@ async function loadStatus() {
 
   document.getElementById('status-text').textContent = data.status === 'running' ? '✅ Online' : '❌ Offline';
   document.getElementById('status-uptime').textContent = data.uptime || '–';
+  // Versionsnummer im Sidebar-Footer aktualisieren
+  const footerVer = document.getElementById('footer-version');
+  if (footerVer && data.version) footerVer.textContent = data.version;
   const channels = data.channels || [];
   document.getElementById('status-channel-count').textContent = channels.length;
   const list = document.getElementById('status-channels');

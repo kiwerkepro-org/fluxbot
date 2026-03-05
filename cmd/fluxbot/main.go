@@ -28,7 +28,9 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/voice"
 )
 
-var version = "v1.1.5"
+// version wird per -ldflags="-X main.version=vX.Y.Z" beim Build gesetzt.
+// Lokal / ohne ldflags bleibt der Wert "dev".
+var version = "dev"
 
 func main() {
 	configPath := flag.String("config", "./workspace/config.json", "Pfad zur Konfigurationsdatei")
@@ -416,6 +418,7 @@ func runBot(ctx context.Context, configPath string) {
 			onReload,
 			dashHMACSecret,
 			skillsLoader,
+			version,
 		)
 		go dash.Start(ctx)
 	}

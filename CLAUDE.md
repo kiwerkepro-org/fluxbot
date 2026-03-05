@@ -176,7 +176,7 @@ with open(path + '.sig', 'w') as f: f.write(sig)
 
 ## Aktueller Stand
 
-- **Letzte Session:** 33 (2026-03-04)
-- **Nächste Session:** 34
-- **Letzter Release:** `v1.1.7` ✅ (Session 33)
+- **Letzte Session:** 34 (2026-03-05)
+- **Nächste Session:** 35
+- **Letzter Release:** `v1.1.7` ✅ (Session 33) → nächster: `v1.1.8`
 - **Details:** `memory-md/03-session-log.md`

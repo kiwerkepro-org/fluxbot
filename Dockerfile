@@ -13,8 +13,13 @@ RUN go mod download
 # Quellcode kopieren
 COPY . .
 
-# Kompiliere den Bot
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -o fluxbot ./cmd/fluxbot
+# Version als Build-Argument (wird vom Release-Workflow übergeben)
+ARG VERSION=dev
+
+# Kompiliere den Bot (Version wird per ldflags eingebettet)
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod \
+    -ldflags="-s -w -X main.version=${VERSION}" \
+    -o fluxbot ./cmd/fluxbot
 
 # --- STAGE 2: FINAL IMAGE ---
 FROM alpine:latest
