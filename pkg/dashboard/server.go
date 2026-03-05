@@ -38,6 +38,7 @@ type Server struct {
 	hmacSecretMu  sync.RWMutex    // schützt Hot-Reload des HMAC-Secrets
 	port          int
 	startTime     time.Time
+	version       string                  // Build-Version (per -ldflags "-X main.version=vX.Y.Z" gesetzt)
 	getChannels   func() []string         // Callback: liefert aktive Kanäle zur Laufzeit
 	logPath       string                  // Pfad zur Terminal-Log-Datei (fluxbot.log)
 	vault         security.SecretProvider  // Secret-Speicher (Keyring / Vault / Chained)
@@ -51,9 +52,13 @@ type Server struct {
 // onReload: wird nach jeder Config- oder Secret-Änderung aufgerufen.
 // hmacSecret: HMAC-Schlüssel für Dashboard-API-Request-Signierung (leer = deaktiviert).
 // skillsLoader: SkillsLoader für Skill-Verwaltung (optional, kann nil sein).
-func New(configPath, workspacePath, password, username string, port int, getChannels func() []string, logPath string, vault security.SecretProvider, onReload func(), hmacSecret string, skillsLoader *skills.Loader) *Server {
+// version: Build-Version ("dev" lokal, "vX.Y.Z" im Release via -ldflags).
+func New(configPath, workspacePath, password, username string, port int, getChannels func() []string, logPath string, vault security.SecretProvider, onReload func(), hmacSecret string, skillsLoader *skills.Loader, version string) *Server {
 	if username == "" {
 		username = "admin"
+	}
+	if version == "" {
+		version = "dev"
 	}
 	return &Server{
 		configPath:    configPath,
@@ -63,6 +68,7 @@ func New(configPath, workspacePath, password, username string, port int, getChan
 		hmacSecret:    hmacSecret,
 		port:          port,
 		startTime:     time.Now(),
+		version:       version,
 		getChannels:   getChannels,
 		logPath:       logPath,
 		vault:         vault,

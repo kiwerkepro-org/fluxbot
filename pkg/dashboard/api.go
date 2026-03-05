@@ -49,7 +49,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Status:   "running",
 		Uptime:   uptimeStr,
 		Channels: channels,
-		Version:  "1.1.1",
+		Version:  s.version,
 	})
 }
 
