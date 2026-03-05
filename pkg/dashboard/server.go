@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ki-werke/fluxbot/pkg/pairing"
 	"github.com/ki-werke/fluxbot/pkg/security"
 	"github.com/ki-werke/fluxbot/pkg/skills"
 )
@@ -44,6 +45,8 @@ type Server struct {
 	vault         security.SecretProvider  // Secret-Speicher (Keyring / Vault / Chained)
 	onReload      func()                  // Callback: wird nach Config-Änderung aufgerufen
 	skillsLoader  *skills.Loader          // SkillsLoader für Skill-Verwaltung
+	pairingStore  *pairing.Store          // Pairing-Store für DM-Pairing Mode (P9)
+	sendToChannel func(channel, chatID, text string) error // Callback: Nachricht an Channel senden
 }
 
 // New erstellt einen neuen Dashboard-Server.
@@ -53,7 +56,7 @@ type Server struct {
 // hmacSecret: HMAC-Schlüssel für Dashboard-API-Request-Signierung (leer = deaktiviert).
 // skillsLoader: SkillsLoader für Skill-Verwaltung (optional, kann nil sein).
 // version: Build-Version ("dev" lokal, "vX.Y.Z" im Release via -ldflags).
-func New(configPath, workspacePath, password, username string, port int, getChannels func() []string, logPath string, vault security.SecretProvider, onReload func(), hmacSecret string, skillsLoader *skills.Loader, version string) *Server {
+func New(configPath, workspacePath, password, username string, port int, getChannels func() []string, logPath string, vault security.SecretProvider, onReload func(), hmacSecret string, skillsLoader *skills.Loader, version string, pairingStore *pairing.Store, sendToChannel func(channel, chatID, text string) error) *Server {
 	if username == "" {
 		username = "admin"
 	}
@@ -74,6 +77,8 @@ func New(configPath, workspacePath, password, username string, port int, getChan
 		vault:         vault,
 		onReload:      onReload,
 		skillsLoader:  skillsLoader,
+		pairingStore:  pairingStore,
+		sendToChannel: sendToChannel,
 	}
 }
 
@@ -140,6 +145,10 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/vt/clear", s.auth(s.hmacVerify(s.handleVTClear)))
 	mux.HandleFunc("/api/skills/sign", s.auth(s.handleSkillsSign))         // Kein HMAC (nur Dashboard-Operation, keine kritischen Daten)
 	mux.HandleFunc("/api/skills/reload", s.auth(s.handleSkillsReload))   // Kein HMAC (nur Reload, kein State-Change)
+
+	// ── Pairing API (P9: DM-Pairing Mode) ─────────────────────────────────
+	mux.HandleFunc("/api/pairing", s.auth(s.hmacVerify(s.handlePairing)))       // GET: Liste, POST: Approve/Block/Remove (HMAC)
+	mux.HandleFunc("/api/pairing/stats", s.auth(s.handlePairingStats))          // GET: Statistiken
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),

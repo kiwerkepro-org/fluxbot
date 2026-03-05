@@ -13,6 +13,7 @@ import (
 	"time"
 
 	googlepkg "github.com/ki-werke/fluxbot/pkg/google"
+	pairingpkg "github.com/ki-werke/fluxbot/pkg/pairing"
 	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
@@ -485,6 +486,93 @@ func (s *Server) handleSkillsReload(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"message": "✅ Alle Skills erfolgreich neu geladen",
 	})
+}
+
+// ── Pairing API (P9: DM-Pairing Mode) ─────────────────────────────────────────
+
+// handlePairing verarbeitet GET (Liste) und POST (Approve/Block/Remove) Requests.
+func (s *Server) handlePairing(w http.ResponseWriter, r *http.Request) {
+	if s.pairingStore == nil {
+		httpError(w, "Pairing-Store nicht initialisiert", http.StatusServiceUnavailable)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		// Filter-Parameter: ?status=pending|approved|blocked (leer = alle)
+		statusFilter := r.URL.Query().Get("status")
+		var entries interface{}
+		switch statusFilter {
+		case "pending", "approved", "blocked":
+			entries = s.pairingStore.List(pairingpkg.PairStatus(statusFilter))
+		default:
+			entries = s.pairingStore.List("")
+		}
+		writeJSON(w, entries)
+
+	case http.MethodPost:
+		// Aktion: approve, block, remove, note
+		var req struct {
+			Action  string `json:"action"`  // "approve", "block", "remove", "note"
+			Channel string `json:"channel"` // "telegram", "discord", etc.
+			UserID  string `json:"userId"`  // User-ID
+			Note    string `json:"note"`    // Admin-Notiz (nur für "note")
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			httpError(w, "Ungültiger Request", http.StatusBadRequest)
+			return
+		}
+		if req.Channel == "" || req.UserID == "" {
+			httpError(w, "channel und userId erforderlich", http.StatusBadRequest)
+			return
+		}
+
+		var err error
+		var msg string
+		switch req.Action {
+		case "approve":
+			err = s.pairingStore.Approve(req.Channel, req.UserID)
+			msg = "✅ User gepairt"
+			// Benachrichtigung an den User senden
+			if err == nil && s.sendToChannel != nil {
+				entry := s.pairingStore.GetEntry(req.Channel, req.UserID)
+				if entry != nil && entry.ChatID != "" {
+					go s.sendToChannel(req.Channel, entry.ChatID,
+						"✅ Pairing bestätigt! Du kannst jetzt mit mir chatten.")
+				}
+			}
+		case "block":
+			err = s.pairingStore.Block(req.Channel, req.UserID)
+			msg = "🚫 User blockiert"
+		case "remove":
+			err = s.pairingStore.Remove(req.Channel, req.UserID)
+			msg = "🗑️ Eintrag entfernt"
+		case "note":
+			err = s.pairingStore.SetNote(req.Channel, req.UserID, req.Note)
+			msg = "📝 Notiz gespeichert"
+		default:
+			httpError(w, fmt.Sprintf("Unbekannte Aktion: %s", req.Action), http.StatusBadRequest)
+			return
+		}
+
+		if err != nil {
+			httpError(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		writeJSON(w, map[string]string{"message": msg})
+
+	default:
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handlePairingStats gibt Pairing-Statistiken zurück.
+func (s *Server) handlePairingStats(w http.ResponseWriter, r *http.Request) {
+	if s.pairingStore == nil {
+		httpError(w, "Pairing-Store nicht initialisiert", http.StatusServiceUnavailable)
+		return
+	}
+	writeJSON(w, s.pairingStore.Stats())
 }
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────

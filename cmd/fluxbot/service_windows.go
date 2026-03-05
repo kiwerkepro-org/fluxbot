@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
 
 	"golang.org/x/sys/windows/svc"
@@ -59,6 +60,19 @@ func (s *fluxSvc) Execute(args []string, r <-chan svc.ChangeRequest, changes cha
 
 // runAsWindowsService startet FluxBot als Windows-Dienst.
 func runAsWindowsService(ctx context.Context, cancel context.CancelFunc, configPath string) {
+	// ── Working Directory auf das Verzeichnis der EXE setzen ─────────────────
+	// Windows-Dienste starten mit CWD = C:\Windows\System32.
+	// Relative Pfade (z.B. "workspace": "./workspace") funktionieren dann nicht.
+	// Fix: CWD auf das Verzeichnis der EXE setzen, damit alle relativen Pfade stimmen.
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		if err := os.Chdir(exeDir); err != nil {
+			log.Printf("[Service] Warnung: Working Directory konnte nicht gesetzt werden: %v", err)
+		} else {
+			log.Printf("[Service] Working Directory: %s", exeDir)
+		}
+	}
+
 	elog, err := eventlog.Open(serviceName)
 	if err != nil {
 		// Fallback: kein Eventlog – trotzdem starten
@@ -163,5 +177,3 @@ func uninstallService() error {
 	return nil
 }
 
-// Sicherstellen dass os importiert wird (für zukünftige Nutzung)
-var _ = os.Executable

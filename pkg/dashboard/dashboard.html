@@ -82,6 +82,7 @@
   .btn-success { background: var(--green); color: #0f1117; }
   .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .pair-filter.active { border-color: var(--accent); color: var(--accent); background: rgba(91,141,238,0.1); }
   .btn-danger { background: var(--red); color: #fff; }
   .btn-danger:hover { background: #c94f4f; }
   .actions { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
@@ -329,6 +330,11 @@
   <div class="nav-item" onclick="showSection('virustotal', this)">
     <span class="nav-icon"><i data-lucide="shield"></i></span> VirusTotal
     <button class="info-btn" onmouseenter="tipShow(this,'Malware-Scan-History und Statistiken. Erfordert API-Key in Danger Zone.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  </div>
+  <div class="nav-item" onclick="showSection('pairing', this)">
+    <span class="nav-icon"><i data-lucide="user-check"></i></span> Pairing
+    <span id="pairing-nav-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:16px;text-align:center"></span>
+    <button class="info-btn" onmouseenter="tipShow(this,'DM-Pairing Mode: Steuere welche Telegram-User deinen Bot nutzen dürfen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
   <div class="nav-item" onclick="showSection('system', this)">
     <span class="nav-icon"><i data-lucide="wrench"></i></span> System
@@ -1382,6 +1388,81 @@
     </div>
   </div>
 
+  <!-- PAIRING (P9) -->
+  <div class="section" id="section-pairing">
+    <h2>🤝 DM-Pairing</h2>
+    <p class="subtitle">Steuere, welche User deinen Bot per DM nutzen dürfen</p>
+
+    <!-- Stats-Karten -->
+    <div class="cards" id="pairing-cards">
+      <div class="card">
+        <div class="card-label">Gepairt</div>
+        <div class="card-value green" id="pair-stat-approved">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Wartend</div>
+        <div class="card-value yellow" id="pair-stat-pending">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Blockiert</div>
+        <div class="card-value" style="color:var(--red)" id="pair-stat-blocked">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Gesamt</div>
+        <div class="card-value blue" id="pair-stat-total">–</div>
+      </div>
+    </div>
+
+    <!-- Info-Banner wenn Pairing deaktiviert -->
+    <div id="pairing-inactive-banner" style="display:none" class="warn-banner">
+      <span class="warn-icon">ℹ️</span>
+      <div>
+        <strong>DM-Pairing nicht aktiv</strong>
+        Aktiviere <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px">pairing.enabled: true</code> in der config.json, um unbekannte DMs zu blockieren und neue User über das Dashboard freizugeben.
+      </div>
+    </div>
+
+    <!-- Filter-Tabs -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="btn btn-secondary pair-filter active" onclick="filterPairing('',this)" style="padding:6px 14px;font-size:13px">Alle</button>
+      <button class="btn btn-secondary pair-filter" onclick="filterPairing('pending',this)" style="padding:6px 14px;font-size:13px">⏳ Wartend</button>
+      <button class="btn btn-secondary pair-filter" onclick="filterPairing('approved',this)" style="padding:6px 14px;font-size:13px">✅ Gepairt</button>
+      <button class="btn btn-secondary pair-filter" onclick="filterPairing('blocked',this)" style="padding:6px 14px;font-size:13px">🚫 Blockiert</button>
+      <button class="btn btn-secondary" onclick="loadPairingData()" style="padding:6px 14px;font-size:13px;margin-left:auto">🔄 Aktualisieren</button>
+    </div>
+
+    <!-- Tabelle -->
+    <div class="panel" style="padding:0;overflow:hidden">
+      <div style="overflow-x:auto">
+        <table class="vt-table" id="pairing-table">
+          <thead>
+            <tr>
+              <th>Channel</th>
+              <th>User-ID</th>
+              <th>Username</th>
+              <th>Status</th>
+              <th>Erstellt</th>
+              <th>Zuletzt gesehen</th>
+              <th style="text-align:right">Aktionen</th>
+            </tr>
+          </thead>
+          <tbody id="pairing-body">
+            <tr><td colspan="7" class="vt-empty" style="text-align:center;padding:30px;color:var(--muted)">Noch keine Pairing-Daten vorhanden.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Info-Box -->
+    <div class="howto-box" style="margin-top:4px">
+      <strong>ℹ️ So funktioniert DM-Pairing:</strong><br>
+      Wenn ein unbekannter User dem Bot eine DM schickt, wird er in die <strong>Wartend</strong>-Liste eingetragen.
+      Du kannst ihn dann hier <strong>freigeben</strong> (✅) oder <strong>blockieren</strong> (🚫).<br>
+      User in der <strong>AllowFrom</strong>-Whitelist (config.json) haben immer Zugriff – unabhängig vom Pairing-Status.<br>
+      <strong>Tipp:</strong> Genehmigte User erhalten automatisch eine Bestätigungsnachricht im Chat.
+    </div>
+  </div>
+
   <!-- HILFE -->
   <div class="section" id="section-help">
     <h2>❓ Hilfe & Dokumentation</h2>
@@ -1786,6 +1867,7 @@ function showSection(name, el) {
   if (name === 'config')     loadConfig();
   if (name === 'system')     updateSystemCmds();
   if (name === 'virustotal') loadVTData();
+  if (name === 'pairing')    loadPairingData();
   if (name === 'danger')     { showDangerTab('keys', document.querySelector('.dtab-btn')); loadDangerKeys(); }
   if (name === 'help') {
     document.getElementById('help-search-input').value = '';
@@ -3169,6 +3251,112 @@ async function clearVTHistory() {
   }
 }
 
+// ── PAIRING (P9) ────────────────────────────────────────────────────────
+
+let pairingFilter = '';
+
+function filterPairing(status, el) {
+  pairingFilter = status;
+  document.querySelectorAll('.pair-filter').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  loadPairingData();
+}
+
+async function loadPairingData() {
+  // Stats laden
+  const stats = await api('/api/pairing/stats');
+  if (stats) {
+    document.getElementById('pair-stat-approved').textContent = stats.approved ?? 0;
+    document.getElementById('pair-stat-pending').textContent = stats.pending ?? 0;
+    document.getElementById('pair-stat-blocked').textContent = stats.blocked ?? 0;
+    document.getElementById('pair-stat-total').textContent = stats.total ?? 0;
+    // Nav-Badge mit Pending-Count
+    const badge = document.getElementById('pairing-nav-badge');
+    if (stats.pending > 0) {
+      badge.textContent = stats.pending;
+      badge.style.display = 'inline-block';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  // Entries laden
+  const url = pairingFilter ? `/api/pairing?status=${pairingFilter}` : '/api/pairing';
+  const entries = await api(url);
+  const body = document.getElementById('pairing-body');
+
+  if (!entries || !Array.isArray(entries) || entries.length === 0) {
+    body.innerHTML = '<tr><td colspan="7" class="vt-empty" style="text-align:center;padding:30px;color:var(--muted)">Keine Einträge' + (pairingFilter ? ` mit Status "${pairingFilter}"` : '') + '.</td></tr>';
+    return;
+  }
+
+  // Sortierung: pending zuerst, dann approved, dann blocked
+  const order = { pending: 0, approved: 1, blocked: 2 };
+  entries.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+
+  body.innerHTML = entries.map(e => {
+    const statusBadge = {
+      pending:  '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;background:rgba(233,196,106,0.12);color:var(--yellow);border:1px solid rgba(233,196,106,0.3)">⏳ Wartend</span>',
+      approved: '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;background:rgba(80,200,120,0.12);color:var(--green);border:1px solid rgba(80,200,120,0.3)">✅ Gepairt</span>',
+      blocked:  '<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;background:rgba(226,93,93,0.12);color:var(--red);border:1px solid rgba(226,93,93,0.3)">🚫 Blockiert</span>',
+    }[e.status] || e.status;
+
+    const created = e.createdAt ? new Date(e.createdAt).toLocaleString('de-AT', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '–';
+    const lastSeen = e.lastSeen ? new Date(e.lastSeen).toLocaleString('de-AT', {day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '–';
+    const userName = e.userName ? `@${escHtml(e.userName)}` : '<span style="color:var(--muted)">–</span>';
+
+    let actions = '';
+    if (e.status === 'pending') {
+      actions = `
+        <button class="btn btn-secondary" onclick="pairingAction('approve','${escHtml(e.channel)}','${escHtml(e.userId)}')" style="padding:4px 10px;font-size:12px;background:rgba(80,200,120,0.1);border-color:rgba(80,200,120,0.3);color:var(--green)" title="Freigeben">✅</button>
+        <button class="btn btn-secondary" onclick="pairingAction('block','${escHtml(e.channel)}','${escHtml(e.userId)}')" style="padding:4px 10px;font-size:12px;background:rgba(226,93,93,0.1);border-color:rgba(226,93,93,0.3);color:var(--red)" title="Blockieren">🚫</button>`;
+    } else if (e.status === 'approved') {
+      actions = `
+        <button class="btn btn-secondary" onclick="pairingAction('block','${escHtml(e.channel)}','${escHtml(e.userId)}')" style="padding:4px 10px;font-size:12px" title="Blockieren">🚫</button>
+        <button class="btn btn-secondary" onclick="pairingAction('remove','${escHtml(e.channel)}','${escHtml(e.userId)}')" style="padding:4px 10px;font-size:12px" title="Entfernen">🗑</button>`;
+    } else if (e.status === 'blocked') {
+      actions = `
+        <button class="btn btn-secondary" onclick="pairingAction('approve','${escHtml(e.channel)}','${escHtml(e.userId)}')" style="padding:4px 10px;font-size:12px;background:rgba(80,200,120,0.1);border-color:rgba(80,200,120,0.3);color:var(--green)" title="Freigeben">✅</button>
+        <button class="btn btn-secondary" onclick="pairingAction('remove','${escHtml(e.channel)}','${escHtml(e.userId)}')" style="padding:4px 10px;font-size:12px" title="Entfernen">🗑</button>`;
+    }
+
+    return `<tr>
+      <td style="font-size:12px">${escHtml(e.channel || '–')}</td>
+      <td><code style="font-size:12px;color:var(--accent)">${escHtml(e.userId)}</code></td>
+      <td style="font-size:13px">${userName}</td>
+      <td>${statusBadge}</td>
+      <td style="font-size:12px;color:var(--muted);white-space:nowrap">${created}</td>
+      <td style="font-size:12px;color:var(--muted);white-space:nowrap">${lastSeen}</td>
+      <td style="text-align:right;white-space:nowrap"><div style="display:flex;gap:6px;justify-content:flex-end">${actions}</div></td>
+    </tr>`;
+  }).join('');
+}
+
+async function pairingAction(action, channel, userId) {
+  if (action === 'remove' && !confirm(`User ${userId} wirklich entfernen?`)) return;
+  if (action === 'block' && !confirm(`User ${userId} wirklich blockieren?`)) return;
+
+  const result = await api('/api/pairing', 'POST', { action, channel, userId });
+  if (result && result.error) {
+    toast('Fehler: ' + result.error, true);
+  } else {
+    toast(result?.message || '✅ Aktion ausgeführt');
+    loadPairingData();
+  }
+}
+
+// Pairing-Badge beim Laden der Seite aktualisieren
+async function updatePairingBadge() {
+  try {
+    const stats = await api('/api/pairing/stats');
+    if (stats && stats.pending > 0) {
+      const badge = document.getElementById('pairing-nav-badge');
+      badge.textContent = stats.pending;
+      badge.style.display = 'inline-block';
+    }
+  } catch(e) { /* silent */ }
+}
+
 // ── DANGER ZONE ─────────────────────────────────────────────────────────
 function showDangerTab(name, el) {
   document.querySelectorAll('.dtab-btn').forEach(b => b.classList.remove('active'));
@@ -3347,6 +3535,8 @@ function updateYoutubeKeyRow() {
 // ── loadInitialData (nach erfolgreichem Login) ────────────────────────
 async function loadInitialData() {
   showSection('status', document.querySelector('.nav-item'));
+  // Pairing-Badge aktualisieren (Pending-Anzahl in Sidebar)
+  updatePairingBadge();
   // Lucide Icons rendern
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
