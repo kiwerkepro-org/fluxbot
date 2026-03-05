@@ -1,0 +1,85 @@
+================================================================================
+FluxBot v1.1.9 – Quick Start Guide
+================================================================================
+
+SZENARIO 1: FluxBot dauerhaft als Windows Service (EMPFOHLEN)
+================================================================
+
+1. Öffne PowerShell als ADMINISTRATOR
+   - Windows-Taste drücken
+   - "PowerShell" eingeben
+   - Rechtsklick → "Als Administrator ausführen"
+
+2. Navigiere zum FluxBot-Ordner:
+   cd C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT
+
+3. Service installieren & starten:
+   powershell -ExecutionPolicy Bypass -File .\INSTALL-Service.ps1 -Action install
+
+4. Fertig! Der Bot läuft jetzt im Hintergrund als Windows Service
+   - Startet automatisch beim Windows-Boot
+   - Dashboard: http://localhost:9090
+
+5. Service verwalten (später):
+   .\INSTALL-Service.ps1 -Action status    # Status abfragen
+   .\INSTALL-Service.ps1 -Action start     # Starten
+   .\INSTALL-Service.ps1 -Action stop      # Stoppen
+   .\INSTALL-Service.ps1 -Action uninstall # Deinstallieren
+
+
+SZENARIO 2: FluxBot nur für diese Session (schneller Test)
+===========================================================
+
+1. Öffne PowerShell (nicht als Admin nötig)
+
+2. Navigiere zum Ordner:
+   cd C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT
+
+3. Starte den Bot:
+   powershell -ExecutionPolicy Bypass -File .\START-FluxBot.ps1
+
+⚠️  WICHTIG: PowerShell-Fenster nicht schließen! Der Bot läuft nur,
+    solange das Fenster offen ist.
+
+
+TROUBLESHOOTING
+===============
+
+❌ "Cannot find fluxbot.exe"
+   → Stelle sicher, dass du im richtigen Ordner bist:
+   cd C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT
+   ls fluxbot.exe  (sollte die Datei anzeigen)
+
+❌ "Das Script darf nicht ausgeführt werden"
+   → Verwende folgende Kommand:
+   powershell -ExecutionPolicy Bypass -File .\INSTALL-Service.ps1
+
+❌ "Access Denied" bei Service-Installation
+   → Öffne PowerShell als Administrator (Rechtsklick → Run as Admin)
+
+❌ Dashboard erreichbar auf http://localhost:9090?
+   → Schau in die Logs:
+   type workspace\logs\fluxbot.log
+   (Die letzte 50 Zeilen zeigen, was los ist)
+
+
+TIPPS
+=====
+
+📊 Dashboard öffnen:
+   http://localhost:9090
+   (nur wenn der Bot läuft!)
+
+📋 Logs ansehen:
+   type workspace\logs\fluxbot.log
+
+🔄 Service neustarten (falls Bot hängt):
+   powershell -File .\INSTALL-Service.ps1 -Action restart
+
+🗑️  Service vollständig entfernen:
+   powershell -File .\INSTALL-Service.ps1 -Action uninstall
+
+
+================================================================================
+FluxBot ist produktiv einsatzbereit! 🚀
+================================================================================
