@@ -575,6 +575,81 @@ func (s *Server) handlePairingStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, s.pairingStore.Stats())
 }
 
+// ── /api/source – Quellcode-Lesing für Self-Extend ────────────────────────────
+
+// sourceCodeResponse ist die Antwort für die Quellcode-API.
+type sourceCodeResponse struct {
+	File    string `json:"file"`
+	Content string `json:"content"`
+	Lines   int    `json:"lines"`
+}
+
+// handleSourceCode liest Go-Quellcode aus whitelisteten Dateien.
+// Query-Parameter: file=pkg/agent/agent.go (relativ zum Repo-Root).
+// Nur whitelisted Pfade dürfen gelesen werden (keine Secrets, kein Vault, kein .git).
+func (s *Server) handleSourceCode(w http.ResponseWriter, r *http.Request) {
+	filePath := r.URL.Query().Get("file")
+	if filePath == "" {
+		httpError(w, "Query-Parameter 'file' erforderlich", http.StatusBadRequest)
+		return
+	}
+
+	// Sicherheits-Whitelist: nur pkg/* und cmd/* Dateien
+	allowedPrefixes := []string{"pkg/", "cmd/", "go.mod", "go.sum", "Dockerfile", "docker-compose.yml"}
+	isAllowed := false
+	for _, prefix := range allowedPrefixes {
+		if strings.HasPrefix(filePath, prefix) {
+			isAllowed = true
+			break
+		}
+	}
+
+	// Blockiere gefährliche Muster
+	deniedPatterns := []string{".git", "vault", "secrets", ".env", ".sig", "config.json"}
+	for _, pattern := range deniedPatterns {
+		if strings.Contains(filePath, pattern) {
+			isAllowed = false
+			break
+		}
+	}
+
+	if !isAllowed {
+		httpError(w, fmt.Sprintf("Zugriff verweigert auf: %s", filePath), http.StatusForbidden)
+		return
+	}
+
+	// Lese die Datei vom Workspace-Parent-Directory (assumes workspace is unter repo-root)
+	// Die config.json liegt im workspace/, also ist der repo-root = workspace/..
+	repoRoot := filepath.Dir(s.workspacePath)
+	fullPath := filepath.Join(repoRoot, filePath)
+
+	// Sicherheit: Stelle sicher, dass fullPath innerhalb von repoRoot liegt (keine directory traversal)
+	absPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		httpError(w, "Fehler beim Lesen des Dateipfads", http.StatusInternalServerError)
+		return
+	}
+	absRepoRoot, _ := filepath.Abs(repoRoot)
+	if !strings.HasPrefix(absPath, absRepoRoot) {
+		httpError(w, "Zugriff verweigert: Pfad außerhalb des Repositories", http.StatusForbidden)
+		return
+	}
+
+	// Lese die Datei
+	content, err := os.ReadFile(absPath)
+	if err != nil {
+		httpError(w, fmt.Sprintf("Datei nicht gefunden: %s", filePath), http.StatusNotFound)
+		return
+	}
+
+	lines := len(strings.Split(string(content), "\n"))
+	writeJSON(w, sourceCodeResponse{
+		File:    filePath,
+		Content: string(content),
+		Lines:   lines,
+	})
+}
+
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
 func writeJSON(w http.ResponseWriter, v interface{}) {

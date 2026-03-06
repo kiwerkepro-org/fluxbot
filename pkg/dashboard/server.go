@@ -133,6 +133,7 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/vt/status", s.auth(s.handleVTStatus))
 	mux.HandleFunc("/api/vt/history", s.auth(s.handleVTHistory))
 	mux.HandleFunc("/api/skills", s.auth(s.handleSkills))
+	mux.HandleFunc("/api/source", s.auth(s.handleSourceCode))  // Self-Extend: Quellcode-Reading
 
 	// ── Google OAuth2 (kein HMAC nötig – auth reicht; Callback ist öffentlich) ──
 	mux.HandleFunc("/api/google/auth-url", s.auth(s.handleGoogleAuthURL))
