@@ -1,83 +1,47 @@
 ================================================================================
-FluxBot v1.1.9 – Quick Start Guide
+FluxBot v1.2.0 – Quick Start Guide
 ================================================================================
 
-SZENARIO 1: FluxBot dauerhaft als Windows Service (EMPFOHLEN)
+EINMALIGES EINRICHTEN (nur beim ersten Mal, als Administrator):
 ================================================================
 
-1. Öffne PowerShell als ADMINISTRATOR
-   - Windows-Taste drücken
-   - "PowerShell" eingeben
-   - Rechtsklick → "Als Administrator ausführen"
+1. Rechtsklick auf PowerShell → "Als Administrator ausführen"
 
-2. Navigiere zum FluxBot-Ordner:
+2. In den FluxBot-Ordner wechseln:
    cd C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT
 
-3. Service installieren & starten:
-   powershell -ExecutionPolicy Bypass -File .\INSTALL-Service.ps1 -Action install
+3. AutoStart einrichten:
+   powershell -ExecutionPolicy Bypass -File .\AUTOSTART-EINRICHTEN.ps1
 
-4. Fertig! Der Bot läuft jetzt im Hintergrund als Windows Service
-   - Startet automatisch beim Windows-Boot
-   - Dashboard: http://localhost:9090
-
-5. Service verwalten (später):
-   .\INSTALL-Service.ps1 -Action status    # Status abfragen
-   .\INSTALL-Service.ps1 -Action start     # Starten
-   .\INSTALL-Service.ps1 -Action stop      # Stoppen
-   .\INSTALL-Service.ps1 -Action uninstall # Deinstallieren
+Das war es! FluxBot läuft ab sofort:
+   ✅ Automatisch im Hintergrund (unsichtbar, kein PowerShell-Fenster)
+   ✅ Startet automatisch bei jedem Windows-Login
+   ✅ Startet sich bei Absturz selbst neu (3x)
 
 
-SZENARIO 2: FluxBot nur für diese Session (schneller Test)
-===========================================================
+NORMALER BETRIEB:
+=================
 
-1. Öffne PowerShell (nicht als Admin nötig)
-
-2. Navigiere zum Ordner:
-   cd C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT
-
-3. Starte den Bot:
-   powershell -ExecutionPolicy Bypass -File .\START-FluxBot.ps1
-
-⚠️  WICHTIG: PowerShell-Fenster nicht schließen! Der Bot läuft nur,
-    solange das Fenster offen ist.
+Desktop-Verknüpfung "FluxBot Dashboard" doppelklicken
+→ Browser öffnet sich direkt mit http://localhost:9090
 
 
 TROUBLESHOOTING
 ===============
 
-❌ "Cannot find fluxbot.exe"
-   → Stelle sicher, dass du im richtigen Ordner bist:
-   cd C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT
-   ls fluxbot.exe  (sollte die Datei anzeigen)
+❌ Dashboard nicht erreichbar?
+   → FluxBot läuft möglicherweise nicht. Prüfen:
+   Get-Process -Name fluxbot
+   → Falls kein Prozess: Einrichtung wiederholen (Schritt 1-3 oben)
 
-❌ "Das Script darf nicht ausgeführt werden"
-   → Verwende folgende Kommand:
-   powershell -ExecutionPolicy Bypass -File .\INSTALL-Service.ps1
-
-❌ "Access Denied" bei Service-Installation
-   → Öffne PowerShell als Administrator (Rechtsklick → Run as Admin)
-
-❌ Dashboard erreichbar auf http://localhost:9090?
-   → Schau in die Logs:
-   type workspace\logs\fluxbot.log
-   (Die letzte 50 Zeilen zeigen, was los ist)
-
-
-TIPPS
-=====
-
-📊 Dashboard öffnen:
-   http://localhost:9090
-   (nur wenn der Bot läuft!)
-
-📋 Logs ansehen:
+❌ Logs ansehen:
    type workspace\logs\fluxbot.log
 
-🔄 Service neustarten (falls Bot hängt):
-   powershell -File .\INSTALL-Service.ps1 -Action restart
+❌ FluxBot manuell starten (ohne Neustart):
+   Start-Process -FilePath .\fluxbot.exe -WorkingDirectory . -WindowStyle Hidden
 
-🗑️  Service vollständig entfernen:
-   powershell -File .\INSTALL-Service.ps1 -Action uninstall
+❌ AutoStart komplett entfernen:
+   powershell -ExecutionPolicy Bypass -File .\AUTOSTART-EINRICHTEN.ps1 -Deinstallieren
 
 
 ================================================================================
