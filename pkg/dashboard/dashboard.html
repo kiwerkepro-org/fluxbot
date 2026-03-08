@@ -439,7 +439,7 @@
         <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
           <button class="btn btn-secondary" onclick="checkUpdate()" id="btn-check-update">🔍 Auf Updates prüfen</button>
           <button class="btn btn-primary" onclick="installUpdate()" id="btn-install-update" style="display:none">⬇️ Update installieren</button>
-          <button class="btn btn-secondary" onclick="restartFluxBot()" id="btn-restart" style="display:none">🔄 Neu starten</button>
+          <button class="btn btn-secondary" onclick="restartFluxBot()" id="btn-restart">🔄 Neu starten</button>
         </div>
         <p id="update-status-msg" style="font-size:12px;color:var(--muted);margin-top:8px"></p>
       </div>
@@ -2428,11 +2428,8 @@ async function installUpdate() {
       if (btn) { btn.disabled = false; btn.textContent = '⬇️ Update installieren'; }
       return;
     }
-    if (msg) msg.textContent = '✅ Update installiert – bitte jetzt neu starten.';
+    if (msg) msg.textContent = '✅ Update installiert – jetzt neu starten.';
     if (btn) { btn.disabled = true; btn.textContent = '✅ Installiert'; }
-    // "Neu starten" Button einblenden
-    const btnRestart = document.getElementById('btn-restart');
-    if (btnRestart) btnRestart.style.display = 'inline-flex';
   } catch(e) {
     if (msg) msg.textContent = `❌ Fehler bei der Installation: ${e.message}`;
     if (btn) { btn.disabled = false; btn.textContent = '⬇️ Update installieren'; }

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -741,10 +740,7 @@ func (s *Server) handleSystemRestart(w http.ResponseWriter, r *http.Request) {
 			log.Printf("[Restart] Executable-Pfad nicht ermittelbar: %v", err)
 			os.Exit(1)
 		}
-		cmd := exec.Command(exe, os.Args[1:]...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Start(); err != nil {
+		if err := startDetached(exe, os.Args[1:]); err != nil {
 			log.Printf("[Restart] Neustart fehlgeschlagen: %v", err)
 		}
 		os.Exit(0)
