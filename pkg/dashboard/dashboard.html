@@ -2441,12 +2441,12 @@ async function restartFluxBot() {
   const msg = document.getElementById('update-status-msg');
   if (!confirm('FluxBot jetzt neu starten?')) return;
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Startet neu...'; }
-  if (msg) msg.textContent = 'Neustart-Signal gesendet – bitte Seite in einigen Sekunden manuell neu laden.';
+  if (msg) msg.textContent = 'Neustart läuft – Seite wird in 5 Sekunden neu geladen...';
   try {
     await api('/api/system/restart', 'POST', {});
   } catch(e) { /* Verbindungsabbruch beim Neustart ist normal */ }
-  await new Promise(r => setTimeout(r, 3000));
-  if (btn) { btn.disabled = false; btn.textContent = '🔄 Neu starten'; }
+  await new Promise(r => setTimeout(r, 5000));
+  location.reload();
 }
 
 // ── CONFIG: Laden ──────────────────────────────────────────────────────────
