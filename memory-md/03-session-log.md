@@ -1560,6 +1560,59 @@ pkg\browser\browser.go:265: WaitForSelector returns 2 values
 
 ---
 
+## Session 50 – P12 Dark/Light Mode Theme Toggle (2026-03-08)
+
+**Fokus:** PRIORITÄT 12 implementieren – Dark/Light Mode Theme Toggle für bessere Dashboard-UX
+
+**Implementierte Features:**
+
+1. **Theme-Toggle Button:**
+   - Im Sidebar-Footer, neben Abmelden-Button
+   - ☀️/🌙 Icons (dynamisch je nach aktuellem Theme)
+   - Label wechselt: "Dark Mode" → "Light Mode"
+
+2. **CSS-Variablen System:**
+   - Light Mode (default): white backgrounds (#ffffff), dark text (#1a1a1a), light borders
+   - Dark Mode: dark backgrounds (#0f1117), light text (#e2e8f0), dark borders
+   - `data-theme` Attribute auf `<html>` für Theme-Switching
+   - CSS-Overrides via `html[data-theme="dark"]`
+
+3. **JavaScript Theme-Management:**
+   - `initTheme()`: Lädt gespeicherte Preference oder System-Preference
+   - `setTheme(theme)`: Setzt Theme + localStorage + aktualisiert Icons
+   - `toggleTheme()`: Wechselt zwischen Light/Dark
+   - localStorage Key: `fluxbot-theme`
+
+4. **Styling-Anpassungen:**
+   - Smooth 0.3s Transitions für alle Farben
+   - Modals, Tooltips, Command-Boxes, Blur-Overlays angepasst
+   - Light Mode: Modal-Overlays weniger opak (0.3 statt 0.72)
+   - Dark Mode: Modal-Overlays voller opak (0.72)
+   - Command-Box: Angepasste Farben per Theme
+
+5. **Persistierung & Fallback:**
+   - localStorage speichert Preference
+   - Auto-detect System-Preference via `window.matchMedia('(prefers-color-scheme: dark)')`
+   - Preference bleibt über mehrere Sessions
+
+**Build & Deployment:**
+- ✅ `go build -o fluxbot.exe ./cmd/fluxbot` – Clean build
+- ✅ Process restart mit neuer Binary
+- ✅ Git commit `595f322`
+
+**Dokumentation aktualisiert:**
+- CLAUDE.md: Session 50 Summary + Status
+- memory-md/06-feature-roadmap.md: P12 als ✅ ERLEDIGT markiert
+- memory-md/03-session-log.md: Diesen Eintrag hinzugefügt
+
+**Status:** ✅ ABGESCHLOSSEN
+- Theme-Toggle funktioniert
+- Persistierung funktioniert
+- Alle Styles angepasst
+- Smooth Transitions implementiert
+
+---
+
 ## Session 49 – Chrome Button Removal (2026-03-08)
 
 **Fokus:** Session 48 Cleanup – Chrome-Button Feature komplett entfernen (unvollstaendige Implementierung)

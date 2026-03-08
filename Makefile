@@ -76,18 +76,18 @@ build-mac:
 	@mkdir -p $(DIST)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build \
 		-ldflags="$(LDFLAGS)" \
-		-o $(DIST)/fluxbot-macos-arm64 \
+		-o $(DIST)/fluxbot-darwin-arm64 \
 		./cmd/fluxbot
-	@echo "✅ $(DIST)/fluxbot-macos-arm64"
+	@echo "✅ $(DIST)/fluxbot-darwin-arm64"
 
 ## build-mac-intel: macOS Binary (Intel x86_64)
 build-mac-intel:
 	@mkdir -p $(DIST)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build \
 		-ldflags="$(LDFLAGS)" \
-		-o $(DIST)/fluxbot-macos-amd64 \
+		-o $(DIST)/fluxbot-darwin-amd64 \
 		./cmd/fluxbot
-	@echo "✅ $(DIST)/fluxbot-macos-amd64"
+	@echo "✅ $(DIST)/fluxbot-darwin-amd64"
 
 ## build-all: Alle Plattformen auf einmal bauen
 build-all: build-linux build-linux-arm build-windows build-mac build-mac-intel
@@ -143,8 +143,8 @@ help:
 	@echo "    make build-linux    - Linux amd64"
 	@echo "    make build-linux-arm- Linux arm64 (Raspberry Pi)"
 	@echo "    make build-windows  - Windows amd64 (.exe)"
-	@echo "    make build-mac      - macOS arm64 (M1+)"
-	@echo "    make build-mac-intel- macOS amd64 (Intel)"
+	@echo "    make build-mac      - macOS arm64 (M1+)  → fluxbot-darwin-arm64"
+	@echo "    make build-mac-intel- macOS amd64 (Intel) → fluxbot-darwin-amd64"
 	@echo "    make build-all      - Alle Plattformen"
 	@echo ""
 	@echo "  Native Installation:"

@@ -1,9 +1,21 @@
 # ─────────────────────────────────────────────────────────────────────────────
-#  FluxBot Installer für Windows (Docker-Variante)
+#  FluxBot Installer für Windows
 #  Verwendung:  irm https://fluxbot.ki-werke.de/install.ps1 | iex
+#
+#  Zwei Modi:
+#    Nativ  – Lädt Binary direkt von GitHub Releases (kein Docker nötig)
+#    Docker – Startet via docker-compose (Docker Desktop erforderlich)
 # ─────────────────────────────────────────────────────────────────────────────
 #Requires -Version 5.1
 $ErrorActionPreference = "Stop"
+
+# ── Konfiguration ────────────────────────────────────────────────────────────
+$GH_REPO      = "kiwerkepro-org/fluxbot"
+$GH_API       = "https://api.github.com/repos/$GH_REPO/releases/latest"
+$COMPOSE_URL  = "https://raw.githubusercontent.com/ki-werke/fluxbot/main/docker-compose.prod.yml"
+$INSTALL_DIR  = Join-Path $env:USERPROFILE "FluxBot"
+$DATA_DIR     = Join-Path $INSTALL_DIR "fluxbot-data"
+$BINARY_NAME  = "fluxbot.exe"
 
 # ── Farben & Banner ──────────────────────────────────────────────────────────
 function Write-Banner {
@@ -19,126 +31,212 @@ function Write-Banner {
     Write-Host ""
 }
 
-function Write-Step($n, $text) {
-    Write-Host "  [$n] " -ForegroundColor Yellow -NoNewline
-    Write-Host $text
-}
-
-function Write-OK($text) {
-    Write-Host "  ✔  " -ForegroundColor Green -NoNewline
-    Write-Host $text
-}
-
-function Write-Fail($text) {
-    Write-Host "  ✘  " -ForegroundColor Red -NoNewline
-    Write-Host $text
-}
-
-function Write-Info($text) {
-    Write-Host "     " -NoNewline
-    Write-Host $text -ForegroundColor DarkGray
-}
+function Write-Step($n, $text) { Write-Host "  [$n] " -ForegroundColor Yellow -NoNewline; Write-Host $text }
+function Write-OK($text)        { Write-Host "  ✔  " -ForegroundColor Green -NoNewline; Write-Host $text }
+function Write-Fail($text)      { Write-Host "  ✘  " -ForegroundColor Red -NoNewline; Write-Host $text }
+function Write-Info($text)      { Write-Host "     $text" -ForegroundColor DarkGray }
 
 # ── Hauptskript ───────────────────────────────────────────────────────────────
 Write-Banner
 
-# ── 1. Docker prüfen ─────────────────────────────────────────────────────────
-Write-Step "1/4" "Prüfe Docker..."
+# ── Modus wählen ─────────────────────────────────────────────────────────────
+Write-Host "  Installationsmodus wählen:" -ForegroundColor White
+Write-Host ""
+Write-Host "  [1] Nativ  – Binary direkt auf Windows (empfohlen, kein Docker nötig)" -ForegroundColor White
+Write-Host "  [2] Docker – via Docker Desktop " -ForegroundColor White
+Write-Host ""
+$choice = Read-Host "  Auswahl [1/2]"
 
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    Write-Fail "Docker ist nicht installiert."
-    Write-Info ""
-    Write-Info "Bitte Docker Desktop für Windows installieren:"
-    Write-Info "https://docs.docker.com/desktop/install/windows-install/"
-    Write-Info ""
-    Write-Info "Nach der Installation diesen Befehl erneut ausführen."
-    exit 1
-}
-
-try {
-    $null = docker info 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "Docker antwortet nicht" }
-    Write-OK "Docker läuft"
-} catch {
-    Write-Fail "Docker Desktop ist nicht gestartet."
-    Write-Info ""
-    Write-Info "Bitte Docker Desktop starten und dann diesen Befehl erneut ausführen."
-    exit 1
-}
-
-# ── 2. Installationsverzeichnis ───────────────────────────────────────────────
-Write-Step "2/4" "Richte Installationsverzeichnis ein..."
-
-$InstallDir = Join-Path $env:USERPROFILE "FluxBot"
-
-if (-not (Test-Path $InstallDir)) {
-    New-Item -ItemType Directory -Path $InstallDir | Out-Null
-    Write-OK "Verzeichnis erstellt: $InstallDir"
+if ($choice -eq "2") {
+    Install-Docker
 } else {
-    Write-OK "Verzeichnis vorhanden: $InstallDir"
+    Install-Native
 }
 
-# Datenverzeichnis für persistente Daten
-$DataDir = Join-Path $InstallDir "fluxbot-data"
-if (-not (Test-Path $DataDir)) {
-    New-Item -ItemType Directory -Path $DataDir | Out-Null
+# ── Native Installation ───────────────────────────────────────────────────────
+function Install-Native {
+    Write-Host ""
+    Write-Host "  ── Native Installation (Windows) ────────────────────────────" -ForegroundColor Cyan
+
+    # 1. Neueste Version ermitteln
+    Write-Step "1/5" "Suche neueste Version auf GitHub..."
+    try {
+        $release = Invoke-RestMethod -Uri $GH_API -Headers @{ "User-Agent" = "FluxBot-Installer" }
+        $version = $release.tag_name
+        $asset   = $release.assets | Where-Object { $_.name -eq "fluxbot-windows-amd64.exe" } | Select-Object -First 1
+        if (-not $asset) {
+            Write-Fail "Kein Windows-Binary im Release $version gefunden."
+            Write-Info "Bitte manuell herunterladen: https://github.com/$GH_REPO/releases"
+            exit 1
+        }
+        Write-OK "Neueste Version: $version"
+    } catch {
+        Write-Fail "GitHub Releases nicht erreichbar: $_"
+        Write-Info "Bitte Internetverbindung prüfen oder manuell installieren."
+        exit 1
+    }
+
+    # 2. Installationsverzeichnis
+    Write-Step "2/5" "Richte Verzeichnisse ein..."
+    New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
+    New-Item -ItemType Directory -Path $DATA_DIR    -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $DATA_DIR "skills") -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $DATA_DIR "logs")   -Force | Out-Null
+    Write-OK "Verzeichnis: $INSTALL_DIR"
+
+    # 3. Binary herunterladen
+    Write-Step "3/5" "Lade FluxBot $version herunter..."
+    $binaryPath = Join-Path $INSTALL_DIR $BINARY_NAME
+    try {
+        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $binaryPath -UseBasicParsing
+        Write-OK "Binary heruntergeladen: $binaryPath"
+    } catch {
+        Write-Fail "Download fehlgeschlagen: $_"
+        exit 1
+    }
+
+    # 4. Playwright-Browser installieren
+    Write-Step "4/5" "Installiere Browser-Komponenten (Playwright)..."
+    try {
+        $proc = Start-Process -FilePath $binaryPath -ArgumentList "--install-playwright" -Wait -PassThru -NoNewWindow
+        if ($proc.ExitCode -eq 0) {
+            Write-OK "Playwright-Browser installiert"
+        } else {
+            Write-Info "Browser-Installation hatte Rückgabewert $($proc.ExitCode) – FluxBot läuft trotzdem."
+        }
+    } catch {
+        Write-Info "Browser-Installation übersprungen (optional): $_"
+    }
+
+    # 5. Autostart via Task Scheduler einrichten
+    Write-Step "5/5" "Richte Autostart ein (Task Scheduler)..."
+    $taskName = "FluxBot"
+    $configArg = "--config `"$DATA_DIR\config.json`""
+
+    # Bestehende Task entfernen
+    schtasks /delete /tn $taskName /f 2>$null | Out-Null
+
+    # Neue Task erstellen (AtLogon, ohne Fenster, mit Auto-Restart)
+    $action  = New-ScheduledTaskAction  -Execute $binaryPath -Argument $configArg -WorkingDirectory $INSTALL_DIR
+    $trigger = New-ScheduledTaskTrigger -AtLogOn
+    $settings = New-ScheduledTaskSettingsSet `
+        -ExecutionTimeLimit 0 `
+        -RestartCount 3 `
+        -RestartInterval (New-TimeSpan -Minutes 1) `
+        -StartWhenAvailable
+
+    Register-ScheduledTask `
+        -TaskName $taskName `
+        -Action $action `
+        -Trigger $trigger `
+        -Settings $settings `
+        -RunLevel Highest `
+        -Force | Out-Null
+
+    # Sofort starten
+    Start-ScheduledTask -TaskName $taskName
+    Write-OK "Task '$taskName' eingerichtet & gestartet"
+
+    # Desktop-Verknüpfung für Dashboard
+    $shell   = New-Object -ComObject WScript.Shell
+    $desktop = $shell.SpecialFolders("Desktop")
+    $link    = $shell.CreateShortcut((Join-Path $desktop "FluxBot Dashboard.lnk"))
+    $link.TargetPath  = "http://localhost:9090"
+    $link.Description = "FluxBot Dashboard öffnen"
+    $link.Save()
+
+    Show-NativeSuccess $version $INSTALL_DIR $DATA_DIR $binaryPath
 }
 
-# ── 3. docker-compose.yml herunterladen ───────────────────────────────────────
-Write-Step "3/4" "Lade Konfiguration herunter..."
+# ── Docker Installation ───────────────────────────────────────────────────────
+function Install-Docker {
+    Write-Host ""
+    Write-Host "  ── Docker Installation ──────────────────────────────────────" -ForegroundColor Cyan
 
-$ComposeUrl  = "https://raw.githubusercontent.com/ki-werke/fluxbot/main/docker-compose.prod.yml"
-$ComposePath = Join-Path $InstallDir "docker-compose.yml"
+    # 1. Docker prüfen
+    Write-Step "1/4" "Prüfe Docker..."
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+        Write-Fail "Docker ist nicht installiert."
+        Write-Info "Bitte Docker Desktop installieren: https://docs.docker.com/desktop/install/windows-install/"
+        exit 1
+    }
+    try {
+        $null = docker info 2>&1
+        if ($LASTEXITCODE -ne 0) { throw "Docker antwortet nicht" }
+        Write-OK "Docker läuft"
+    } catch {
+        Write-Fail "Docker Desktop ist nicht gestartet. Bitte starten und erneut versuchen."
+        exit 1
+    }
 
-try {
-    Invoke-WebRequest -Uri $ComposeUrl -OutFile $ComposePath -UseBasicParsing
-    Write-OK "docker-compose.yml heruntergeladen"
-} catch {
-    Write-Fail "Download fehlgeschlagen: $_"
-    Write-Info "Überprüfe deine Internetverbindung und versuche es erneut."
-    exit 1
-}
+    # 2. Verzeichnisse
+    Write-Step "2/4" "Richte Installationsverzeichnis ein..."
+    New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
+    New-Item -ItemType Directory -Path $DATA_DIR    -Force | Out-Null
+    Write-OK "Verzeichnis: $INSTALL_DIR"
 
-# ── 4. FluxBot starten ────────────────────────────────────────────────────────
-Write-Step "4/4" "Starte FluxBot..."
+    # 3. docker-compose.yml herunterladen
+    Write-Step "3/4" "Lade Konfiguration herunter..."
+    $ComposePath = Join-Path $INSTALL_DIR "docker-compose.yml"
+    try {
+        Invoke-WebRequest -Uri $COMPOSE_URL -OutFile $ComposePath -UseBasicParsing
+        Write-OK "docker-compose.yml heruntergeladen"
+    } catch {
+        Write-Fail "Download fehlgeschlagen: $_"
+        exit 1
+    }
 
-Set-Location $InstallDir
-
-try {
+    # 4. Starten
+    Write-Step "4/4" "Starte FluxBot..."
+    Set-Location $INSTALL_DIR
     docker compose pull
     docker compose up -d
-} catch {
-    Write-Fail "Fehler beim Starten: $_"
-    exit 1
+    Write-OK "FluxBot (Docker) läuft!"
+
+    Show-DockerSuccess $INSTALL_DIR $DATA_DIR $ComposePath
 }
 
-Write-OK "FluxBot läuft!"
+# ── Erfolgs-Ausgabe: Nativ ────────────────────────────────────────────────────
+function Show-NativeSuccess($version, $installDir, $dataDir, $binaryPath) {
+    Write-Host ""
+    Write-Host "  ╔════════════════════════════════════════════════════════════╗" -ForegroundColor Green
+    Write-Host "  ║                                                            ║" -ForegroundColor Green
+    Write-Host "  ║   FluxBot $version wurde erfolgreich installiert!          ║" -ForegroundColor Green
+    Write-Host "  ║                                                            ║" -ForegroundColor Green
+    Write-Host "  ║   👉  http://localhost:9090   (Setup-Assistent)            ║" -ForegroundColor Green
+    Write-Host "  ║                                                            ║" -ForegroundColor Green
+    Write-Host "  ║   Desktop-Verknüpfung 'FluxBot Dashboard' erstellt.       ║" -ForegroundColor Green
+    Write-Host "  ╚════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+    Write-Host ""
+    Write-Info "Installationsverzeichnis: $installDir"
+    Write-Info "Daten (config, Skills):   $dataDir"
+    Write-Info "Binary:                   $binaryPath"
+    Write-Info ""
+    Write-Info "Autostart: Task Scheduler → Aufgabe 'FluxBot'"
+    Write-Info "Updaten:   Dashboard → Status → Update installieren"
+    Write-Info "Stoppen:   schtasks /end /tn FluxBot"
+    Write-Host ""
+    Start-Sleep -Seconds 3
+    try { Start-Process "http://localhost:9090" } catch {}
+}
 
-# ── Fertig ────────────────────────────────────────────────────────────────────
-Write-Host ""
-Write-Host "  ╔══════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "  ║                                                      ║" -ForegroundColor Green
-Write-Host "  ║   FluxBot wurde erfolgreich installiert!             ║" -ForegroundColor Green
-Write-Host "  ║                                                      ║" -ForegroundColor Green
-Write-Host "  ║   👉  http://localhost:8090                          ║" -ForegroundColor Green
-Write-Host "  ║                                                      ║" -ForegroundColor Green
-Write-Host "  ║   Der Einrichtungsassistent öffnet sich gleich.      ║" -ForegroundColor Green
-Write-Host "  ║   Folge den Schritten um FluxBot zu konfigurieren.   ║" -ForegroundColor Green
-Write-Host "  ║                                                      ║" -ForegroundColor Green
-Write-Host "  ╚══════════════════════════════════════════════════════╝" -ForegroundColor Green
-Write-Host ""
-Write-Info "Installationsverzeichnis: $InstallDir"
-Write-Info "Daten (config, Skills):   $DataDir"
-Write-Info ""
-Write-Info "FluxBot stoppen:   docker compose -f `"$ComposePath`" down"
-Write-Info "FluxBot updaten:   docker compose -f `"$ComposePath`" pull && docker compose -f `"$ComposePath`" up -d"
-Write-Host ""
-
-# Browser öffnen (kurz warten damit der Container hochfährt)
-Start-Sleep -Seconds 3
-try {
-    Start-Process "http://localhost:8090"
-} catch {
-    Write-Info "Browser konnte nicht automatisch geöffnet werden."
-    Write-Info "Bitte manuell öffnen: http://localhost:8090"
+# ── Erfolgs-Ausgabe: Docker ───────────────────────────────────────────────────
+function Show-DockerSuccess($installDir, $dataDir, $composePath) {
+    Write-Host ""
+    Write-Host "  ╔════════════════════════════════════════════════════════════╗" -ForegroundColor Green
+    Write-Host "  ║                                                            ║" -ForegroundColor Green
+    Write-Host "  ║   FluxBot (Docker) wurde erfolgreich installiert!         ║" -ForegroundColor Green
+    Write-Host "  ║                                                            ║" -ForegroundColor Green
+    Write-Host "  ║   👉  http://localhost:8090   (Setup-Assistent)            ║" -ForegroundColor Green
+    Write-Host "  ║                                                            ║" -ForegroundColor Green
+    Write-Host "  ╚════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+    Write-Host ""
+    Write-Info "Installationsverzeichnis: $installDir"
+    Write-Info "Daten (config, Skills):   $dataDir"
+    Write-Info ""
+    Write-Info "Stoppen:  docker compose -f `"$composePath`" down"
+    Write-Info "Updaten:  docker compose -f `"$composePath`" pull && docker compose -f `"$composePath`" up -d"
+    Write-Host ""
+    Start-Sleep -Seconds 3
+    try { Start-Process "http://localhost:8090" } catch {}
 }

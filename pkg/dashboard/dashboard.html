@@ -419,6 +419,30 @@
         </a>
       </div>
     </div>
+
+    <!-- Update-Panel -->
+    <div id="update-panel" class="panel" style="margin-top:20px;display:none">
+      <div class="panel-title">🔄 Software-Update</div>
+      <div id="update-content">
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px">
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:2px">Aktuelle Version</div>
+            <span id="update-current" style="font-weight:600;color:var(--text)">–</span>
+          </div>
+          <div style="color:var(--muted);font-size:18px">→</div>
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:2px">Neueste Version</div>
+            <span id="update-latest" style="font-weight:600">–</span>
+          </div>
+        </div>
+        <div id="update-notes" style="font-size:12px;color:var(--muted);margin-top:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto;display:none"></div>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="checkUpdate()" id="btn-check-update">🔍 Auf Updates prüfen</button>
+          <button class="btn btn-primary" onclick="installUpdate()" id="btn-install-update" style="display:none">⬇️ Update installieren</button>
+        </div>
+        <p id="update-status-msg" style="font-size:12px;color:var(--muted);margin-top:8px"></p>
+      </div>
+    </div>
   </div>
 
   <!-- CONFIG -->
@@ -2238,6 +2262,91 @@ async function loadStatus() {
     badge.style.cssText = `display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:${bg};color:${color};border:1px solid ${border}`;
     badge.textContent = `${icon} ${name}`;
     mode.textContent  = isDocker ? '(Docker-Modus)' : '(Lokaler Modus)';
+  }
+
+  // Update-Panel laden
+  const updatePanel = document.getElementById('update-panel');
+  if (updatePanel) {
+    updatePanel.style.display = 'block';
+    try {
+      const vInfo = await api('/api/system/version');
+      renderUpdateInfo(vInfo);
+    } catch(e) {
+      // Update-API nicht verfügbar – Panel ausblenden
+      updatePanel.style.display = 'none';
+    }
+  }
+}
+
+// Rendert Update-Infos im Status-Tab
+function renderUpdateInfo(vInfo) {
+  const elCurrent = document.getElementById('update-current');
+  const elLatest  = document.getElementById('update-latest');
+  const elNotes   = document.getElementById('update-notes');
+  const elInstall = document.getElementById('btn-install-update');
+  const elMsg     = document.getElementById('update-status-msg');
+
+  if (elCurrent) elCurrent.textContent = vInfo.current_version || '–';
+
+  if (!vInfo.latest_version) {
+    if (elLatest) elLatest.textContent = '(noch nicht geprüft)';
+    if (elMsg) elMsg.textContent = 'Klicke "Auf Updates prüfen" um die neueste Version zu ermitteln.';
+    return;
+  }
+
+  if (elLatest) {
+    elLatest.textContent = vInfo.latest_version;
+    elLatest.style.color = vInfo.update_available ? 'var(--green)' : 'var(--muted)';
+  }
+
+  if (vInfo.update_available) {
+    if (elMsg) elMsg.textContent = `✅ Update verfügbar: ${vInfo.current_version} → ${vInfo.latest_version}`;
+    if (elInstall) elInstall.style.display = 'inline-flex';
+    if (elNotes && vInfo.release_notes) {
+      elNotes.textContent = vInfo.release_notes;
+      elNotes.style.display = 'block';
+    }
+  } else {
+    if (elMsg) elMsg.textContent = vInfo.latest_version ? '✔ FluxBot ist aktuell.' : '';
+    if (elInstall) elInstall.style.display = 'none';
+  }
+
+  if (vInfo.checked_at) {
+    const ts = new Date(vInfo.checked_at).toLocaleString('de-AT');
+    if (elMsg && !vInfo.update_available) elMsg.textContent += ` (Zuletzt geprüft: ${ts})`;
+  }
+}
+
+// Sofortiger Update-Check via API
+async function checkUpdate() {
+  const btn = document.getElementById('btn-check-update');
+  const msg = document.getElementById('update-status-msg');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Prüfe...'; }
+  if (msg) msg.textContent = 'Prüfe GitHub Releases...';
+  try {
+    const vInfo = await api('/api/system/check-update', 'POST', {});
+    renderUpdateInfo(vInfo);
+  } catch(e) {
+    if (msg) msg.textContent = `Fehler beim Update-Check: ${e.message}`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Auf Updates prüfen'; }
+  }
+}
+
+// Update herunterladen und installieren
+async function installUpdate() {
+  if (!confirm('Update jetzt herunterladen und installieren?\n\nFluxBot muss danach manuell neu gestartet werden.')) return;
+  const btn = document.getElementById('btn-install-update');
+  const msg = document.getElementById('update-status-msg');
+  if (btn) { btn.disabled = true; btn.textContent = '⬇️ Installiere...'; }
+  if (msg) msg.textContent = 'Lade neue Version herunter...';
+  try {
+    const result = await api('/api/system/install-update', 'POST', {});
+    if (msg) msg.textContent = result.message || 'Update installiert. Bitte FluxBot neu starten.';
+    if (btn) { btn.disabled = true; btn.textContent = '✅ Installiert'; }
+  } catch(e) {
+    if (msg) msg.textContent = `Fehler bei der Installation: ${e.message}`;
+    if (btn) { btn.disabled = false; btn.textContent = '⬇️ Update installieren'; }
   }
 }
 

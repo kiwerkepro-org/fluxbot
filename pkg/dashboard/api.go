@@ -650,6 +650,79 @@ func (s *Server) handleSourceCode(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// ── /api/system/* (Auto-Update System) ───────────────────────────────────────
+
+// handleSystemVersion liefert aktuelle + neueste Version (aus dem letzten Check).
+func (s *Server) handleSystemVersion(w http.ResponseWriter, r *http.Request) {
+	if s.updater == nil {
+		writeJSON(w, map[string]interface{}{
+			"current_version":  s.version,
+			"latest_version":   "",
+			"update_available": false,
+			"checked_at":       nil,
+		})
+		return
+	}
+	info := s.updater.LastCheckResult()
+	writeJSON(w, info)
+}
+
+// handleSystemCheckUpdate löst einen sofortigen Update-Check aus.
+func (s *Server) handleSystemCheckUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpError(w, "Nur POST erlaubt", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.updater == nil {
+		httpError(w, "Auto-Update nicht verfügbar", http.StatusServiceUnavailable)
+		return
+	}
+	info, err := s.updater.CheckUpdate()
+	if err != nil {
+		httpError(w, fmt.Sprintf("Update-Check fehlgeschlagen: %v", err), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, info)
+}
+
+// handleSystemInstallUpdate lädt eine neue Binary herunter und installiert sie.
+// HMAC-signiert (kritische Operation).
+func (s *Server) handleSystemInstallUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpError(w, "Nur POST erlaubt", http.StatusMethodNotAllowed)
+		return
+	}
+	if s.updater == nil {
+		httpError(w, "Auto-Update nicht verfügbar", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Download-URL aus Request-Body oder letzten Check verwenden
+	var body struct {
+		DownloadURL string `json:"download_url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.DownloadURL == "" {
+		// Fallback: letzter Check
+		info := s.updater.LastCheckResult()
+		body.DownloadURL = info.DownloadURL
+	}
+
+	if body.DownloadURL == "" {
+		httpError(w, "Kein Download-URL verfügbar. Bitte zuerst Update-Check durchführen.", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.updater.InstallUpdate(body.DownloadURL); err != nil {
+		httpError(w, fmt.Sprintf("Update-Installation fehlgeschlagen: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]string{
+		"status":  "success",
+		"message": "Update installiert. Bitte FluxBot neu starten um die neue Version zu aktivieren.",
+	})
+}
+
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
 func writeJSON(w http.ResponseWriter, v interface{}) {

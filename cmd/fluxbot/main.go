@@ -13,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/playwright-community/playwright-go"
+
 	"github.com/ki-werke/fluxbot/pkg/agent"
 	"github.com/ki-werke/fluxbot/pkg/browser"
 	"github.com/ki-werke/fluxbot/pkg/channels"
@@ -28,18 +30,32 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/security"
 	"github.com/ki-werke/fluxbot/pkg/setup"
 	"github.com/ki-werke/fluxbot/pkg/skills"
+	systempkg "github.com/ki-werke/fluxbot/pkg/system"
 	"github.com/ki-werke/fluxbot/pkg/voice"
 )
 
 // version wird per -ldflags="-X main.version=vX.Y.Z" beim Build gesetzt.
 // Lokal / ohne ldflags bleibt der Wert "dev".
-var version = "v1.1.9"
+var version = "v1.2.1"
 
 func main() {
-	configPath := flag.String("config", "./workspace/config.json", "Pfad zur Konfigurationsdatei")
-	debug := flag.Bool("debug", false, "Debug-Logging aktivieren")
-	service := flag.String("service", "", "Service-Modus: install | uninstall | run")
+	configPath        := flag.String("config", "./workspace/config.json", "Pfad zur Konfigurationsdatei")
+	debug             := flag.Bool("debug", false, "Debug-Logging aktivieren")
+	service           := flag.String("service", "", "Service-Modus: install | uninstall | run")
+	installPlaywright := flag.Bool("install-playwright", false, "Playwright-Browser installieren und beenden")
 	flag.Parse()
+
+	// Playwright-Browser-Installation (von Installer-Skripten aufgerufen)
+	if *installPlaywright {
+		log.Println("[Setup] Installiere Playwright-Browser (Chromium)...")
+		pw, err := playwright.Run()
+		if err != nil {
+			log.Fatalf("[Setup] Playwright konnte nicht gestartet werden: %v", err)
+		}
+		log.Println("[Setup] ✅ Playwright-Browser erfolgreich installiert.")
+		pw.Stop()
+		return
+	}
 
 	if *debug {
 		log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -453,6 +469,11 @@ func runBot(ctx context.Context, configPath string) {
 			pairingStore,
 			sendToChannel,
 		)
+		// Auto-Updater initialisieren und an Dashboard übergeben
+		updater := systempkg.New(version)
+		updater.StartBackgroundCheck(ctx)
+		dash.SetUpdater(updater)
+
 		go dash.Start(ctx)
 	}
 

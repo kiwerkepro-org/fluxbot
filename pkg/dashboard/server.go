@@ -21,6 +21,7 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/pairing"
 	"github.com/ki-werke/fluxbot/pkg/security"
 	"github.com/ki-werke/fluxbot/pkg/skills"
+	"github.com/ki-werke/fluxbot/pkg/system"
 )
 
 //go:embed dashboard.html
@@ -47,6 +48,7 @@ type Server struct {
 	skillsLoader  *skills.Loader          // SkillsLoader für Skill-Verwaltung
 	pairingStore  *pairing.Store          // Pairing-Store für DM-Pairing Mode (P9)
 	sendToChannel func(channel, chatID, text string) error // Callback: Nachricht an Channel senden
+	updater       *system.Updater         // Auto-Update-System (P0)
 }
 
 // New erstellt einen neuen Dashboard-Server.
@@ -80,6 +82,11 @@ func New(configPath, workspacePath, password, username string, port int, getChan
 		pairingStore:  pairingStore,
 		sendToChannel: sendToChannel,
 	}
+}
+
+// SetUpdater setzt den Auto-Updater nach der Initialisierung.
+func (s *Server) SetUpdater(u *system.Updater) {
+	s.updater = u
 }
 
 // UpdateHMACSecret aktualisiert das HMAC-Secret zur Laufzeit (Hot-Reload).
@@ -150,6 +157,11 @@ func (s *Server) Start(ctx context.Context) {
 	// ── Pairing API (P9: DM-Pairing Mode) ─────────────────────────────────
 	mux.HandleFunc("/api/pairing", s.auth(s.hmacVerify(s.handlePairing)))       // GET: Liste, POST: Approve/Block/Remove (HMAC)
 	mux.HandleFunc("/api/pairing/stats", s.auth(s.handlePairingStats))          // GET: Statistiken
+
+	// ── System API (P0: Auto-Update) ────────────────────────────────────────
+	mux.HandleFunc("/api/system/version", s.auth(s.handleSystemVersion))                         // GET: Version-Info + Update-Status
+	mux.HandleFunc("/api/system/check-update", s.auth(s.handleSystemCheckUpdate))                // POST: Sofortiger Update-Check
+	mux.HandleFunc("/api/system/install-update", s.auth(s.hmacVerify(s.handleSystemInstallUpdate))) // POST: Update installieren (HMAC)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),

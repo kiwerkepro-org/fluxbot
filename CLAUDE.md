@@ -185,9 +185,9 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 50 (2026-03-08) – P12 Dark/Light Mode Theme Toggle ✅ IMPLEMENTIERT
-- **Nächste Aktion:** Installation & Update System (PRIORITÄT 0) oder weitere Features
-- **Aktueller Release:** `v1.2.1` ✅ RELEASED
+- **Letzte Session:** 51 (2026-03-08) – P0 Installation & Update System ✅ IMPLEMENTIERT
+- **Nächste Aktion:** Features aus Roadmap (P10 Granulare DM-Policy, P11 Dangerous-Tools, P13 OCR)
+- **Aktueller Release:** `v1.2.1` ✅ (nächster Release nach P0: v1.2.2)
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 - **Dark Mode:** ✅ LIVE – Theme-Toggle im Sidebar-Footer
 
@@ -242,6 +242,20 @@ git push origin main
 - ✅ **Git History clean:** O1000-OpenClaw komplett entfernt + purged
 - ✅ **Validierung:** OpenVisible funktioniert ✅, Lucide Icons ✅
 - 🔄 **P4 System-Testing:** Auf "später" verschoben (Cal.com, VT Live-Test, Google OAuth)
+
+### Session 51 Summary (2026-03-08) – P0 INSTALLATION & UPDATE SYSTEM
+- ✅ **`install.ps1`** – Windows Installer (Nativ + Docker Menü)
+  - Nativ: GitHub Release Binary, Playwright-Browser, Task Scheduler Autostart
+- ✅ **`install.sh`** – Linux/macOS Installer (Nativ + Docker Menü)
+  - Nativ: GitHub Release Binary, Systemd (Linux) / LaunchAgent (macOS)
+- ✅ **`pkg/system/updater.go`** – Auto-Updater (Go)
+  - GitHub Releases API, Background-Check alle 6h, Binary-Download + Install
+- ✅ **Dashboard API:** `/api/system/version`, `/api/system/check-update`, `/api/system/install-update`
+- ✅ **Update-Panel** im Status-Tab – Versions-Badge + 1-Klick-Update
+- ✅ **`--install-playwright` Flag** – Browser-Installation via Binary-Flag
+- ✅ **Makefile:** macOS-Assets normalisiert (`fluxbot-darwin-*` statt `fluxbot-macos-*`)
+- ✅ **Version:** Hardcoded-Fallback auf `v1.2.1` korrigiert (war `v1.1.9`)
+- ✅ **Build:** `go build -o fluxbot.exe ./cmd/fluxbot` ✅ SUCCESS
 
 ### Status nach Session 50
 - **AutoStart:** ✅ Task Scheduler (AtLogon, Hidden, Auto-Restart)
