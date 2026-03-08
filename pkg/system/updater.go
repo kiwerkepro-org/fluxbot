@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -184,9 +185,7 @@ func (u *Updater) fetchLatestRelease() (*UpdateInfo, error) {
 	}, nil
 }
 
-// InstallUpdate lädt die neue Binary herunter und ersetzt die aktuelle.
-// Der Neustart muss vom Caller (z.B. Systemd/Task Scheduler) durchgeführt werden.
-// Gibt den Pfad der heruntergeladenen Binary zurück.
+// InstallUpdate lädt die neue Binary herunter, ersetzt die aktuelle und startet neu.
 func (u *Updater) InstallUpdate(downloadURL string) error {
 	if downloadURL == "" {
 		return fmt.Errorf("kein Download-URL für diese Plattform verfügbar")
@@ -207,7 +206,14 @@ func (u *Updater) InstallUpdate(downloadURL string) error {
 	// Neue Binary in temporäre Datei laden
 	tmpPath := exePath + ".update"
 	if err := u.downloadFile(downloadURL, tmpPath); err != nil {
+		os.Remove(tmpPath)
 		return fmt.Errorf("Download fehlgeschlagen: %w", err)
+	}
+
+	// Dateigröße prüfen (mindestens 1 MB – sonst ist es wahrscheinlich eine Fehlerseite)
+	if info, err := os.Stat(tmpPath); err == nil && info.Size() < 1024*1024 {
+		os.Remove(tmpPath)
+		return fmt.Errorf("Download unvollständig oder fehlerhaft (nur %d Bytes). Ist das GitHub-Repo öffentlich zugänglich?", info.Size())
 	}
 
 	// Ausführbar machen (Linux/macOS)
@@ -220,7 +226,7 @@ func (u *Updater) InstallUpdate(downloadURL string) error {
 
 	// Alte Binary sichern
 	backupPath := exePath + ".bak"
-	os.Remove(backupPath) // Altes Backup löschen, ignoriere Fehler
+	os.Remove(backupPath)
 	if err := os.Rename(exePath, backupPath); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("Backup der alten Binary fehlgeschlagen: %w", err)
@@ -228,14 +234,26 @@ func (u *Updater) InstallUpdate(downloadURL string) error {
 
 	// Neue Binary an den richtigen Platz verschieben
 	if err := os.Rename(tmpPath, exePath); err != nil {
-		// Rollback: alte Binary wiederherstellen
-		os.Rename(backupPath, exePath)
+		os.Rename(backupPath, exePath) // Rollback
 		return fmt.Errorf("Installation fehlgeschlagen: %w", err)
 	}
 
-	log.Printf("[Updater] Update erfolgreich installiert → %s", exePath)
-	log.Printf("[Updater] Backup der alten Version: %s", backupPath)
-	log.Printf("[Updater] Bitte FluxBot neu starten um das Update zu aktivieren.")
+	log.Printf("[Updater] ✅ Update installiert → %s (Backup: %s)", exePath, backupPath)
+
+	// Self-Restart: neuen Prozess mit neuer Binary starten, dann selbst beenden
+	go func() {
+		time.Sleep(500 * time.Millisecond) // kurz warten damit die HTTP-Antwort noch zurückkommt
+		log.Printf("[Updater] Starte neu mit neuer Binary...")
+		cmd := exec.Command(exePath, os.Args[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			log.Printf("[Updater] Neustart fehlgeschlagen: %v – bitte manuell neu starten.", err)
+			return
+		}
+		os.Exit(0)
+	}()
+
 	return nil
 }
 

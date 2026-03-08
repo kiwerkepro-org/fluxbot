@@ -2325,9 +2325,13 @@ async function checkUpdate() {
   if (msg) msg.textContent = 'Prüfe GitHub Releases...';
   try {
     const vInfo = await api('/api/system/check-update', 'POST', {});
-    renderUpdateInfo(vInfo);
+    if (vInfo.error) {
+      if (msg) msg.textContent = `❌ ${vInfo.error}`;
+    } else {
+      renderUpdateInfo(vInfo);
+    }
   } catch(e) {
-    if (msg) msg.textContent = `Fehler beim Update-Check: ${e.message}`;
+    if (msg) msg.textContent = `❌ Fehler beim Update-Check: ${e.message}`;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🔍 Auf Updates prüfen'; }
   }
@@ -2335,17 +2339,25 @@ async function checkUpdate() {
 
 // Update herunterladen und installieren
 async function installUpdate() {
-  if (!confirm('Update jetzt herunterladen und installieren?\n\nFluxBot muss danach manuell neu gestartet werden.')) return;
+  if (!confirm('Update jetzt herunterladen und installieren?\n\nFluxBot startet danach automatisch neu.')) return;
   const btn = document.getElementById('btn-install-update');
   const msg = document.getElementById('update-status-msg');
   if (btn) { btn.disabled = true; btn.textContent = '⬇️ Installiere...'; }
   if (msg) msg.textContent = 'Lade neue Version herunter...';
   try {
     const result = await api('/api/system/install-update', 'POST', {});
-    if (msg) msg.textContent = result.message || 'Update installiert. Bitte FluxBot neu starten.';
+    // Fehler-Check: API gibt bei Fehler {error: "..."} zurück (HTTP 4xx/5xx)
+    if (result.error) {
+      if (msg) msg.textContent = `❌ Fehler: ${result.error}`;
+      if (btn) { btn.disabled = false; btn.textContent = '⬇️ Update installieren'; }
+      return;
+    }
+    if (msg) msg.textContent = '✅ Update installiert – FluxBot startet neu...';
     if (btn) { btn.disabled = true; btn.textContent = '✅ Installiert'; }
+    // Nach 8 Sekunden Dashboard neu laden (FluxBot braucht ein paar Sekunden zum Starten)
+    setTimeout(() => location.reload(), 8000);
   } catch(e) {
-    if (msg) msg.textContent = `Fehler bei der Installation: ${e.message}`;
+    if (msg) msg.textContent = `❌ Fehler bei der Installation: ${e.message}`;
     if (btn) { btn.disabled = false; btn.textContent = '⬇️ Update installieren'; }
   }
 }
