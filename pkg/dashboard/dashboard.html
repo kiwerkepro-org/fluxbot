@@ -420,15 +420,6 @@
       </div>
     </div>
 
-    <!-- Neustart-Panel (immer sichtbar) -->
-    <div class="panel" style="margin-top:20px">
-      <div class="panel-title">⚙️ Steuerung</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-        <button class="btn btn-secondary" onclick="restartFluxBot()" id="btn-restart">🔄 Neu starten</button>
-      </div>
-      <p id="restart-status-msg" style="font-size:12px;color:var(--muted);margin-top:8px"></p>
-    </div>
-
     <!-- Update-Panel (nur sichtbar wenn API verfügbar) -->
     <div id="update-panel" class="panel" style="margin-top:20px;display:none">
       <div class="panel-title">🔄 Software-Update</div>
@@ -448,6 +439,7 @@
         <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
           <button class="btn btn-secondary" onclick="checkUpdate()" id="btn-check-update">🔍 Auf Updates prüfen</button>
           <button class="btn btn-primary" onclick="installUpdate()" id="btn-install-update" style="display:none">⬇️ Update installieren</button>
+          <button class="btn btn-secondary" onclick="restartFluxBot()" id="btn-restart">🔄 Neu starten</button>
         </div>
         <p id="update-status-msg" style="font-size:12px;color:var(--muted);margin-top:8px"></p>
       </div>
@@ -2348,7 +2340,7 @@ async function loadStatus() {
     mode.textContent  = isDocker ? '(Docker-Modus)' : '(Lokaler Modus)';
   }
 
-  // Update-Panel laden
+  // Update-Panel laden (immer sichtbar – enthält auch Neu-starten-Button)
   const updatePanel = document.getElementById('update-panel');
   if (updatePanel) {
     updatePanel.style.display = 'block';
@@ -2356,8 +2348,7 @@ async function loadStatus() {
       const vInfo = await api('/api/system/version');
       renderUpdateInfo(vInfo);
     } catch(e) {
-      // Update-API nicht verfügbar – Panel ausblenden
-      updatePanel.style.display = 'none';
+      // Version-API nicht verfügbar – Panel trotzdem zeigen (Restart-Button bleibt erreichbar)
     }
   }
 }
@@ -2447,60 +2438,14 @@ async function installUpdate() {
 // FluxBot neu starten
 async function restartFluxBot() {
   const btn = document.getElementById('btn-restart');
-  const msg = document.getElementById('restart-status-msg');
+  const msg = document.getElementById('update-status-msg');
+  if (!confirm('FluxBot jetzt neu starten?')) return;
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Startet neu...'; }
-  if (msg) msg.textContent = 'Sende Neustart-Signal...';
-
-  let requestOk = false;
+  if (msg) msg.textContent = 'Neustart-Signal gesendet – bitte Seite in einigen Sekunden manuell neu laden.';
   try {
-    const result = await api('/api/system/restart', 'POST', {});
-    if (result && result.error) {
-      if (msg) msg.textContent = `❌ Neustart abgelehnt: ${result.error}`;
-      if (btn) { btn.disabled = false; btn.textContent = '🔄 Neu starten'; }
-      return;
-    }
-    requestOk = true;
-  } catch(e) {
-    // Verbindungsabbruch ist beim Neustart normal – kein echter Fehler
-    requestOk = true;
-  }
-
-  if (!requestOk) return;
-  if (msg) msg.textContent = '⏳ Warte bis FluxBot offline geht...';
-
-  // Phase 1: Warten bis FluxBot offline geht (max 5 Sekunden)
-  let wentDown = false;
-  for (let i = 0; i < 10; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    try {
-      await fetch('/api/status'); // Kein auth – nur Erreichbarkeit prüfen
-    } catch(e) {
-      wentDown = true;
-      break;
-    }
-  }
-
-  // Phase 2: Warten bis FluxBot wieder erreichbar ist (max 20 Sekunden)
-  if (msg) msg.textContent = '⏳ Warte auf FluxBot-Neustart...';
-  for (let i = 0; i < 40; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    try {
-      const resp = await fetch('/api/status');
-      if (resp.ok || resp.status === 401) {
-        // Erreichbar (401 = läuft, aber Auth fehlt) → Seite neu laden
-        location.reload();
-        return;
-      }
-    } catch(e) { /* noch nicht erreichbar */ }
-  }
-
-  if (msg) {
-    if (!wentDown) {
-      msg.textContent = '⚠️ FluxBot hat nicht reagiert – war der Neustart erfolgreich?';
-    } else {
-      msg.textContent = '⚠️ FluxBot nicht erreichbar – bitte Seite manuell neu laden.';
-    }
-  }
+    await api('/api/system/restart', 'POST', {});
+  } catch(e) { /* Verbindungsabbruch beim Neustart ist normal */ }
+  await new Promise(r => setTimeout(r, 3000));
   if (btn) { btn.disabled = false; btn.textContent = '🔄 Neu starten'; }
 }
 
