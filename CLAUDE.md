@@ -20,7 +20,7 @@
 |-------|--------|
 | `memory-md/01-features.md` | Alle implementierten Features (P1–P10) + offene Punkte |
 | `memory-md/02-architektur.md` | Architektur-Entscheidungen + Secret-Strategie + Keyring |
-| `memory-md/03-session-log.md` | Chronologisches Session-Protokoll (Sessions 1–48) |
+| `memory-md/03-session-log.md` | Chronologisches Session-Protokoll (Sessions 1–53) |
 | `memory-md/04-redesign-spec.md` | Dashboard Redesign Spezifikation (Session 20+) |
 | `memory-md/05-bugreports.md` | Bugs & Issues (Session 30+) |
 | `memory-md/06-feature-roadmap.md` | Zukunfts-Features & Ideen aus INBOX.md → priorisiert |
@@ -137,6 +137,10 @@ BROWSER_ALLOWED_DOMAINS ← kommagetrennte Whitelist (leer = alle, nicht empfohl
 | `/api/pairing` | GET | Pairing-Liste (optional ?status=pending/approved/blocked) |
 | `/api/pairing` | POST | Pairing-Aktion: approve/block/remove/note (HMAC) |
 | `/api/pairing/stats` | GET | Pairing-Statistiken (approved/pending/blocked/total) |
+| `/api/system/version` | GET | Version-Info + Update-Status |
+| `/api/system/check-update` | POST | Sofortiger Update-Check |
+| `/api/system/install-update` | POST | Update installieren (HMAC) |
+| `/api/system/restart` | POST | FluxBot neu starten (HMAC) |
 
 ---
 
@@ -185,9 +189,9 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 51 (2026-03-08) – P0 Installation & Update System ✅ IMPLEMENTIERT
-- **Nächste Aktion:** Features aus Roadmap (P10 Granulare DM-Policy, P11 Dangerous-Tools, P13 OCR)
-- **Aktueller Release:** `v1.2.2` ✅ RELEASED
+- **Letzte Session:** 54 (2026-03-08) – P11 Dangerous-Tools Whitelist ✅
+- **Nächste Aktion:** Features aus Roadmap (P13 OCR, P14 Multi-Modal)
+- **Aktueller Release:** `v1.2.2` ✅ RELEASED (nächste: v1.2.3)
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 - **Dark Mode:** ✅ LIVE – Theme-Toggle im Sidebar-Footer
 
@@ -243,6 +247,25 @@ git push origin main
 - ✅ **Validierung:** OpenVisible funktioniert ✅, Lucide Icons ✅
 - 🔄 **P4 System-Testing:** Auf "später" verschoben (Cal.com, VT Live-Test, Google OAuth)
 
+### Session 53 Summary (2026-03-08) – RESTART-BUTTON FIX + CACHE-CONTROL
+- ✅ **Bug:** Restart-Button war unsichtbar (update-panel hatte `display:none`)
+- ✅ **Fix:** `display:none` aus HTML-Tag entfernt → Panel + Button immer sichtbar
+- ✅ **Vereinfachung:** Auto-Restart-Polling komplett entfernt → 5s wait + `location.reload()`
+- ✅ **Cache-Control:** `no-store` Header auf Dashboard-HTML → kein Browser-Caching mehr
+- ✅ **Windows Restart:** `startDetached()` mit `CREATE_BREAKAWAY_FROM_JOB` (0x01000000) in `restart_windows.go`
+- ✅ **Build:** `go build -o fluxbot.exe ./cmd/fluxbot` ✅ SUCCESS
+
+### Session 52 Summary (2026-03-08) – P10 GRANULARE DM-POLICY
+- ✅ **Feature:** Granulare DM-Policy (P10) – alle 5 Kanäle
+- ✅ **`pkg/channels/access.go`:** Zentrale `CheckAccess()` Funktion – `AccessAllowed/Denied/Pending`
+- ✅ **3 Modi:** `open` (alle), `allowlist` (nur AllowFrom), `pairing` (Freigabe via Dashboard)
+- ✅ **Alle Kanäle:** Telegram, Discord, Slack, Matrix, WhatsApp – je `DMMode` + `GroupMode`
+- ✅ **Dashboard:** DMMode/GroupMode Dropdowns für alle 5 Kanäle
+- ✅ **WhatsApp:** IsDM=true (alle WA = DM), `normalizePhone()` für AllowFrom
+- ✅ **Matrix:** IsDM=false (alle Rooms = GroupMode, kein zuverlässiges DM-Detection)
+- ✅ **main.go:** Alle 5 Channel-Konstruktoren mit DMMode/GroupMode/PairingStore/PairingMessage
+- ✅ **Build:** `go build -o fluxbot.exe ./cmd/fluxbot` ✅ SUCCESS
+
 ### Session 51 Summary (2026-03-08) – P0 INSTALLATION & UPDATE SYSTEM
 - ✅ **`install.ps1`** – Windows Installer (Nativ + Docker Menü)
   - Nativ: GitHub Release Binary, Playwright-Browser, Task Scheduler Autostart
@@ -257,14 +280,34 @@ git push origin main
 - ✅ **Version:** Hardcoded-Fallback auf `v1.2.1` korrigiert (war `v1.1.9`)
 - ✅ **Build:** `go build -o fluxbot.exe ./cmd/fluxbot` ✅ SUCCESS
 
-### Status nach Session 50
+### Session 54 Summary (2026-03-08) – P11 DANGEROUS-TOOLS WHITELIST
+- ✅ **Feature:** Dangerous-Tools Whitelist implementiert (P11)
+- ✅ **`pkg/security/dangerous_tools.go`:** 5 Kategorien, 80+ DE+EN Muster, In-Memory Stats
+  - `system.run` – Shell-Befehle (bash, PowerShell, rm -rf, taskkill, …)
+  - `file.delete` – Dateien löschen (os.remove, shutil.rmtree, …)
+  - `file.modify` – Dateien überschreiben (sed -i, open(w), …)
+  - `code.eval` – Code ausführen (eval, exec, subprocess, …)
+  - `network.unrestricted` – HTTP-Requests (curl, wget, requests, …)
+- ✅ **Config:** `DangerousToolsConfig{Enabled, AdminIDs, Blocked}` in config.json
+  - Default: alle 5 Kategorien gesperrt, Enabled=true
+  - AdminIDs: Format "senderID" oder "channel:senderID" → Bypass
+- ✅ **Agent-Check:** In `processText()` vor callAI() – Admin-Bypass + Pattern-Match
+- ✅ **Hot-Reload:** `UpdateDangerousToolsConfig()` – sofort wirksam ohne Neustart
+- ✅ **Dashboard:** Nav-Tab "Dangerous Tools" mit Stats-Karten + Konfig-UI (Enabled/Blocked/AdminIDs)
+- ✅ **API:** `GET /api/security/dangerous-tools` – Stats + Kategorie-Labels
+- ✅ **Build:** `go build -o fluxbot.exe ./cmd/fluxbot` ✅ SUCCESS
+
+### Status nach Session 53
 - **AutoStart:** ✅ Task Scheduler (AtLogon, Hidden, Auto-Restart)
 - **Dashboard:** http://localhost:9090 erreichbar, Lucide Icons ✅, Dark Mode ✅
+- **P11 Dangerous-Tools Whitelist:** ✅ LIVE – 5 Kategorien, 80+ Muster, Admin-Bypass, Hot-Reload
 - **P9 DM-Pairing Mode:** ✅ LIVE & FUNKTIONAL
+- **P10 Granulare DM-Policy:** ✅ LIVE – alle 5 Kanäle, DMMode/GroupMode Dropdowns
 - **P12 Dark/Light Mode:** ✅ LIVE – Theme-Toggle im Sidebar, localStorage Persistierung
+- **P0 Auto-Update:** ✅ LIVE – Restart-Button immer sichtbar, 5s wait + reload
 - **Self-Extend Feature:** ✅ LIVE – 3 Stufen implementiert
 - **Browser Skills:** ✅ VOLL FUNKTIONAL – Screenshot, Read, Fill, Actions, OpenVisible (Playwright)
 - **OpenVisible:** ✅ FUNKTIONAL (via Heimnetzwerk, öffnet auf Desktop wenn auf Handy Telegram-Befehl kam)
 - **Docker:** ❌ ENTFERNT – FluxBot läuft nur noch nativ auf Windows
-- **Release:** `v1.2.1` ✅ PUBLISHED
-- **Details:** `memory-md/03-session-log.md` (Sessions 1–50)
+- **Release:** `v1.2.2` ✅ PUBLISHED
+- **Details:** `memory-md/03-session-log.md` (Sessions 1–53)

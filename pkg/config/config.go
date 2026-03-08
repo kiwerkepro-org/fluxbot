@@ -22,6 +22,17 @@ type Config struct {
 	SkillSecret  string             `json:"skillSecret,omitempty"`  // HMAC-Key für Skill-Signierung
 	Security     SecurityConfig     `json:"security"`               // vt-go Implementierung
 	BrowserSkills BrowserSkillsConfig `json:"browserSkills,omitempty"` // Session 42: Web-Suche + Browser CDP
+	DangerousTools DangerousToolsConfig `json:"dangerousTools,omitempty"` // P11: Dangerous-Tools Whitelist
+}
+
+// DangerousToolsConfig konfiguriert die Dangerous-Tools Whitelist (P11).
+// Enabled: wenn true, werden User-Prompts auf gefährliche Operationen geprüft.
+// AdminIDs: User-IDs die alle Operationen nutzen dürfen (Format: "123456" oder "telegram:123456").
+// Blocked: Liste der gesperrten Kategorien (leer = alles erlaubt).
+type DangerousToolsConfig struct {
+	Enabled  bool     `json:"enabled"`            // true = Prüfung aktiv (Default: true)
+	AdminIDs []string `json:"adminIDs,omitempty"` // Bypass-Liste für Admins
+	Blocked  []string `json:"blocked,omitempty"`  // Kategorien: system.run, file.delete, file.modify, code.eval, network.unrestricted
 }
 
 // BrowserSkillsConfig konfiguriert die Browser Skills (Playwright).
@@ -407,6 +418,16 @@ func Load(path string) (*Config, error) {
 
 	if cfg.Dashboard.Port == 0 {
 		cfg.Dashboard.Port = 9090
+	}
+
+	// ── DangerousTools Defaults ─────────────────────────────────────────────
+	// Enabled=true per Default (JSON bool defaults to false, daher explizit setzen)
+	// Wenn Blocked leer ist → alle Kategorien sperren
+	if !cfg.DangerousTools.Enabled && len(cfg.DangerousTools.Blocked) == 0 {
+		cfg.DangerousTools.Enabled = true
+		cfg.DangerousTools.Blocked = []string{
+			"system.run", "file.delete", "file.modify", "code.eval", "network.unrestricted",
+		}
 	}
 
 	// ── Skill-Secret auto-generieren wenn noch nicht vorhanden ──────────────

@@ -158,6 +158,9 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/pairing", s.auth(s.hmacVerify(s.handlePairing)))       // GET: Liste, POST: Approve/Block/Remove (HMAC)
 	mux.HandleFunc("/api/pairing/stats", s.auth(s.handlePairingStats))          // GET: Statistiken
 
+	// ── Security API (P11: Dangerous-Tools Whitelist) ───────────────────────
+	mux.HandleFunc("/api/security/dangerous-tools", s.auth(s.handleDangerousToolsStats)) // GET: Stats
+
 	// ── System API (P0: Auto-Update) ────────────────────────────────────────
 	mux.HandleFunc("/api/system/version", s.auth(s.handleSystemVersion))                            // GET: Version-Info + Update-Status
 	mux.HandleFunc("/api/system/check-update", s.auth(s.handleSystemCheckUpdate))                   // POST: Sofortiger Update-Check

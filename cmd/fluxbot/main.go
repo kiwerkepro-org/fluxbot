@@ -414,6 +414,7 @@ func runBot(ctx context.Context, configPath string) {
 		TTSMode:          cfg.Voice.TTSMode,
 		SearchClient:     searchClient,
 		BrowserClient:    browserClient,
+		DangerousTools:   buildDangerousToolsCfg(cfg),
 	})
 
 	if cfg.Dashboard.Enabled {
@@ -454,6 +455,9 @@ func runBot(ctx context.Context, configPath string) {
 			// Session 42: Browser Skills Hot-Reload
 			fluxAgent.UpdateSearchClient(buildSearchClient(newCfg))
 			fluxAgent.UpdateBrowserClient(buildBrowserClient(newCfg))
+
+			// P11: Dangerous-Tools Whitelist Hot-Reload
+			fluxAgent.UpdateDangerousToolsConfig(buildDangerousToolsCfg(newCfg))
 
 			// TTS Hot-Reload: aktiviert sich automatisch wenn VOICE_TTS_API_KEY gesetzt wird,
 			// deaktiviert sich automatisch wenn Key entfernt wird – kein Neustart nötig.
@@ -1094,4 +1098,19 @@ func buildBrowserClient(cfg *config.Config) *browser.Client {
 		log.Printf("[Main] ⚠️ Browser Skills aktiviert (Playwright/%s) | KEINE Domain-Whitelist – alle URLs erlaubt!", browserType)
 	}
 	return client
+}
+
+// ── P11: DANGEROUS-TOOLS ───────────────────────────────────────────────────
+
+// buildDangerousToolsCfg erstellt die Dangerous-Tools Konfiguration für den Agent.
+func buildDangerousToolsCfg(cfg *config.Config) *agent.DangerousToolsCfg {
+	dt := cfg.DangerousTools
+	if !dt.Enabled {
+		return nil
+	}
+	return &agent.DangerousToolsCfg{
+		Enabled:  true,
+		AdminIDs: dt.AdminIDs,
+		Blocked:  dt.Blocked,
+	}
 }

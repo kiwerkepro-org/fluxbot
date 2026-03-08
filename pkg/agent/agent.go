@@ -38,6 +38,7 @@ type Agent struct {
 	voiceLang       string
 	guard           *security.Guard
 	auditLogger     *security.AuditLogger // Session 31: Audit-Logging mit Duration, Intent, Error-Code
+	dangerousTools  *DangerousToolsCfg   // P11: Dangerous-Tools Whitelist
 	imageGenerators []imagegen.Generator // Alle verfügbaren Bildgeneratoren (in Auswahl-Reihenfolge)
 	imageSize        string
 	videoDefault     string        // "disabled" oder Provider-Name – steuert Video-Meldung
@@ -56,6 +57,13 @@ type Agent struct {
 	// Session 42: Browser Skills (Phase 1: Suche, Phase 2: Browser CDP)
 	searchClient  *searchpkg.Client // nil = Web-Suche deaktiviert
 	browserClient *browser.Client   // nil = Browser-Steuerung deaktiviert
+}
+
+// DangerousToolsCfg speichert die Dangerous-Tools Whitelist-Konfiguration (P11).
+type DangerousToolsCfg struct {
+	Enabled  bool     // true = Prüfung aktiv
+	AdminIDs []string // User-IDs die den Check überspringen dürfen ("123456" oder "telegram:123456")
+	Blocked  []string // Gesperrte Kategorien: "system.run","file.delete","file.modify","code.eval","network.unrestricted"
 }
 
 // Config enthält die Konfiguration für den Agent
@@ -85,6 +93,8 @@ type Config struct {
 	// Session 42: Browser Skills
 	SearchClient  *searchpkg.Client // Optional – nil = Web-Suche deaktiviert (Vault: SEARCH_API_KEY)
 	BrowserClient *browser.Client   // Optional – nil = Browser deaktiviert (Vault: BROWSER_ENDPOINT)
+	// P11: Dangerous-Tools Whitelist
+	DangerousTools *DangerousToolsCfg // Optional – nil = kein Dangerous-Tools-Check
 }
 
 // New erstellt einen neuen Agent
@@ -118,6 +128,7 @@ func New(cfg Config) *Agent {
 		ttsMode:          cfg.TTSMode,
 		searchClient:     cfg.SearchClient,
 		browserClient:    cfg.BrowserClient,
+		dangerousTools:   cfg.DangerousTools,
 	}
 
 	// Session 31: auditLogger vom Guard extrahieren (falls Guard vorhanden)
@@ -225,6 +236,16 @@ func (a *Agent) UpdateBrowserClient(client *browser.Client) {
 		log.Println("[Agent] 🔄 Browser-Steuerung deaktiviert (kein BROWSER_ENDPOINT).")
 	} else {
 		log.Println("[Agent] 🔄 Browser-Steuerung (CDP) aktiviert.")
+	}
+}
+
+// UpdateDangerousToolsConfig aktualisiert die Dangerous-Tools Konfiguration (P11) zur Laufzeit.
+func (a *Agent) UpdateDangerousToolsConfig(cfg *DangerousToolsCfg) {
+	a.dangerousTools = cfg
+	if cfg == nil || !cfg.Enabled {
+		log.Println("[Agent] 🔄 Dangerous-Tools Check deaktiviert.")
+	} else {
+		log.Printf("[Agent] 🔄 Dangerous-Tools Check aktiv | Geblockt: %v | Admins: %d", cfg.Blocked, len(cfg.AdminIDs))
 	}
 }
 
@@ -746,6 +767,17 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 		log.Printf("[Agent] Skill: %s", matchResult.Skill.Name)
 	} else {
 		rules = matchResult.FallbackContent
+	}
+
+	// ── P11: DANGEROUS-TOOLS CHECK ────────────────────────────────────────
+	if a.dangerousTools != nil && a.dangerousTools.Enabled {
+		if !security.IsDangerousToolsAdmin(msg.SenderID, msg.ChannelID, a.dangerousTools.AdminIDs) {
+			dtResult := security.CheckDangerousTools(text, a.dangerousTools.Blocked)
+			if dtResult.Blocked {
+				log.Printf("[Agent] ⛔ Dangerous Tool blockiert: %s | Muster: %s | Sender: %s", dtResult.Category, dtResult.Pattern, msg.SenderID)
+				return fmt.Sprintf("⛔ **Zugriff verweigert**\n\nDiese Operation ist nicht erlaubt: **%s** (%s)\n\nNur Admins dürfen diese Art von Anfragen stellen. Bitte wende dich an den Bot-Administrator.", security.DangerousCategoryLabel(dtResult.Category), dtResult.Reason)
+			}
+		}
 	}
 
 	return a.callAI(ctx, msg, session, text, rules)

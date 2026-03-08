@@ -347,6 +347,10 @@
     <span class="nav-icon"><i data-lucide="shield"></i></span> VirusTotal
     <button class="info-btn" onmouseenter="tipShow(this,'Malware-Scan-History und Statistiken. Erfordert API-Key in Danger Zone.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
   </div>
+  <div class="nav-item" onclick="showSection('dangerous-tools', this)">
+    <span class="nav-icon"><i data-lucide="shield-alert"></i></span> Dangerous Tools
+    <button class="info-btn" onmouseenter="tipShow(this,'Blockiert gefährliche Operationen wie Shell-Befehle, Datei-Löschung und Code-Ausführung.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button>
+  </div>
   <div class="nav-item" onclick="showSection('pairing', this)">
     <span class="nav-icon"><i data-lucide="user-check"></i></span> Pairing
     <span id="pairing-nav-badge" style="display:none;margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;min-width:16px;text-align:center"></span>
@@ -1506,6 +1510,91 @@
   </div>
 
   <!-- PAIRING (P9) -->
+  <!-- ═══════════════════ DANGEROUS TOOLS (P11) ═════════════════════════ -->
+  <div class="section" id="section-dangerous-tools">
+    <h2>⛔ Dangerous Tools</h2>
+    <p class="subtitle">Blockiert gefährliche Operationen wie Shell-Befehle, Datei-Löschung und Code-Ausführung</p>
+
+    <!-- Stats-Karten -->
+    <div class="cards" id="dt-cards">
+      <div class="card">
+        <div class="card-label">Gesamt blockiert</div>
+        <div class="card-value red" id="dt-total">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">System-Befehle</div>
+        <div class="card-value" id="dt-system-run">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Dateien löschen</div>
+        <div class="card-value" id="dt-file-delete">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Dateien ändern</div>
+        <div class="card-value" id="dt-file-modify">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Code-Ausführung</div>
+        <div class="card-value" id="dt-code-eval">–</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Netzwerk-Zugriff</div>
+        <div class="card-value" id="dt-network">–</div>
+      </div>
+    </div>
+
+    <!-- Konfiguration -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-label" style="margin-bottom:16px;font-size:15px;font-weight:600">⚙️ Konfiguration</div>
+
+      <div class="field" style="margin-bottom:16px">
+        <label>Dangerous-Tools Prüfung <button class="info-btn" onmouseenter="tipShow(this,'Wenn aktiv, werden User-Anfragen auf gefährliche Operationen geprüft. Admins können alle Operationen nutzen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></label>
+        <select id="dt-enabled" onchange="dtSaveConfig()">
+          <option value="true">✅ Aktiv – gefährliche Anfragen blockieren</option>
+          <option value="false">❌ Deaktiviert – alle Anfragen erlaubt</option>
+        </select>
+      </div>
+
+      <div class="field" style="margin-bottom:16px">
+        <label>Gesperrte Kategorien <button class="info-btn" onmouseenter="tipShow(this,'Wähle welche Operationstypen blockiert werden sollen. Admins (siehe unten) sind immer ausgenommen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="dt-block-system-run" onchange="dtSaveConfig()" style="width:16px;height:16px;cursor:pointer">
+            <span><strong>system.run</strong> – Shell-Befehle (bash, PowerShell, cmd.exe, rm -rf, …)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="dt-block-file-delete" onchange="dtSaveConfig()" style="width:16px;height:16px;cursor:pointer">
+            <span><strong>file.delete</strong> – Dateien löschen (os.remove, shutil.rmtree, …)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="dt-block-file-modify" onchange="dtSaveConfig()" style="width:16px;height:16px;cursor:pointer">
+            <span><strong>file.modify</strong> – Dateien schreiben/überschreiben (sed -i, open(w), …)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="dt-block-code-eval" onchange="dtSaveConfig()" style="width:16px;height:16px;cursor:pointer">
+            <span><strong>code.eval</strong> – Code ausführen (eval, exec, subprocess, …)</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+            <input type="checkbox" id="dt-block-network" onchange="dtSaveConfig()" style="width:16px;height:16px;cursor:pointer">
+            <span><strong>network.unrestricted</strong> – HTTP-Requests ohne Whitelist (curl, wget, requests, …)</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Admin-IDs (bypass) <button class="info-btn" onmouseenter="tipShow(this,'Diese User-IDs dürfen alle Operationen nutzen, auch wenn sie geblockt sind. Format: SenderID oder channel:SenderID (z.B. telegram:123456). Eine ID pro Zeile.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></label>
+        <textarea id="dt-admin-ids" rows="3" placeholder="Eine ID pro Zeile, z.B.:&#10;123456789&#10;telegram:987654321" style="width:100%;resize:vertical;font-family:monospace;font-size:12px" oninput="dtSaveConfig()"></textarea>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Admins können auch gesperrte Operationen nutzen – keine Einschränkung.</div>
+      </div>
+
+      <div id="dt-save-status" style="margin-top:12px;font-size:12px;color:var(--green);display:none">✅ Gespeichert</div>
+    </div>
+
+    <p style="font-size:12px;color:var(--muted);margin-top:12px">
+      ℹ️ Die Statistiken werden beim Neustart zurückgesetzt. Konfigurationsänderungen werden sofort wirksam (Hot-Reload).
+    </p>
+  </div>
+
   <div class="section" id="section-pairing">
     <h2>🤝 DM-Pairing</h2>
     <p class="subtitle">Steuere, welche User deinen Bot per DM nutzen dürfen</p>
@@ -1983,8 +2072,9 @@ function showSection(name, el) {
   if (name === 'status')     loadStatus();
   if (name === 'config')     loadConfig();
   if (name === 'system')     updateSystemCmds();
-  if (name === 'virustotal') loadVTData();
-  if (name === 'pairing')    loadPairingData();
+  if (name === 'virustotal')      loadVTData();
+  if (name === 'dangerous-tools') loadDangerousToolsData();
+  if (name === 'pairing')         loadPairingData();
   if (name === 'danger')     { showDangerTab('keys', document.querySelector('.dtab-btn')); loadDangerKeys(); }
   if (name === 'help') {
     document.getElementById('help-search-input').value = '';
@@ -3506,6 +3596,88 @@ function filterPairing(status, el) {
   document.querySelectorAll('.pair-filter').forEach(b => b.classList.remove('active'));
   if (el) el.classList.add('active');
   loadPairingData();
+}
+
+// ── Dangerous Tools (P11) ─────────────────────────────────────────────────
+
+async function loadDangerousToolsData() {
+  // Stats laden
+  const data = await api('/api/security/dangerous-tools');
+  if (data) {
+    document.getElementById('dt-total').textContent = data.total ?? 0;
+    if (data.categories) {
+      for (const cat of data.categories) {
+        const elMap = {
+          'system.run':           'dt-system-run',
+          'file.delete':          'dt-file-delete',
+          'file.modify':          'dt-file-modify',
+          'code.eval':            'dt-code-eval',
+          'network.unrestricted': 'dt-network',
+        };
+        const elId = elMap[cat.key];
+        if (elId) {
+          const el = document.getElementById(elId);
+          if (el) el.textContent = cat.blocked;
+        }
+      }
+    }
+  }
+
+  // Aktuelle Config laden und UI befüllen
+  const cfg = await api('/api/config');
+  if (cfg && cfg.dangerousTools) {
+    const dt = cfg.dangerousTools;
+    document.getElementById('dt-enabled').value = dt.enabled ? 'true' : 'false';
+
+    const blocked = dt.blocked || [];
+    document.getElementById('dt-block-system-run').checked  = blocked.includes('system.run');
+    document.getElementById('dt-block-file-delete').checked = blocked.includes('file.delete');
+    document.getElementById('dt-block-file-modify').checked = blocked.includes('file.modify');
+    document.getElementById('dt-block-code-eval').checked   = blocked.includes('code.eval');
+    document.getElementById('dt-block-network').checked     = blocked.includes('network.unrestricted');
+
+    document.getElementById('dt-admin-ids').value = (dt.adminIDs || []).join('\n');
+  }
+}
+
+let dtSaveTimer = null;
+function dtSaveConfig() {
+  clearTimeout(dtSaveTimer);
+  dtSaveTimer = setTimeout(async () => {
+    const enabled = document.getElementById('dt-enabled').value === 'true';
+    const blocked = [];
+    if (document.getElementById('dt-block-system-run').checked)  blocked.push('system.run');
+    if (document.getElementById('dt-block-file-delete').checked) blocked.push('file.delete');
+    if (document.getElementById('dt-block-file-modify').checked) blocked.push('file.modify');
+    if (document.getElementById('dt-block-code-eval').checked)   blocked.push('code.eval');
+    if (document.getElementById('dt-block-network').checked)     blocked.push('network.unrestricted');
+
+    const rawAdmins = document.getElementById('dt-admin-ids').value;
+    const adminIDs = rawAdmins.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+
+    // Aktuelle Config laden, DangerousTools-Feld aktualisieren, speichern
+    const cfg = await api('/api/config');
+    if (!cfg) return;
+    cfg.dangerousTools = { enabled, blocked, adminIDs };
+
+    const res = await fetch('/api/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Basic ' + btoa(currentUser + ':' + currentPass) },
+      body: JSON.stringify(cfg)
+    });
+    const statusEl = document.getElementById('dt-save-status');
+    if (res.ok) {
+      statusEl.style.display = 'block';
+      statusEl.style.color = 'var(--green)';
+      statusEl.textContent = '✅ Gespeichert';
+      setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
+    } else {
+      statusEl.style.display = 'block';
+      statusEl.style.color = 'var(--red)';
+      statusEl.textContent = '❌ Fehler beim Speichern';
+      setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+    }
+  }, 800);
 }
 
 async function loadPairingData() {

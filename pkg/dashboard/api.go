@@ -747,6 +747,32 @@ func (s *Server) handleSystemRestart(w http.ResponseWriter, r *http.Request) {
 	}()
 }
 
+// ── /api/security/dangerous-tools ─────────────────────────────────────────────
+
+// handleDangerousToolsStats gibt Statistiken und Kategorie-Labels zurück.
+func (s *Server) handleDangerousToolsStats(w http.ResponseWriter, r *http.Request) {
+	counts := security.GetDangerousToolsStats()
+	total := security.GetDangerousToolsTotal()
+
+	type categoryInfo struct {
+		Key     string `json:"key"`
+		Label   string `json:"label"`
+		Blocked int64  `json:"blocked"`
+	}
+	categories := []categoryInfo{
+		{Key: security.CategorySystemRun, Label: security.DangerousCategoryLabel(security.CategorySystemRun), Blocked: counts[security.CategorySystemRun]},
+		{Key: security.CategoryFileDelete, Label: security.DangerousCategoryLabel(security.CategoryFileDelete), Blocked: counts[security.CategoryFileDelete]},
+		{Key: security.CategoryFileModify, Label: security.DangerousCategoryLabel(security.CategoryFileModify), Blocked: counts[security.CategoryFileModify]},
+		{Key: security.CategoryCodeEval, Label: security.DangerousCategoryLabel(security.CategoryCodeEval), Blocked: counts[security.CategoryCodeEval]},
+		{Key: security.CategoryNetworkUnrestricted, Label: security.DangerousCategoryLabel(security.CategoryNetworkUnrestricted), Blocked: counts[security.CategoryNetworkUnrestricted]},
+	}
+
+	writeJSON(w, map[string]interface{}{
+		"total":      total,
+		"categories": categories,
+	})
+}
+
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
