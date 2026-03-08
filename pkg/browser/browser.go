@@ -15,12 +15,17 @@ import (
 
 // Client steuert einen Browser via Playwright.
 type Client struct {
-	browser        playwright.Browser // Playwright Browser-Instanz
+	browser        playwright.Browser // Playwright Browser-Instanz (headless, für Screenshots etc.)
+	visibleBrowser playwright.Browser // Sichtbare Browser-Instanz (für "öffne Seite")
+	visiblePW      *playwright.Playwright // Playwright-Instanz für sichtbaren Browser
 	allowedDomains []string           // Whitelist (leer = alle erlaubt – Warnung im Log)
 	timeout        time.Duration      // Timeout pro Aktion (Standard: 60s)
 	headless       bool               // Headless-Modus (Standard: true)
 	browserType    string             // "chromium" (default), "firefox", "webkit"
 }
+
+// realisticUA ist ein aktueller Chrome User-Agent um Bot-Erkennung zu vermeiden.
+const realisticUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 // FillField beschreibt ein Formularfeld zum Ausfüllen.
 type FillField struct {
@@ -82,6 +87,11 @@ func (c *Client) ensureBrowser(ctx context.Context) (playwright.Browser, error) 
 
 	opts := playwright.BrowserTypeLaunchOptions{
 		Headless: playwright.Bool(c.headless),
+		Args: []string{
+			"--disable-blink-features=AutomationControlled",
+			"--no-first-run",
+			"--no-default-browser-check",
+		},
 	}
 
 	var browser playwright.Browser
@@ -102,6 +112,128 @@ func (c *Client) ensureBrowser(ctx context.Context) (playwright.Browser, error) 
 	return browser, nil
 }
 
+// stealthInit injiziert Anti-Detection Scripts auf einer neuen Seite.
+// Verwendet AddInitScript damit das Script vor jedem Page-Load ausgeführt wird.
+func stealthInit(page playwright.Page) {
+	script := `
+		Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+		Object.defineProperty(navigator, 'languages', {get: () => ['de-DE', 'de', 'en-US', 'en']});
+		Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+		window.chrome = {runtime: {}};
+	`
+	if err := page.AddInitScript(playwright.Script{Content: &script}); err != nil {
+		log.Printf("[Browser] ⚠️ Stealth-Init fehlgeschlagen: %v", err)
+	}
+}
+
+// dismissCookieBanner versucht gängige Cookie-Consent-Banner wegzuklicken.
+// Wartet kurz (max 2s) und klickt auf bekannte "Ablehnen"/"Reject"-Buttons.
+// Fehler werden ignoriert – wenn kein Banner da ist, passiert nichts.
+func dismissCookieBanner(page playwright.Page) {
+	// Gängige Selektoren für "Alle ablehnen" / "Reject all" / "Decline" Buttons
+	selectors := []string{
+		// Google Consent
+		`button:has-text("Alle ablehnen")`,
+		`button:has-text("Reject all")`,
+		`button:has-text("Alle ablehnen")`,
+		// Generische Cookie-Banner
+		`button:has-text("Decline")`,
+		`button:has-text("Ablehnen")`,
+		`button:has-text("Nur notwendige")`,
+		`button:has-text("Only necessary")`,
+		`button:has-text("Reject")`,
+		`[id*="reject" i]`,
+		`[id*="decline" i]`,
+		`[class*="reject" i]`,
+		// CMP (Consent Management Platforms)
+		`.cmpboxbtn[onclick*="reject"]`,
+		`#onetrust-reject-all-handler`,
+		`[data-testid="reject-all"]`,
+		`.cc-deny`,
+	}
+
+	timeout := float64(2000) // 2 Sekunden max
+	for _, sel := range selectors {
+		el, err := page.WaitForSelector(sel, playwright.PageWaitForSelectorOptions{
+			Timeout: &timeout,
+			State:   playwright.WaitForSelectorStateVisible,
+		})
+		if err == nil && el != nil {
+			if err := el.Click(); err == nil {
+				log.Printf("[Browser] 🍪 Cookie-Banner geschlossen via: %s", sel)
+				// Kurz warten bis Banner-Animation fertig
+				page.WaitForTimeout(500)
+				return
+			}
+		}
+	}
+}
+
+// OpenVisible öffnet eine URL in einem sichtbaren Browserfenster.
+// Der Browser bleibt offen – der User kann interagieren.
+func (c *Client) OpenVisible(url string) error {
+	if !c.IsAllowed(url) {
+		return fmt.Errorf("🚫 URL nicht in Whitelist erlaubt: %s", url)
+	}
+
+	// Sichtbaren Browser starten falls noch nicht vorhanden
+	if c.visibleBrowser == nil {
+		pw, err := playwright.Run()
+		if err != nil {
+			return fmt.Errorf("Playwright nicht verfügbar: %w", err)
+		}
+		c.visiblePW = pw
+
+		opts := playwright.BrowserTypeLaunchOptions{
+			Headless: playwright.Bool(false),
+			Args: []string{
+				"--disable-blink-features=AutomationControlled",
+				"--no-first-run",
+				"--no-default-browser-check",
+				"--start-maximized",
+			},
+		}
+
+		var browser playwright.Browser
+		switch strings.ToLower(c.browserType) {
+		case "firefox":
+			browser, err = pw.Firefox.Launch(opts)
+		case "webkit":
+			browser, err = pw.WebKit.Launch(opts)
+		default:
+			browser, err = pw.Chromium.Launch(opts)
+		}
+		if err != nil {
+			return fmt.Errorf("Sichtbarer Browser konnte nicht gestartet werden: %w", err)
+		}
+		c.visibleBrowser = browser
+		log.Printf("[Browser] ✅ Sichtbarer %s gestartet", c.browserType)
+	}
+
+	// Neue Seite öffnen (mit 0x0 Viewport = maximiert)
+	ua := realisticUA
+	page, err := c.visibleBrowser.NewPage(playwright.BrowserNewPageOptions{
+		UserAgent:      &ua,
+		NoViewport:     playwright.Bool(true),
+	})
+	if err != nil {
+		return fmt.Errorf("Neue Seite konnte nicht geöffnet werden: %w", err)
+	}
+	stealthInit(page)
+
+	if _, err := page.Goto(url, playwright.PageGotoOptions{
+		WaitUntil: playwright.WaitUntilStateNetworkidle,
+	}); err != nil {
+		page.Close()
+		return fmt.Errorf("Seite laden fehlgeschlagen: %w", err)
+	}
+	dismissCookieBanner(page)
+
+	log.Printf("[Browser] 🌐 Sichtbare Seite geöffnet: %s", url)
+	// Seite bleibt offen – NICHT page.Close()!
+	return nil
+}
+
 // newPage öffnet eine neue Browser-Seite.
 func (c *Client) newPage(ctx context.Context) (playwright.Page, error) {
 	browser, err := c.ensureBrowser(ctx)
@@ -109,7 +241,10 @@ func (c *Client) newPage(ctx context.Context) (playwright.Page, error) {
 		return nil, err
 	}
 
-	page, err := browser.NewPage()
+	ua := realisticUA
+	page, err := browser.NewPage(playwright.BrowserNewPageOptions{
+		UserAgent: &ua,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("Neue Seite konnte nicht geöffnet werden: %w", err)
 	}
@@ -118,6 +253,7 @@ func (c *Client) newPage(ctx context.Context) (playwright.Page, error) {
 	timeoutMs := float64(c.timeout.Milliseconds())
 	page.SetDefaultTimeout(timeoutMs)
 	page.SetDefaultNavigationTimeout(timeoutMs)
+	stealthInit(page)
 
 	return page, nil
 }
@@ -142,6 +278,7 @@ func (c *Client) ReadPage(url string) (string, error) {
 	}); err != nil {
 		return "", fmt.Errorf("Seite laden fehlgeschlagen (%s): %w", url, err)
 	}
+	dismissCookieBanner(page)
 
 	if err := page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
 		State: playwright.LoadStateNetworkidle,
@@ -178,8 +315,10 @@ func (c *Client) Screenshot(url string) ([]byte, error) {
 	}
 
 	// Viewport auf 1280x800 setzen (Desktop-Ansicht, Telegram-kompatibel)
+	ua := realisticUA
 	page, err := browser.NewPage(playwright.BrowserNewPageOptions{
-		Viewport: &playwright.Size{Width: 1280, Height: 800},
+		Viewport:  &playwright.Size{Width: 1280, Height: 800},
+		UserAgent: &ua,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("Neue Seite konnte nicht geöffnet werden: %w", err)
@@ -189,12 +328,14 @@ func (c *Client) Screenshot(url string) ([]byte, error) {
 	timeoutMs := float64(c.timeout.Milliseconds())
 	page.SetDefaultTimeout(timeoutMs)
 	page.SetDefaultNavigationTimeout(timeoutMs)
+	stealthInit(page)
 
 	if _, err := page.Goto(url, playwright.PageGotoOptions{
 		WaitUntil: playwright.WaitUntilStateNetworkidle,
 	}); err != nil {
 		return nil, fmt.Errorf("Seite laden fehlgeschlagen (%s): %w", url, err)
 	}
+	dismissCookieBanner(page)
 
 	if err := page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
 		State: playwright.LoadStateNetworkidle,
@@ -243,6 +384,7 @@ func (c *Client) FillForm(url string, fields []FillField, submitSelector string)
 	}); err != nil {
 		return "", fmt.Errorf("Seite laden fehlgeschlagen (%s): %w", url, err)
 	}
+	dismissCookieBanner(page)
 
 	if err := page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
 		State: playwright.LoadStateNetworkidle,
@@ -290,8 +432,169 @@ func (c *Client) FillForm(url string, fields []FillField, submitSelector string)
 	return resultText, nil
 }
 
+// WebAction beschreibt eine einzelne Browser-Aktion in einer Sequenz.
+type WebAction struct {
+	Action   string `json:"action"`             // "goto", "fill", "click", "screenshot", "read", "wait", "select"
+	URL      string `json:"url,omitempty"`      // für "goto"
+	Selector string `json:"selector,omitempty"` // für "fill", "click", "wait", "select", "read"
+	Value    string `json:"value,omitempty"`    // für "fill", "select"
+	WaitMs   int    `json:"wait,omitempty"`     // Millisekunden für "wait" (max 10000)
+}
+
+// ActionResult enthält das kombinierte Ergebnis von RunActions.
+type ActionResult struct {
+	Text       string   // Akkumulierter Text von "read"-Aktionen
+	Screenshot []byte   // Screenshot-Bytes von der letzten "screenshot"-Aktion
+	Log        []string // Schritt-für-Schritt-Protokoll
+}
+
+// RunActions führt eine Sequenz von Browser-Aktionen auf einer einzelnen Seite aus.
+// Maximal 20 Aktionen pro Aufruf. Gesamttimeout: 120 Sekunden.
+func (c *Client) RunActions(actions []WebAction) (*ActionResult, error) {
+	if len(actions) == 0 {
+		return nil, fmt.Errorf("keine Aktionen angegeben")
+	}
+	if len(actions) > 20 {
+		return nil, fmt.Errorf("maximal 20 Aktionen erlaubt (erhalten: %d)", len(actions))
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	browser, err := c.ensureBrowser(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	ua := realisticUA
+	page, err := browser.NewPage(playwright.BrowserNewPageOptions{
+		Viewport:  &playwright.Size{Width: 1280, Height: 800},
+		UserAgent: &ua,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("Neue Seite konnte nicht geöffnet werden: %w", err)
+	}
+	defer page.Close()
+
+	timeoutMs := float64(c.timeout.Milliseconds())
+	page.SetDefaultTimeout(timeoutMs)
+	page.SetDefaultNavigationTimeout(timeoutMs)
+	stealthInit(page)
+
+	result := &ActionResult{}
+
+	for i, action := range actions {
+		step := fmt.Sprintf("Schritt %d/%d: %s", i+1, len(actions), action.Action)
+		log.Printf("[Browser] %s", step)
+
+		switch action.Action {
+		case "goto":
+			if action.URL == "" {
+				return result, fmt.Errorf("%s: URL fehlt", step)
+			}
+			if !c.IsAllowed(action.URL) {
+				return result, fmt.Errorf("%s: 🚫 URL nicht erlaubt: %s", step, action.URL)
+			}
+			if _, err := page.Goto(action.URL, playwright.PageGotoOptions{
+				WaitUntil: playwright.WaitUntilStateNetworkidle,
+			}); err != nil {
+				return result, fmt.Errorf("%s: Seite laden fehlgeschlagen: %w", step, err)
+			}
+			dismissCookieBanner(page)
+			result.Log = append(result.Log, fmt.Sprintf("✅ %s aufgerufen", action.URL))
+
+		case "fill":
+			if action.Selector == "" {
+				return result, fmt.Errorf("%s: Selektor fehlt", step)
+			}
+			// Passwort-Felder blockieren
+			selectorLower := strings.ToLower(action.Selector)
+			if strings.Contains(selectorLower, "password") || strings.Contains(selectorLower, "passwd") || strings.Contains(selectorLower, "pwd") {
+				return result, fmt.Errorf("%s: 🔒 Passwort-Felder dürfen nicht automatisch ausgefüllt werden", step)
+			}
+			if err := page.Fill(action.Selector, action.Value); err != nil {
+				return result, fmt.Errorf("%s: Feld ausfüllen fehlgeschlagen (%s): %w", step, action.Selector, err)
+			}
+			result.Log = append(result.Log, fmt.Sprintf("✅ Feld %s ausgefüllt", action.Selector))
+
+		case "click":
+			if action.Selector == "" {
+				return result, fmt.Errorf("%s: Selektor fehlt", step)
+			}
+			if err := page.Click(action.Selector); err != nil {
+				return result, fmt.Errorf("%s: Klick fehlgeschlagen (%s): %w", step, action.Selector, err)
+			}
+			// Nach Klick auf Seitenladung warten
+			page.WaitForLoadState(playwright.PageWaitForLoadStateOptions{
+				State: playwright.LoadStateNetworkidle,
+			})
+			result.Log = append(result.Log, fmt.Sprintf("✅ Klick auf %s", action.Selector))
+
+		case "screenshot":
+			buf, err := page.Screenshot(playwright.PageScreenshotOptions{
+				FullPage: playwright.Bool(false),
+				Type:     playwright.ScreenshotTypePng,
+			})
+			if err != nil {
+				return result, fmt.Errorf("%s: Screenshot fehlgeschlagen: %w", step, err)
+			}
+			result.Screenshot = buf
+			result.Log = append(result.Log, fmt.Sprintf("📸 Screenshot (%d bytes)", len(buf)))
+
+		case "read":
+			selector := action.Selector
+			if selector == "" {
+				selector = "body"
+			}
+			text, err := page.TextContent(selector)
+			if err != nil {
+				return result, fmt.Errorf("%s: Text lesen fehlgeschlagen (%s): %w", step, selector, err)
+			}
+			if len(text) > 4000 {
+				text = text[:3997] + "..."
+			}
+			result.Text += text
+			result.Log = append(result.Log, fmt.Sprintf("✅ Text gelesen (%d Zeichen)", len(text)))
+
+		case "wait":
+			waitMs := action.WaitMs
+			if waitMs <= 0 {
+				waitMs = 1000
+			}
+			if waitMs > 10000 {
+				waitMs = 10000
+			}
+			time.Sleep(time.Duration(waitMs) * time.Millisecond)
+			result.Log = append(result.Log, fmt.Sprintf("⏳ %dms gewartet", waitMs))
+
+		case "select":
+			if action.Selector == "" {
+				return result, fmt.Errorf("%s: Selektor fehlt", step)
+			}
+			if _, err := page.SelectOption(action.Selector, playwright.SelectOptionValues{Values: &[]string{action.Value}}); err != nil {
+				return result, fmt.Errorf("%s: Auswahl fehlgeschlagen (%s): %w", step, action.Selector, err)
+			}
+			result.Log = append(result.Log, fmt.Sprintf("✅ Option '%s' gewählt in %s", action.Value, action.Selector))
+
+		default:
+			return result, fmt.Errorf("%s: Unbekannte Aktion '%s'", step, action.Action)
+		}
+	}
+
+	log.Printf("[Browser] ✅ RunActions: %d Aktionen ausgeführt", len(actions))
+	return result, nil
+}
+
 // Close schließt den Browser.
 func (c *Client) Close() error {
+	if c.visibleBrowser != nil {
+		c.visibleBrowser.Close()
+		c.visibleBrowser = nil
+	}
+	if c.visiblePW != nil {
+		c.visiblePW.Stop()
+		c.visiblePW = nil
+	}
 	if c.browser == nil {
 		return nil
 	}

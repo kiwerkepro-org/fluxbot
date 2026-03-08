@@ -647,7 +647,6 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 	// Browser-Kontext (Screenshot, URL, Webseite) NICHT als Bild-Request behandeln
 	isBrowser := a.isBrowserContext(text)
 	isImage := a.isImageRequest(text)
-	log.Printf("[Agent] DEBUG processText: text=%q isBrowser=%v isImage=%v", text, isBrowser, isImage)
 	if !isBrowser && isImage {
 		if len(a.imageGenerators) == 0 {
 			return "🎨 Bildgenerierung ist aktuell nicht aktiviert.\n\n" +
@@ -664,14 +663,43 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 	// Das verhindert false positives (z.B. "google.com" → GDocs statt browser-screenshot).
 	if isBrowser {
 		lower := strings.ToLower(text)
+
+		// "Rufe X auf" / "Öffne X" / "Geh auf X" → Sichtbares Browserfenster öffnen
+		if strings.Contains(lower, "aufrufen") || strings.Contains(lower, "ruf") ||
+			strings.Contains(lower, "öffne") || strings.Contains(lower, "geh auf") ||
+			strings.Contains(lower, "gehe auf") || strings.Contains(lower, "auf die seite") {
+			// Nicht wenn explizit Screenshot/Text/Formular gewünscht
+			if !strings.Contains(lower, "screenshot") && !strings.Contains(lower, "lies") &&
+				!strings.Contains(lower, "text") && !strings.Contains(lower, "formular") &&
+				!strings.Contains(lower, "klick") {
+				url := extractURL(text)
+				if url != "" && a.browserClient != nil && a.browserClient.IsConfigured() {
+					log.Printf("[Agent] Browser öffne sichtbar: %s", url)
+					if err := a.browserClient.OpenVisible(url); err != nil {
+						log.Printf("[Agent] ❌ OpenVisible: %v", err)
+						return fmt.Sprintf("❌ Seite konnte nicht geöffnet werden: %v", err)
+					}
+					return fmt.Sprintf("🌐 %s wurde im Browser geöffnet.", url)
+				}
+			}
+		}
+
 		var browserSkillName string
 		switch {
 		case strings.Contains(lower, "screenshot") || strings.Contains(lower, "foto von") || strings.Contains(lower, "fotografier"):
 			browserSkillName = "browser-screenshot"
 		case strings.Contains(lower, "formular") || strings.Contains(lower, "ausfüllen") || strings.Contains(lower, "eintragen"):
 			browserSkillName = "browser-fill"
-		default:
+		case strings.Contains(lower, "klick") || strings.Contains(lower, "navigier") ||
+			strings.Contains(lower, "dann") || strings.Contains(lower, "danach") ||
+			strings.Contains(lower, "schritt") || strings.Contains(lower, "aktion"):
+			browserSkillName = "browser-actions"
+		case strings.Contains(lower, "text") || strings.Contains(lower, "inhalt") ||
+			strings.Contains(lower, "lies") || strings.Contains(lower, "lese") ||
+			strings.Contains(lower, "was steht"):
 			browserSkillName = "browser-read"
+		default:
+			browserSkillName = "browser-screenshot"
 		}
 		if skill := a.skillsLoader.GetByName(browserSkillName); skill != nil {
 			log.Printf("[Agent] Browser-Skill (direkt): %s", skill.Name)
@@ -1047,6 +1075,10 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 	// Browser: Formular ausfüllen (CDP)
 	if strings.Contains(response, "__BROWSER_FILL__") && strings.Contains(response, "__BROWSER_FILL_END__") {
 		return a.handleBrowserFill(response)
+	}
+	// Browser: Dynamische Aktionen (multi-step)
+	if strings.Contains(response, "__BROWSER_ACTIONS__") && strings.Contains(response, "__BROWSER_ACTIONS_END__") {
+		return a.handleBrowserActions(ctx, msg, response)
 	}
 
 	// ── Cron-Reminder Marker ──────────────────────────────────────────────────
@@ -2168,14 +2200,35 @@ func (a *Agent) extractFact(text string) string {
 
 // ── BILD-GENERIERUNG ───────────────────────────────────────────────────────
 
+// extractURL versucht eine URL oder Domain aus dem Text zu extrahieren.
+// Erkennt "https://...", "http://...", "www.xyz.de" und nackte Domains wie "kiwerkepro.com".
+func extractURL(text string) string {
+	// Zuerst vollständige URLs
+	urlRe := regexp.MustCompile(`https?://[^\s"'<>]+`)
+	if m := urlRe.FindString(text); m != "" {
+		return m
+	}
+	// www.-Domains
+	wwwRe := regexp.MustCompile(`www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
+	if m := wwwRe.FindString(text); m != "" {
+		return "https://" + m
+	}
+	// Nackte Domains (z.B. "kiwerkepro.com", "bild.de")
+	domainRe := regexp.MustCompile(`[a-zA-Z0-9][-a-zA-Z0-9]*\.(com|de|org|net|at|ch|io|eu|info|biz|co|ai|app|dev)`)
+	if m := domainRe.FindString(text); m != "" {
+		return "https://" + m
+	}
+	return ""
+}
+
 // isImageRequest erkennt Anfragen zur Bildgenerierung
 // isBrowserContext erkennt ob der Text einen Browser/Web-Kontext hat
 // (Screenshot, URL, Webseite, etc.) – dann NICHT als Bild-Generierung behandeln.
 func (a *Agent) isBrowserContext(text string) bool {
 	lower := strings.ToLower(text)
-	// Explizite Domain/Website-Indikatoren ZUERST prüfen
+	// Explizite Browser/Website-Indikatoren
 	if strings.Contains(lower, "screenshot") ||
-		strings.Contains(lower, "seite") || // "seite" vor "bild" damit "seite zeigen" nicht als image request interpretiert wird
+		strings.Contains(lower, "seite") ||
 		strings.Contains(lower, "webseite") ||
 		strings.Contains(lower, "webpage") ||
 		strings.Contains(lower, "website") ||
@@ -2184,15 +2237,23 @@ func (a *Agent) isBrowserContext(text string) bool {
 		strings.Contains(lower, "www.") ||
 		strings.Contains(lower, "lies") ||
 		strings.Contains(lower, "öffne") ||
+		strings.Contains(lower, "aufrufen") ||
+		strings.Contains(lower, "ruf") || // "rufe ... auf", "ruf ... auf"
+		strings.Contains(lower, "navigier") ||
+		strings.Contains(lower, "geh auf") ||
+		strings.Contains(lower, "gehe auf") ||
 		strings.Contains(lower, "zeig mir") ||
-		strings.Contains(lower, "foto") && strings.Contains(lower, "seite") ||
+		(strings.Contains(lower, "foto") && strings.Contains(lower, "seite")) ||
 		strings.Contains(lower, "formular") ||
 		strings.Contains(lower, "browser") {
 		return true
 	}
-	// Domain-Namen erkennen (.de, .com, .org, etc.)
-	if (strings.Contains(lower, ".de") || strings.Contains(lower, ".com") || strings.Contains(lower, ".org") || strings.Contains(lower, ".net")) &&
-		(strings.Contains(lower, "screenshot") || strings.Contains(lower, "zeig") || strings.Contains(lower, "foto") || strings.Contains(lower, "von ")) {
+	// Domain-Endung erkannt → Browser-Kontext (jemand redet über eine echte Website)
+	hasDomain := strings.Contains(lower, ".de") || strings.Contains(lower, ".com") ||
+		strings.Contains(lower, ".org") || strings.Contains(lower, ".net") ||
+		strings.Contains(lower, ".at") || strings.Contains(lower, ".ch") ||
+		strings.Contains(lower, ".io") || strings.Contains(lower, ".eu")
+	if hasDomain {
 		return true
 	}
 	return false
@@ -2201,19 +2262,7 @@ func (a *Agent) isBrowserContext(text string) bool {
 func (a *Agent) isImageRequest(text string) bool {
 	lower := strings.ToLower(text)
 	// Browser/Screenshot-Kontext ausschließen – kein Bild-KI-Request
-	if strings.Contains(lower, "screenshot") ||
-		strings.Contains(lower, "seite") ||
-		strings.Contains(lower, "webseite") ||
-		strings.Contains(lower, "webpage") ||
-		strings.Contains(lower, "http://") ||
-		strings.Contains(lower, "https://") ||
-		strings.Contains(lower, "www.") ||
-		strings.Contains(lower, ".de") ||
-		strings.Contains(lower, ".com") ||
-		strings.Contains(lower, ".org") ||
-		strings.Contains(lower, ".net") ||
-		strings.Contains(lower, "zeig mir") ||
-		strings.Contains(lower, "öffne") {
+	if a.isBrowserContext(text) {
 		return false
 	}
 	// Nur explizite Bildgenerierungs-Trigger
@@ -2685,4 +2734,81 @@ func (a *Agent) handleBrowserFill(response string) string {
 		return msg
 	}
 	return fmt.Sprintf("✅ Formular auf %s wurde ausgefüllt (nicht abgesendet – bitte selbst prüfen und bestätigen).", p.URL)
+}
+
+// handleBrowserActions führt eine Sequenz dynamischer Browser-Aktionen aus.
+// Marker-Format: __BROWSER_ACTIONS__\n{"actions":[...]}\n__BROWSER_ACTIONS_END__
+// Oder direkt: __BROWSER_ACTIONS__\n[...]\n__BROWSER_ACTIONS_END__
+func (a *Agent) handleBrowserActions(ctx context.Context, msg channels.Message, response string) string {
+	if a.browserClient == nil || !a.browserClient.IsConfigured() {
+		return "🌐 Browser-Steuerung ist aktuell nicht aktiviert.\n\n" +
+			"*Einrichtung:* Chrome mit `--remote-debugging-port=9222` starten und " +
+			"`BROWSER_ENDPOINT` im Dashboard setzen."
+	}
+
+	start := strings.Index(response, "__BROWSER_ACTIONS__")
+	end := strings.Index(response, "__BROWSER_ACTIONS_END__")
+	if start < 0 || end < 0 {
+		return "❌ Browser Actions: Interner Marker-Fehler."
+	}
+	jsonStr := strings.TrimSpace(response[start+len("__BROWSER_ACTIONS__") : end])
+
+	// Beide Formate unterstützen: Array oder Objekt mit "actions"-Feld
+	var actions []browser.WebAction
+	if strings.HasPrefix(jsonStr, "[") {
+		if err := json.Unmarshal([]byte(jsonStr), &actions); err != nil {
+			log.Printf("[Agent] ❌ Browser Actions JSON (array): %v", err)
+			return "❌ Browser Actions: Ungültiger JSON-Block."
+		}
+	} else {
+		var wrapper struct {
+			Actions []browser.WebAction `json:"actions"`
+		}
+		if err := json.Unmarshal([]byte(jsonStr), &wrapper); err != nil {
+			log.Printf("[Agent] ❌ Browser Actions JSON (object): %v", err)
+			return "❌ Browser Actions: Ungültiger JSON-Block."
+		}
+		actions = wrapper.Actions
+	}
+
+	if len(actions) == 0 {
+		return "❌ Browser Actions: Keine Aktionen angegeben."
+	}
+
+	log.Printf("[Agent] Browser Actions: %d Aktionen", len(actions))
+	result, err := a.browserClient.RunActions(actions)
+	if err != nil {
+		log.Printf("[Agent] ❌ Browser RunActions: %v", err)
+		return fmt.Sprintf("❌ Browser-Aktionen fehlgeschlagen: %v", err)
+	}
+
+	// Screenshot senden falls vorhanden
+	if len(result.Screenshot) > 0 {
+		caption := "📸 Browser Actions – Screenshot"
+		if err := a.manager.ReplyPhotoBytes(msg, result.Screenshot, "screenshot.png", caption); err != nil {
+			log.Printf("[Agent] ❌ Browser Actions Screenshot senden: %v", err)
+		}
+	}
+
+	// Antwort zusammenbauen
+	var sb strings.Builder
+	sb.WriteString("✅ Browser-Aktionen abgeschlossen.\n")
+	if len(result.Log) > 0 {
+		sb.WriteString("\n*Protokoll:*\n")
+		for _, entry := range result.Log {
+			sb.WriteString("• ")
+			sb.WriteString(entry)
+			sb.WriteString("\n")
+		}
+	}
+	if result.Text != "" {
+		sb.WriteString("\n*Ergebnis:*\n")
+		// Text kürzen auf 3000 Zeichen
+		text := result.Text
+		if len(text) > 3000 {
+			text = text[:3000] + "\n\n_(gekürzt)_"
+		}
+		sb.WriteString(text)
+	}
+	return sb.String()
 }

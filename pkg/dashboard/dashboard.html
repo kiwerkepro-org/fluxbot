@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FluxBot Dashboard</title>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   a { color: var(--accent); text-decoration: none; }
@@ -3458,7 +3459,7 @@ async function loadSkillsList() {
     const skills = Array.isArray(data) ? data : (data.skills || []);
     sel.innerHTML = skills.map(s => {
       const name = s.name || s;
-      const label = s.needsResigning ? `⚠️ ${escHtml(name)} (neu signieren!)` : escHtml(name);
+      const label = s.needsResigning ? `⚠️  ${escHtml(name)}  (neu signieren!)` : escHtml(name);
       return `<option value="${escHtml(name)}">${label}</option>`;
     }).join('');
     onSkillSelect();

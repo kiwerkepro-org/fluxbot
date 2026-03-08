@@ -172,6 +172,7 @@ func (l *Loader) isSignatureInvalid(path string) bool {
 			return true // .sig vorhanden aber falsch = ungültig
 		}
 		log.Printf("[Skills] ℹ️ Skill %s ist unsigniert", filepath.Base(path))
+		return true // keine .sig = unsigniert = muss signiert werden
 	}
 	return false
 }

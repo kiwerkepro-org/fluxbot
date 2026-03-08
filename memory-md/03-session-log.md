@@ -5,6 +5,73 @@
 
 ---
 
+## Session 47 – Browser Actions, Stealth, Cookie-Banner, OpenVisible, Lucide Fix (2026-03-08)
+
+**Fokus:** Dynamische Browser-Aktionen, Anti-Bot-Detection, Cookie-Banner Auto-Dismiss, sichtbarer Browser
+
+### Neue Features:
+1. **Dynamische Browser-Aktionen (`RunActions`):**
+   - `pkg/browser/browser.go`: `WebAction`, `ActionResult` Structs + `RunActions()` Methode
+   - 7 Aktionstypen: goto, fill, click, screenshot, read, wait, select
+   - Max 20 Aktionen, 120s Gesamttimeout, Domain-Whitelist + Passwort-Block
+   - `pkg/agent/agent.go`: `handleBrowserActions()` Handler + `__BROWSER_ACTIONS__` Marker
+   - Beide JSON-Formate: Array `[...]` und Objekt `{actions:[...]}`
+   - `workspace/skills/browser-actions.md` Skill-Datei erstellt + signiert
+
+2. **Anti-Bot-Detection (Stealth):**
+   - Browser-Launch: `--disable-blink-features=AutomationControlled`
+   - `stealthInit()`: `navigator.webdriver=undefined`, realistische `languages`, `plugins`, `window.chrome`
+   - Realistischer User-Agent: Chrome 131 auf Windows 10
+   - `AddInitScript()` statt einmaligem `Evaluate()` → wirkt bei jedem Page-Load
+
+3. **Cookie-Banner Auto-Dismiss:**
+   - `dismissCookieBanner()` Funktion: 16 Selektoren für gängige Banner
+   - Google ("Alle ablehnen"), OneTrust, CMP, generische (.cc-deny, etc.)
+   - Max 2s Wartezeit, kein Fehler wenn kein Banner da
+   - Wird nach jedem `Goto` in allen Browser-Funktionen aufgerufen
+
+4. **OpenVisible – Sichtbarer Browser:**
+   - `OpenVisible(url)`: Öffnet echtes Chromium-Fenster (headless=false)
+   - Eigene Browser-Instanz (`visibleBrowser`), bleibt offen zum Interagieren
+   - Maximiert, Stealth + Cookie-Dismiss aktiv
+   - Routing: "rufe X auf" / "öffne X" → sichtbares Browserfenster
+
+5. **Browser-Routing überarbeitet:**
+   - Default von `browser-read` auf `browser-screenshot` geändert
+   - "Rufe auf" / "Öffne" → `OpenVisible()` (sichtbarer Browser)
+   - "lies" / "text" / "inhalt" → `browser-read` (explizit)
+   - Multi-Step ("klick", "dann", "danach") → `browser-actions`
+   - `isBrowserContext()` erweitert: "aufrufen", "ruf", "geh auf", .at/.ch/.io/.eu
+   - Domain-Erkennung ohne zusätzliches Keyword (`.com` allein reicht)
+   - `isImageRequest()` vereinfacht: ruft `isBrowserContext()` auf statt doppelter Logik
+   - `extractURL()` Hilfsfunktion: erkennt URLs, www-Domains, nackte Domains
+
+6. **Lucide Icons im Dashboard:**
+   - CDN-Script fehlte komplett → `<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js">` eingebunden
+   - Nav-Icons (Status, Konfiguration, etc.) wieder sichtbar
+
+7. **Unsignierte Skills im Dashboard:**
+   - `pkg/skills/loader.go`: `isSignatureInvalid()` gibt jetzt `true` zurück wenn `.sig` fehlt
+   - Neue Skills erscheinen mit `⚠️ name (neu signieren!)` im Dashboard
+   - Leerzeichen zwischen Icon und Name verbessert
+
+### Code-Änderungen:
+- `pkg/browser/browser.go`: +RunActions, +OpenVisible, +stealthInit, +dismissCookieBanner, +realisticUA, Close() erweitert
+- `pkg/agent/agent.go`: +handleBrowserActions, +extractURL, isBrowserContext/isImageRequest überarbeitet, Browser-Routing erweitert
+- `pkg/skills/loader.go`: isSignatureInvalid() – unsignierte Skills als NeedsResigning markiert
+- `pkg/dashboard/dashboard.html`: Lucide CDN eingebunden, Skill-Label Spacing
+- `workspace/skills/browser-actions.md`: Neuer Skill (signiert)
+- `go.mod`: `go-openai` bleibt drin (wird für OpenAI-Provider gebraucht)
+
+### Status: ✅ GETESTET
+- Google-Suche Screenshot ohne Bot-Detection ✅
+- Cookie-Banner automatisch geschlossen ✅
+- ki-werke.at Screenshot ✅
+- Lucide Icons im Dashboard ✅
+- Unsignierte Skills Warnung ✅
+
+---
+
 ## Session 46 – Browser Screenshot Bug ENDGÜLTIG GEFIXT (2026-03-08)
 
 **Fokus:** Browser-Screenshot endgültig zum Laufen bringen – kein Trial-and-Error mehr

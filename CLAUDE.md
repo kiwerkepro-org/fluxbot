@@ -185,77 +185,25 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 46 (2026-03-08) – Browser Screenshot Bug ENDGÜLTIG GEFIXT
-- **Nächste Aktion:** Debug-Log entfernen, Release v1.2.1 taggen
+- **Letzte Session:** 47 (2026-03-08) – Browser Actions, Stealth, Cookie-Banner, OpenVisible, Lucide
+- **Nächste Aktion:** Release v1.2.1 taggen + pushen
 - **Aktueller Release:** `v1.2.0` → `v1.2.1` vorbereitet
-- **Browser Integration:** playwright-go v0.5700.1 ✅ FUNKTIONAL (Viewport 1280x800)
+- **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 
-### Session 46 Summary (2026-03-08) – BROWSER SCREENSHOT GEFIXT
-- **4 Root Causes** gefunden und behoben:
-  1. `splitAndTrim()` strippte YAML `[]` Brackets nicht → Tags matchten nie
-  2. Generischer Matcher routete "google.com" zu GDocs → direktes Browser-Skill-Routing implementiert
-  3. Docker-Container (`fluxbot_ai`) lief parallel mit gleichem Telegram-Token → entfernt
-  4. Full-Page Screenshot 7.6 MB → Viewport 1280x800
-- **Status:** ✅ GEFIXT & GETESTET – Screenshot von bild.de erfolgreich
+### Session 47 Summary (2026-03-08) – BROWSER ACTIONS + STEALTH + LUCIDE
+- ✅ **Dynamische Browser-Aktionen:** `RunActions()` mit 7 Aktionstypen + `browser-actions.md` Skill
+- ✅ **Anti-Bot-Detection:** Stealth-Init, `--disable-blink-features=AutomationControlled`, realistischer UA
+- ✅ **Cookie-Banner Auto-Dismiss:** 16 Selektoren, max 2s, nach jedem Goto
+- ✅ **OpenVisible():** Sichtbares Chromium-Fenster via "rufe X auf" / "öffne X"
+- ✅ **Browser-Routing:** Default → Screenshot, "öffne" → sichtbar, "lies" → Text, Domain = Browser
+- ✅ **Lucide CDN:** Script fehlte → eingebunden, Nav-Icons wieder sichtbar
+- ✅ **Unsignierte Skills:** `isSignatureInvalid()` erkennt fehlende `.sig` → Warnung im Dashboard
 
-### Session 44 Summary (2026-03-07) – PLAYWRIGHT-MIGRATION
-- 🔄 **Playwright-Version Problem gelöst:**
-  - Problem: go.mod hatte `v1.45.0` (ungültig) → `v1.44.0` (auch ungültig)
-  - Solution: go.mod → `v0.5700.1` (korrekte installierte Version)
-  - **Root Cause:** `go.sum` hatte 0 Playwright-Einträge = Build nie erfolgreich = **alte Binary lief immer noch!**
-
-- ✅ **8 API-Inkompatibilitäten in pkg/browser/browser.go behoben:**
-  - Timeouts: int64 → float64 Konvertierung
-  - WaitUntilLoadState Constructor existiert nicht → Enum-Konstanten verwenden
-  - LoadState Enums sind bereits Pointer-Typen (keine `&` nötig)
-  - ScreenshotType Enum statt String
-  - WaitForSelector gibt 2 Werte zurück (Element, error)
-  - **Detailfixes:** siehe `memory-md/05-bugreports.md` Bug #7 & `memory-md/03-session-log.md` Session 44
-
-- ✅ **Dokumentation aktualisiert:**
-  - `05-bugreports.md` – Bug #7 mit Session 44 Details + 8 API-Fixes
-  - `03-session-log.md` – Sessions 41, 42, 43, 44 vollständig dokumentiert
-  - `CLAUDE.md` (diese Datei) – Aktualisiert
-
-- ⏳ **TODO vor Release v1.2.1:**
-  1. ✅ browser.go API-Fixes abgeschlossen
-  2. ⏳ `go build -o fluxbot.exe ./cmd/fluxbot` (sollte jetzt erfolgreich sein)
-  3. ⏳ Prozess neustarten + Screenshot-Test
-  4. ⏳ Git Commit + Tag v1.2.1
-
-### Session 43 Summary (2026-03-07)
-- 🔴 **Browser Screenshots Bug Debugging:**
-  - Problem: `"Mache einen Screenshot von bild.de"` → "Bildgenerierung ist aktuell nicht aktiviert"
-  - Root Cause (Session 43): `isBrowserContext()` nicht implementiert → Build schlägt fehl
-  - **Wahre Root Cause (Session 44):** Falsche Playwright-Version in go.mod (chromedp wurde zu playwright gemigrt)
-  - Status: Code-Fixes in Session 43, aber Build war nie erfolgreich
-
-### Session 42 Summary (2026-03-06)
-- ✅ **Browser Skills (Option D) implementiert:**
-  - Phase 1: Web-Suche via Tavily API (`pkg/search/search.go`)
-  - Phase 2: Browser-Steuerung via **chromedp** (`pkg/browser/browser.go`)
-    - **Anmerkung:** chromedp wurde später in Session 44 durch playwright-go ersetzt
-  - 4 neue Skills: web-search, browser-read, browser-screenshot, browser-fill
-  - Vault-Keys: `SEARCH_API_KEY`, `BROWSER_ENDPOINT`, `BROWSER_ALLOWED_DOMAINS`
-
-### Session 41 Summary (2026-03-06)
-- ✅ **AutoStart-Bug behoben:** AUTOSTART-EINRICHTEN.ps1 mit Task Scheduler (statt sc.exe Service)
-  - FluxBot läuft unsichtbar im Hintergrund, Auto-Restart bei Crash
-  - Startet automatisch bei Windows-Login
-  - Desktop-Verknüpfung "FluxBot Dashboard" öffnet Browser
-- ✅ **QUICK-START.txt** auf v1.2.0 aktualisiert
-
-### Session 40 Summary (2026-03-05)
-- ✅ **Option A (P9 Live-Testing):** PASSED – Pairing-Tab funktional
-- ✅ **Option C (Self-Extend Feature):** COMPLETED
-  - Stufe 1: Skill-Writer, Stufe 2: Code-Reader API, Stufe 3: Code-Extender
-  - Security: Whitelist-basiert, Directory-Traversal Schutz
-
-### Status nach Session 44
+### Status nach Session 47
 - **AutoStart:** ✅ Task Scheduler (AtLogon, Hidden, Auto-Restart)
-- **Dashboard:** http://localhost:9090 erreichbar
+- **Dashboard:** http://localhost:9090 erreichbar, Lucide Icons ✅
 - **P9 DM-Pairing Mode:** ✅ LIVE & FUNKTIONAL
 - **Self-Extend Feature:** ✅ LIVE – 3 Stufen implementiert
-- **Browser Skills:** ✅ FUNKTIONAL – Screenshot, Read, Fill (Playwright/chromium, Viewport 1280x800)
+- **Browser Skills:** ✅ VOLL FUNKTIONAL – Screenshot, Read, Fill, Actions, OpenVisible (Playwright/chromium)
 - **Docker:** ❌ ENTFERNT – FluxBot läuft nur noch nativ auf Windows
-- **Details:** `memory-md/03-session-log.md` (Sessions 1–46)
+- **Details:** `memory-md/03-session-log.md` (Sessions 1–47)
