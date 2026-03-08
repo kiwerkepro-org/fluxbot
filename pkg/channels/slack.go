@@ -14,21 +14,26 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ki-werke/fluxbot/pkg/pairing"
 	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
 const (
-	slackAPIBase    = "https://slack.com/api"
+	slackAPIBase     = "https://slack.com/api"
 	slackWebhookPort = 3000
 )
 
 // SlackConfig enthält die Konfiguration für den Slack-Kanal
 type SlackConfig struct {
-	BotToken      string   // xoxb-... Bot OAuth Token
-	AppToken      string   // Wird für Socket Mode verwendet (hier nicht genutzt)
-	SigningSecret string   // Slack Signing Secret für HMAC-Verifizierung
-	WebhookPort   int      // Port für Events API Webhook (default: 3000)
-	AllowFrom     []string // User-IDs oder Channel-IDs die erlaubt sind
+	BotToken       string         // xoxb-... Bot OAuth Token
+	AppToken       string         // Wird für Socket Mode verwendet (hier nicht genutzt)
+	SigningSecret  string         // Slack Signing Secret für HMAC-Verifizierung
+	WebhookPort    int            // Port für Events API Webhook (default: 3000)
+	AllowFrom      []string       // User-IDs oder Channel-IDs die erlaubt sind
+	DMMode         string         // "open" | "allowlist" | "pairing"
+	GroupMode      string         // "open" | "allowlist"
+	PairingStore   *pairing.Store // nil = Pairing deaktiviert
+	PairingMessage string
 }
 
 // SlackChannel implementiert den Slack-Kanal via Events API (HTTP Webhook)
@@ -42,19 +47,14 @@ type SlackChannel struct {
 	cfg    SlackConfig
 	bus    chan<- Message
 	server *http.Server
-	allow  map[string]bool
 }
 
 // NewSlackChannel erstellt einen neuen Slack-Kanal
 func NewSlackChannel(cfg SlackConfig) *SlackChannel {
-	allow := make(map[string]bool)
-	for _, a := range cfg.AllowFrom {
-		allow[a] = true
-	}
 	if cfg.WebhookPort == 0 {
 		cfg.WebhookPort = slackWebhookPort
 	}
-	return &SlackChannel{cfg: cfg, allow: allow}
+	return &SlackChannel{cfg: cfg}
 }
 
 func (s *SlackChannel) Name() string { return "slack" }
@@ -179,9 +179,22 @@ func (s *SlackChannel) handleEvent(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Whitelist prüfen
-	if len(s.allow) > 0 && !s.allow[e.User] && !s.allow[e.Channel] {
-		log.Printf("[Slack] Nachricht von %s verworfen (nicht in Whitelist)", e.User)
+	// P10: DM erkennen (Slack DM-Channel-IDs beginnen mit "D")
+	isDM := strings.HasPrefix(e.Channel, "D")
+	result := CheckAccess(AccessConfig{
+		Channel:        "slack",
+		SenderID:       e.User,
+		UserName:       e.User,
+		ChatID:         e.Channel,
+		IsDM:           isDM,
+		DMMode:         s.cfg.DMMode,
+		GroupMode:      s.cfg.GroupMode,
+		AllowFrom:      s.cfg.AllowFrom,
+		PairingStore:   s.cfg.PairingStore,
+		PairingMessage: s.cfg.PairingMessage,
+		SendFn:         func(msg string) { s.Send(e.Channel, msg) },
+	})
+	if result != AccessAllowed {
 		return
 	}
 

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ki-werke/fluxbot/pkg/pairing"
 	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
@@ -23,13 +24,17 @@ const (
 
 // WhatsAppConfig enthält die Konfiguration für den WhatsApp-Kanal
 type WhatsAppConfig struct {
-	Provider      string
-	PhoneNumber   string
-	PhoneNumberID string
-	APIKey        string
-	WebhookSecret string
-	WebhookPort   int
-	AllowFrom     []string
+	Provider       string
+	PhoneNumber    string
+	PhoneNumberID  string
+	APIKey         string
+	WebhookSecret  string
+	WebhookPort    int
+	AllowFrom      []string
+	DMMode         string         // "open" | "allowlist" | "pairing"
+	GroupMode      string         // "open" | "allowlist"
+	PairingStore   *pairing.Store // nil = Pairing deaktiviert
+	PairingMessage string
 }
 
 // WhatsAppChannel implementiert den WhatsApp Meta Business Cloud API Kanal
@@ -37,16 +42,11 @@ type WhatsAppChannel struct {
 	cfg    WhatsAppConfig
 	bus    chan<- Message
 	server *http.Server
-	allow  map[string]bool
 }
 
 // NewWhatsAppChannel erstellt einen neuen WhatsApp-Kanal
 func NewWhatsAppChannel(cfg WhatsAppConfig) *WhatsAppChannel {
-	allow := make(map[string]bool)
-	for _, a := range cfg.AllowFrom {
-		allow[normalizePhone(a)] = true
-	}
-	return &WhatsAppChannel{cfg: cfg, allow: allow}
+	return &WhatsAppChannel{cfg: cfg}
 }
 
 func (w *WhatsAppChannel) Name() string { return "whatsapp" }
@@ -205,17 +205,31 @@ func (w *WhatsAppChannel) handleIncoming(rw http.ResponseWriter, r *http.Request
 
 func (w *WhatsAppChannel) processIncomingMessage(wmsg whatsAppMessage, contacts []whatsAppContact) {
 	from := wmsg.From
+	userName := from
 	for _, c := range contacts {
 		if c.WaID == from {
+			userName = c.Profile.Name
 			break
 		}
 	}
 
 	normalized := normalizePhone(from)
 
-	// Whitelist prüfen
-	if len(w.allow) > 0 && !w.allow[normalized] {
-		log.Printf("[WhatsApp] Nachricht von nicht erlaubter Nummer verworfen: %s", from)
+	// Zugriffskontrolle (WhatsApp Business API: immer DM)
+	result := CheckAccess(AccessConfig{
+		Channel:        "whatsapp",
+		SenderID:       normalized,
+		UserName:       userName,
+		ChatID:         from,
+		IsDM:           true,
+		DMMode:         w.cfg.DMMode,
+		GroupMode:      w.cfg.GroupMode,
+		AllowFrom:      w.cfg.AllowFrom,
+		PairingStore:   w.cfg.PairingStore,
+		PairingMessage: w.cfg.PairingMessage,
+		SendFn:         func(msg string) { w.Send(from, msg) },
+	})
+	if result != AccessAllowed {
 		return
 	}
 

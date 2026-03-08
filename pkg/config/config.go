@@ -66,16 +66,32 @@ type ChannelsConfig struct {
 	WhatsApp WhatsAppChannelConfig `json:"whatsapp"`
 }
 
+// AccessMode steuert wer Nachrichten senden darf.
+// "open"      – alle User erlaubt (kein Filter)
+// "allowlist" – nur User aus AllowFrom erlaubt
+// "pairing"   – unbekannte User müssen erst im Dashboard freigegeben werden
+type AccessMode = string
+
+const (
+	AccessOpen      AccessMode = "open"
+	AccessAllowlist AccessMode = "allowlist"
+	AccessPairing   AccessMode = "pairing"
+)
+
 type TelegramChannelConfig struct {
 	Enabled   bool     `json:"enabled"`
 	Token     string   `json:"token"`
 	AllowFrom []string `json:"allowFrom"`
+	DMMode    string   `json:"dmMode"`    // "open" | "allowlist" | "pairing" (default: inherit from Pairing.Enabled)
+	GroupMode string   `json:"groupMode"` // "open" | "allowlist" (default: "open")
 }
 
 type DiscordChannelConfig struct {
 	Enabled   bool     `json:"enabled"`
 	Token     string   `json:"token"`
 	AllowFrom []string `json:"allowFrom"`
+	DMMode    string   `json:"dmMode"`    // "open" | "allowlist" | "pairing"
+	GroupMode string   `json:"groupMode"` // "open" | "allowlist"
 }
 
 type SlackChannelConfig struct {
@@ -85,6 +101,8 @@ type SlackChannelConfig struct {
 	SigningSecret string   `json:"signingSecret"` // Slack Signing Secret für HMAC
 	WebhookPort   int      `json:"webhookPort"`   // Port für Events API (default: 3000)
 	AllowFrom     []string `json:"allowFrom"`
+	DMMode        string   `json:"dmMode"`    // "open" | "allowlist" | "pairing"
+	GroupMode     string   `json:"groupMode"` // "open" | "allowlist"
 }
 
 type MatrixChannelConfig struct {
@@ -93,6 +111,8 @@ type MatrixChannelConfig struct {
 	UserID     string   `json:"userId"`
 	Token      string   `json:"token"`
 	AllowFrom  []string `json:"allowFrom"`
+	DMMode     string   `json:"dmMode"`    // "open" | "allowlist" | "pairing"
+	GroupMode  string   `json:"groupMode"` // "open" | "allowlist"
 }
 
 // WhatsAppChannelConfig – nutzt die WhatsApp Business Cloud API (Meta)
@@ -105,6 +125,8 @@ type WhatsAppChannelConfig struct {
 	WebhookSecret string   `json:"webhookSecret"` // HMAC-Verifizierungsschlüssel
 	WebhookPort   int      `json:"webhookPort"`   // Port für Webhook-Server (default: 8443)
 	AllowFrom     []string `json:"allowFrom"`     // Erlaubte Rufnummern (leer = alle)
+	DMMode        string   `json:"dmMode"`        // "open" | "allowlist" | "pairing"
+	GroupMode     string   `json:"groupMode"`     // "open" | "allowlist"
 }
 
 // ProvidersConfig enthält alle KI-Provider-Konfigurationen.

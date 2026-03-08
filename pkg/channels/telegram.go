@@ -12,14 +12,13 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
-// DefaultPairingMessage ist die Standard-Nachricht für ungepaarte User.
-const DefaultPairingMessage = "⏳ Pairing erforderlich.\n\nDu bist noch nicht berechtigt, diesen Bot zu nutzen.\nDeine User-ID wurde an den Admin gesendet.\n\nBitte warte auf Freigabe im Dashboard."
-
 type TelegramConfig struct {
 	Token          string   `json:"token"`
 	AllowFrom      []string `json:"allow_from"`
-	PairingEnabled bool     // true = DM-Pairing Mode aktiv
-	PairingMessage string   // Custom-Nachricht (leer = DefaultPairingMessage)
+	DMMode         string   // "open" | "allowlist" | "pairing"
+	GroupMode      string   // "open" | "allowlist"
+	PairingEnabled bool     // Legacy: wird in DMMode="pairing" übersetzt wenn DMMode leer
+	PairingMessage string   // Custom-Nachricht (leer = Default)
 }
 
 type TelegramChannel struct {
@@ -57,37 +56,29 @@ func (t *TelegramChannel) Start(ctx context.Context, input chan<- Message) error
 			chatID := fmt.Sprintf("%d", update.Message.Chat.ID)
 			userName := update.Message.From.UserName
 
-			// ── Zugriffskontrolle (3 Stufen) ─────────────────────────────────
-			// Stufe 1: AllowFrom-Whitelist (statisch, hat IMMER Vorrang)
-			if t.isAllowed(senderID) {
-				// Whitelist-User → direkt durchlassen
-			} else if t.config.PairingEnabled && t.pairingStore != nil {
-				// Stufe 2: DM-Pairing Mode aktiv → Store prüfen
-				if t.pairingStore.IsBlocked("telegram", senderID) {
-					// Blockierter User → ignorieren
-					log.Printf("[Telegram/Pairing] 🚫 Blockierter User ignoriert: %s @%s", senderID, userName)
-					continue
-				}
-				if !t.pairingStore.IsPaired("telegram", senderID) {
-					// Unbekannter User → Pairing-Request registrieren
-					isNew := t.pairingStore.RequestPairing("telegram", senderID, userName, chatID)
-					if isNew {
-						log.Printf("[Telegram/Pairing] 📩 Neuer Pairing-Request: %s @%s", senderID, userName)
-					}
-					// Nachricht an User senden
-					pairingMsg := t.config.PairingMessage
-					if pairingMsg == "" {
-						pairingMsg = DefaultPairingMessage
-					}
-					t.Send(chatID, fmt.Sprintf("%s\n\n🆔 Deine User-ID: %s", pairingMsg, senderID))
-					continue
-				}
-				// Gepairter User → durchlassen
-			} else if len(t.config.AllowFrom) > 0 {
-				// Stufe 3: AllowFrom ist gesetzt aber User nicht drin → blockieren
+			// ── Zugriffskontrolle (P10: Granulare DM-Policy) ─────────────────
+			isDM := update.Message.Chat.Type == "private"
+			dmMode := t.config.DMMode
+			// Legacy-Kompatibilität: PairingEnabled ohne DMMode → "pairing"
+			if dmMode == "" && t.config.PairingEnabled {
+				dmMode = "pairing"
+			}
+			result := CheckAccess(AccessConfig{
+				Channel:        "telegram",
+				SenderID:       senderID,
+				UserName:       userName,
+				ChatID:         chatID,
+				IsDM:           isDM,
+				DMMode:         dmMode,
+				GroupMode:      t.config.GroupMode,
+				AllowFrom:      t.config.AllowFrom,
+				PairingStore:   t.pairingStore,
+				PairingMessage: t.config.PairingMessage,
+				SendFn:         func(msg string) { t.Send(chatID, msg) },
+			})
+			if result != AccessAllowed {
 				continue
 			}
-			// Wenn AllowFrom leer UND Pairing deaktiviert → offen (wie bisher)
 
 			msg := Message{
 				ID:        fmt.Sprintf("%d", update.Message.MessageID),
@@ -279,17 +270,6 @@ func (t *TelegramChannel) DownloadFile(fileID string) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
-func (t *TelegramChannel) isAllowed(senderID string) bool {
-	if len(t.config.AllowFrom) == 0 {
-		return false // Keine Whitelist = nicht automatisch erlaubt (Pairing entscheidet)
-	}
-	for _, id := range t.config.AllowFrom {
-		if id == senderID {
-			return true
-		}
-	}
-	return false
-}
 
 func (t *TelegramChannel) Stop() {}
 

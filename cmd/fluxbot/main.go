@@ -296,14 +296,57 @@ func runBot(ctx context.Context, configPath string) {
 		manager.Register(channels.NewTelegramChannel(channels.TelegramConfig{
 			Token:          cfg.Channels.Telegram.Token,
 			AllowFrom:      cfg.Channels.Telegram.AllowFrom,
+			DMMode:         cfg.Channels.Telegram.DMMode,
+			GroupMode:      cfg.Channels.Telegram.GroupMode,
 			PairingEnabled: cfg.Pairing.Enabled,
 			PairingMessage: cfg.Pairing.Message,
 		}, pairingStore))
 	}
 	if cfg.Channels.Discord.Enabled {
 		manager.Register(channels.NewDiscordChannel(channels.DiscordConfig{
-			Token:     cfg.Channels.Discord.Token,
-			AllowFrom: cfg.Channels.Discord.AllowFrom,
+			Token:          cfg.Channels.Discord.Token,
+			AllowFrom:      cfg.Channels.Discord.AllowFrom,
+			DMMode:         cfg.Channels.Discord.DMMode,
+			GroupMode:      cfg.Channels.Discord.GroupMode,
+			PairingStore:   pairingStore,
+			PairingMessage: cfg.Pairing.Message,
+		}))
+	}
+	if cfg.Channels.Slack.Enabled {
+		manager.Register(channels.NewSlackChannel(channels.SlackConfig{
+			BotToken:       cfg.Channels.Slack.BotToken,
+			SigningSecret:  cfg.Channels.Slack.SigningSecret,
+			WebhookPort:    cfg.Channels.Slack.WebhookPort,
+			AllowFrom:      cfg.Channels.Slack.AllowFrom,
+			DMMode:         cfg.Channels.Slack.DMMode,
+			GroupMode:      cfg.Channels.Slack.GroupMode,
+			PairingStore:   pairingStore,
+			PairingMessage: cfg.Pairing.Message,
+		}))
+	}
+	if cfg.Channels.Matrix.Enabled {
+		manager.Register(channels.NewMatrixChannel(channels.MatrixConfig{
+			HomeServer:     cfg.Channels.Matrix.HomeServer,
+			UserID:         cfg.Channels.Matrix.UserID,
+			Token:          cfg.Channels.Matrix.Token,
+			AllowFrom:      cfg.Channels.Matrix.AllowFrom,
+			DMMode:         cfg.Channels.Matrix.DMMode,
+			GroupMode:      cfg.Channels.Matrix.GroupMode,
+			PairingStore:   pairingStore,
+			PairingMessage: cfg.Pairing.Message,
+		}))
+	}
+	if cfg.Channels.WhatsApp.Enabled {
+		manager.Register(channels.NewWhatsAppChannel(channels.WhatsAppConfig{
+			PhoneNumberID:  cfg.Channels.WhatsApp.PhoneNumberID,
+			APIKey:         cfg.Channels.WhatsApp.APIKey,
+			WebhookSecret:  cfg.Channels.WhatsApp.WebhookSecret,
+			WebhookPort:    cfg.Channels.WhatsApp.WebhookPort,
+			AllowFrom:      cfg.Channels.WhatsApp.AllowFrom,
+			DMMode:         cfg.Channels.WhatsApp.DMMode,
+			GroupMode:      cfg.Channels.WhatsApp.GroupMode,
+			PairingStore:   pairingStore,
+			PairingMessage: cfg.Pairing.Message,
 		}))
 	}
 

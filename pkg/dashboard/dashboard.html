@@ -485,6 +485,21 @@
             <div class="field"><label>Erlaubte User-IDs (kommagetrennt)</label>
               <div class="input-wrap"><input type="password" id="tg-allowfrom" placeholder="123456789, 987654321" autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
             </div>
+            <div class="two-col">
+              <div class="field"><label>DM-Modus <button class="info-btn" onmouseenter="tipShow(this,'open = alle erlaubt · allowlist = nur AllowFrom · pairing = Freigabe via Dashboard')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></label>
+                <select id="tg-dmmode">
+                  <option value="open">open – alle erlaubt</option>
+                  <option value="allowlist">allowlist – nur Whitelist</option>
+                  <option value="pairing">pairing – Freigabe erforderlich</option>
+                </select>
+              </div>
+              <div class="field"><label>Gruppen-Modus</label>
+                <select id="tg-groupmode">
+                  <option value="open">open – alle erlaubt</option>
+                  <option value="allowlist">allowlist – nur Whitelist</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -503,6 +518,21 @@
           <div class="ch-acc-body" id="ch-body-dc" style="display:none">
             <div class="field"><label>Discord Bot Token</label>
               <div class="input-wrap"><input type="password" id="dc-token" placeholder="MTxxxxxx..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+            </div>
+            <div class="two-col">
+              <div class="field"><label>DM-Modus</label>
+                <select id="dc-dmmode">
+                  <option value="open">open – alle erlaubt</option>
+                  <option value="allowlist">allowlist – nur Whitelist</option>
+                  <option value="pairing">pairing – Freigabe erforderlich</option>
+                </select>
+              </div>
+              <div class="field"><label>Gruppen-Modus</label>
+                <select id="dc-groupmode">
+                  <option value="open">open – alle erlaubt</option>
+                  <option value="allowlist">allowlist – nur Whitelist</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -526,6 +556,21 @@
               </div>
               <div class="field"><label>Signing Secret</label>
                 <div class="input-wrap"><input type="password" id="slack-signing" placeholder="abc123..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+              </div>
+            </div>
+            <div class="two-col">
+              <div class="field"><label>DM-Modus</label>
+                <select id="slack-dmmode">
+                  <option value="open">open – alle erlaubt</option>
+                  <option value="allowlist">allowlist – nur Whitelist</option>
+                  <option value="pairing">pairing – Freigabe erforderlich</option>
+                </select>
+              </div>
+              <div class="field"><label>Gruppen-Modus</label>
+                <select id="slack-groupmode">
+                  <option value="open">open – alle erlaubt</option>
+                  <option value="allowlist">allowlist – nur Whitelist</option>
+                </select>
               </div>
             </div>
           </div>
@@ -552,6 +597,21 @@
                 <div class="input-wrap"><input type="password" id="matrix-token" placeholder="syt_..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
               </div>
             </div>
+            <div class="two-col">
+              <div class="field"><label>DM-Modus</label>
+                <select id="matrix-dmmode">
+                  <option value="open">open – alle erlaubt</option>
+                  <option value="allowlist">allowlist – nur Whitelist</option>
+                  <option value="pairing">pairing – Freigabe erforderlich</option>
+                </select>
+              </div>
+              <div class="field"><label>Gruppen-Modus</label>
+                <select id="matrix-groupmode">
+                  <option value="open">open – alle erlaubt</option>
+                  <option value="allowlist">allowlist – nur Whitelist</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -574,6 +634,21 @@
               </div>
               <div class="field"><label>Access Token</label>
                 <div class="input-wrap"><input type="password" id="wa-token" placeholder="EAA..." autocomplete="off"><button type="button" class="eye-btn" onclick="toggleEye(this)">👁</button></div>
+              </div>
+            </div>
+            <div class="two-col">
+              <div class="field"><label>DM-Modus</label>
+                <select id="wa-dmmode">
+                  <option value="open">open – alle erlaubt</option>
+                  <option value="allowlist">allowlist – nur Whitelist</option>
+                  <option value="pairing">pairing – Freigabe erforderlich</option>
+                </select>
+              </div>
+              <div class="field"><label>Gruppen-Modus</label>
+                <select id="wa-groupmode">
+                  <option value="open">open – alle erlaubt</option>
+                  <option value="allowlist">allowlist – nur Whitelist</option>
+                </select>
               </div>
             </div>
           </div>
@@ -2413,17 +2488,27 @@ async function loadConfig() {
   setVal('tg-enabled',       c.telegram?.enabled,    'toggle');
   setVal('tg-token',         secretsData['TELEGRAM_TOKEN']       || '');
   setVal('tg-allowfrom',     (c.telegram?.allowFrom  || []).join(', '));
+  setVal('tg-dmmode',        c.telegram?.dmMode    || 'open', 'select');
+  setVal('tg-groupmode',     c.telegram?.groupMode || 'open', 'select');
   setVal('dc-enabled',       c.discord?.enabled,     'toggle');
   setVal('dc-token',         secretsData['DISCORD_TOKEN']        || '');
+  setVal('dc-dmmode',        c.discord?.dmMode    || 'open', 'select');
+  setVal('dc-groupmode',     c.discord?.groupMode || 'open', 'select');
   setVal('slack-enabled',    c.slack?.enabled,       'toggle');
   setVal('slack-bot-token',  secretsData['SLACK_BOT_TOKEN']      || '');
   setVal('slack-signing',    secretsData['SLACK_SIGNING_SECRET'] || '');
+  setVal('slack-dmmode',     c.slack?.dmMode    || 'open', 'select');
+  setVal('slack-groupmode',  c.slack?.groupMode || 'open', 'select');
   setVal('matrix-enabled',   c.matrix?.enabled,      'toggle');
   setVal('matrix-homeserver',c.matrix?.homeServer    || '');
   setVal('matrix-token',     secretsData['MATRIX_TOKEN']         || '');
+  setVal('matrix-dmmode',    c.matrix?.dmMode    || 'open', 'select');
+  setVal('matrix-groupmode', c.matrix?.groupMode || 'open', 'select');
   setVal('wa-enabled',       c.whatsapp?.enabled,    'toggle');
   setVal('wa-phoneid',       c.whatsapp?.phoneNumberId || '');
   setVal('wa-token',         secretsData['WHATSAPP_API_KEY']     || '');
+  setVal('wa-dmmode',        c.whatsapp?.dmMode    || 'open', 'select');
+  setVal('wa-groupmode',     c.whatsapp?.groupMode || 'open', 'select');
 
   // ── AI Provider (API-Key aus Vault) ──────────────────────────────────────
   const activeProvider = p.default || 'openrouter';
@@ -2546,21 +2631,31 @@ async function saveConfig() {
     ch.telegram.enabled   = getVal('tg-enabled', 'toggle');
     ch.telegram.token     = '';  // im Vault, nicht in config.json
     ch.telegram.allowFrom = getVal('tg-allowfrom').split(',').map(s=>s.trim()).filter(Boolean);
+    ch.telegram.dmMode    = getVal('tg-dmmode', 'select');
+    ch.telegram.groupMode = getVal('tg-groupmode', 'select');
     ch.discord = ch.discord || {};
-    ch.discord.enabled = getVal('dc-enabled', 'toggle');
-    ch.discord.token   = '';  // im Vault
+    ch.discord.enabled    = getVal('dc-enabled', 'toggle');
+    ch.discord.token      = '';  // im Vault
+    ch.discord.dmMode     = getVal('dc-dmmode', 'select');
+    ch.discord.groupMode  = getVal('dc-groupmode', 'select');
     ch.slack = ch.slack || {};
     ch.slack.enabled       = getVal('slack-enabled', 'toggle');
     ch.slack.botToken      = '';  // im Vault
     ch.slack.signingSecret = '';  // im Vault
+    ch.slack.dmMode        = getVal('slack-dmmode', 'select');
+    ch.slack.groupMode     = getVal('slack-groupmode', 'select');
     ch.matrix = ch.matrix || {};
     ch.matrix.enabled    = getVal('matrix-enabled', 'toggle');
     ch.matrix.homeServer = getVal('matrix-homeserver');
     ch.matrix.token      = '';  // im Vault
+    ch.matrix.dmMode     = getVal('matrix-dmmode', 'select');
+    ch.matrix.groupMode  = getVal('matrix-groupmode', 'select');
     ch.whatsapp = ch.whatsapp || {};
     ch.whatsapp.enabled       = getVal('wa-enabled', 'toggle');
     ch.whatsapp.phoneNumberId = getVal('wa-phoneid');
     ch.whatsapp.apiKey        = '';  // im Vault
+    ch.whatsapp.dmMode        = getVal('wa-dmmode', 'select');
+    ch.whatsapp.groupMode     = getVal('wa-groupmode', 'select');
 
     // Vault-Patch für Kanäle
     secretsPatch['TELEGRAM_TOKEN']       = getVal('tg-token');

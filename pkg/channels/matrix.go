@@ -12,15 +12,20 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ki-werke/fluxbot/pkg/pairing"
 	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
 // MatrixConfig enthält die Konfiguration für den Matrix-Kanal
 type MatrixConfig struct {
-	HomeServer string   // z.B. https://matrix.org
-	UserID     string   // z.B. @fluxbot:matrix.org
-	Token      string   // Access Token
-	AllowFrom  []string // User-IDs die Nachrichten senden dürfen
+	HomeServer     string         // z.B. https://matrix.org
+	UserID         string         // z.B. @fluxbot:matrix.org
+	Token          string         // Access Token
+	AllowFrom      []string       // User-IDs die Nachrichten senden dürfen
+	DMMode         string         // "open" | "allowlist" | "pairing"
+	GroupMode      string         // "open" | "allowlist"
+	PairingStore   *pairing.Store // nil = Pairing deaktiviert
+	PairingMessage string
 }
 
 // MatrixChannel implementiert den Matrix-Kanal via Client-Server API (Long-Polling /sync)
@@ -33,19 +38,13 @@ type MatrixChannel struct {
 	client    *http.Client
 	nextBatch string
 	botUserID string
-	allow     map[string]bool
 }
 
 // NewMatrixChannel erstellt einen neuen Matrix-Kanal
 func NewMatrixChannel(cfg MatrixConfig) *MatrixChannel {
-	allow := make(map[string]bool)
-	for _, a := range cfg.AllowFrom {
-		allow[a] = true
-	}
 	return &MatrixChannel{
 		cfg:    cfg,
-		client: &http.Client{Timeout: 35 * time.Second}, // Timeout > sync timeout
-		allow:  allow,
+		client: &http.Client{Timeout: 35 * time.Second},
 	}
 }
 
@@ -220,8 +219,22 @@ func (m *MatrixChannel) processSync(sync matrixSyncResponse) {
 			if event.Sender == m.botUserID {
 				continue
 			}
-			// Whitelist prüfen
-			if len(m.allow) > 0 && !m.allow[event.Sender] {
+
+			// Zugriffskontrolle (Matrix: alle Räume als Gruppe behandelt)
+			result := CheckAccess(AccessConfig{
+				Channel:        "matrix",
+				SenderID:       event.Sender,
+				UserName:       event.Sender,
+				ChatID:         roomID,
+				IsDM:           false,
+				DMMode:         m.cfg.DMMode,
+				GroupMode:      m.cfg.GroupMode,
+				AllowFrom:      m.cfg.AllowFrom,
+				PairingStore:   m.cfg.PairingStore,
+				PairingMessage: m.cfg.PairingMessage,
+				SendFn:         func(msg string) { m.Send(roomID, msg) },
+			})
+			if result != AccessAllowed {
 				continue
 			}
 

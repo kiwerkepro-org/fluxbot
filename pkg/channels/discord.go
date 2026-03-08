@@ -12,13 +12,18 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/ki-werke/fluxbot/pkg/pairing"
 	"github.com/ki-werke/fluxbot/pkg/security"
 )
 
 // DiscordConfig enthält die Konfiguration für den Discord-Kanal
 type DiscordConfig struct {
-	Token     string
-	AllowFrom []string // Discord User-IDs die Nachrichten senden dürfen (leer = alle)
+	Token          string
+	AllowFrom      []string       // Discord User-IDs die Nachrichten senden dürfen (leer = alle)
+	DMMode         string         // "open" | "allowlist" | "pairing"
+	GroupMode      string         // "open" | "allowlist"
+	PairingStore   *pairing.Store // nil = Pairing deaktiviert
+	PairingMessage string
 }
 
 // DiscordChannel implementiert den Discord-Kanal via Gateway (WebSocket).
@@ -28,23 +33,17 @@ type DiscordConfig struct {
 //  2. Unter "Privileged Gateway Intents": MESSAGE CONTENT INTENT aktivieren
 //  3. Bot einladen: OAuth2 → URL Generator → Scopes: bot → Permissions: Send Messages, Read Messages
 type DiscordChannel struct {
-	cfg     DiscordConfig
+	cfg    DiscordConfig
 	session *discordgo.Session
-	bus     chan<- Message
-	allow   map[string]bool
-	stopCh  chan struct{}
-	client  *http.Client
+	bus    chan<- Message
+	stopCh chan struct{}
+	client *http.Client
 }
 
 // NewDiscordChannel erstellt einen neuen Discord-Kanal
 func NewDiscordChannel(cfg DiscordConfig) *DiscordChannel {
-	allow := make(map[string]bool)
-	for _, id := range cfg.AllowFrom {
-		allow[id] = true
-	}
 	return &DiscordChannel{
 		cfg:    cfg,
-		allow:  allow,
 		stopCh: make(chan struct{}),
 		client: &http.Client{Timeout: 30 * time.Second},
 	}
@@ -101,14 +100,27 @@ func (d *DiscordChannel) onMessage(s *discordgo.Session, m *discordgo.MessageCre
 		return
 	}
 
-	// Whitelist-Prüfung (leer = alle erlaubt)
-	if len(d.allow) > 0 && !d.allow[m.Author.ID] {
-		log.Printf("[Discord] User %s (%s) nicht in allowFrom – ignoriert", m.Author.Username, m.Author.ID)
-		return
-	}
-
 	chatID := m.ChannelID
 	senderID := m.Author.ID
+
+	// P10: DM erkennen (kein GuildID = Direktnachricht)
+	isDM := m.GuildID == ""
+	result := CheckAccess(AccessConfig{
+		Channel:        "discord",
+		SenderID:       senderID,
+		UserName:       m.Author.Username,
+		ChatID:         chatID,
+		IsDM:           isDM,
+		DMMode:         d.cfg.DMMode,
+		GroupMode:      d.cfg.GroupMode,
+		AllowFrom:      d.cfg.AllowFrom,
+		PairingStore:   d.cfg.PairingStore,
+		PairingMessage: d.cfg.PairingMessage,
+		SendFn:         func(msg string) { d.Send(chatID, msg) },
+	})
+	if result != AccessAllowed {
+		return
+	}
 
 	// ── Anhänge scannen (alle Typen: Audio, Bild, Dokument, Video, ...) ──────
 	for _, att := range m.Attachments {

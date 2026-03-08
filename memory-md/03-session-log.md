@@ -5,6 +5,94 @@
 
 ---
 
+## Session 52 – P10 Granulare DM-Policy (2026-03-08)
+
+**Fokus:** Zentrale Zugriffskontrolle für alle 5 Kanäle (open/allowlist/pairing)
+
+### Neue Features:
+1. **`pkg/channels/access.go`** (neu) – Zentrale `CheckAccess()` Funktion
+   - `AccessResult`: `AccessAllowed`, `AccessDenied`, `AccessPending`
+   - `AccessConfig`: Channel, SenderID, UserName, ChatID, IsDM, DMMode, GroupMode, AllowFrom, PairingStore, PairingMessage, SendFn
+   - Stufe 1: AllowFrom (statisch) → immer erlaubt
+   - Stufe 2: open/allowlist/pairing Modus
+
+2. **`pkg/config/config.go`** – `DMMode`/`GroupMode` zu allen 5 Channel-Configs hinzugefügt
+   - `AccessMode` Type + Konstanten: `AccessOpen`, `AccessAllowlist`, `AccessPairing`
+
+3. **`pkg/channels/telegram.go`** – `CheckAccess()` statt isAllowed(), Legacy `PairingEnabled` erhalten
+4. **`pkg/channels/discord.go`** – `CheckAccess()` + DM-Erkennung via `GuildID == ""`
+5. **`pkg/channels/slack.go`** – `CheckAccess()` + DM-Erkennung via Channel-Prefix "D"
+6. **`pkg/channels/matrix.go`** – `CheckAccess()` in `processSync()` (Gruppen-Modus, kein DM-Detect)
+7. **`pkg/channels/whatsapp.go`** – `CheckAccess()` + `pairing`-Import, `allow`-Map entfernt (IsDM=true)
+8. **`cmd/fluxbot/main.go`** – Alle 5 Channel-Konstruktoren mit DMMode/GroupMode/PairingStore
+   - Slack, Matrix, WhatsApp Kanal-Registrierungen neu hinzugefügt
+9. **`pkg/dashboard/dashboard.html`** – DMMode/GroupMode Dropdowns für alle 5 Kanäle
+   - Laden (`setVal`) + Speichern (`getVal`) für alle 10 neuen Felder
+
+### Geänderte Dateien:
+- `pkg/channels/access.go` (neu)
+- `pkg/channels/telegram.go`, `discord.go`, `slack.go`, `matrix.go`, `whatsapp.go`
+- `pkg/config/config.go`
+- `cmd/fluxbot/main.go`
+- `pkg/dashboard/dashboard.html`
+
+---
+
+## Session 51 – P0 Installation & Update System (2026-03-08)
+
+**Fokus:** Plattformübergreifende Installation + Auto-Update System
+
+### Neue Features:
+
+1. **`pkg/system/updater.go`** – Go Auto-Updater (neu)
+   - `CheckUpdate()`: GitHub Releases API → Version vergleichen (Semver)
+   - `InstallUpdate(url)`: Binary herunterladen, Backup `.bak`, ersetzen
+   - `StartBackgroundCheck(ctx)`: alle 6h automatischer Check im Hintergrund
+   - `platformAssetName()`: OS/Arch-Erkennung → `fluxbot-windows-amd64.exe`, `fluxbot-linux-amd64`, `fluxbot-darwin-arm64` etc.
+   - `isNewerVersion()`: Semver-Vergleich `vMAJOR.MINOR.PATCH`
+
+2. **`install.ps1`** – Windows Installer erweitert (Nativ + Docker, Menü)
+   - **Nativ-Modus:** GitHub Release herunterladen, Playwright-Browser installieren, Task Scheduler Autostart, Desktop-Verknüpfung
+   - **Docker-Modus:** wie vorher (docker-compose pull + up)
+
+3. **`install.sh`** – Linux/macOS Installer erweitert (Nativ + Docker, Menü)
+   - **Linux Nativ:** Binary + systemd User-Unit (`~/.config/systemd/user/fluxbot.service`)
+   - **macOS Nativ:** Binary + LaunchAgent (`~/Library/LaunchAgents/de.ki-werke.fluxbot.plist`)
+   - **Docker:** wie vorher
+
+4. **Dashboard-Endpoints** (`pkg/dashboard/api.go` + `server.go`):
+   - `GET /api/system/version` – Version-Info + letzter Check-Zeitpunkt
+   - `POST /api/system/check-update` – sofortiger GitHub-Check
+   - `POST /api/system/install-update` – 1-Klick-Update (HMAC-signiert)
+
+5. **Update-Panel im Status-Tab** (`dashboard.html`):
+   - Zeigt: Aktuelle Version ↔ Neueste Version
+   - Buttons: "🔍 Auf Updates prüfen", "⬇️ Update installieren"
+   - Release-Notes anzeigbar
+   - Automatisch ausgeblendet wenn `/api/system/version` nicht verfügbar
+
+6. **`--install-playwright` Flag** in `main.go`:
+   - `fluxbot.exe --install-playwright` → Browser installieren + beenden
+   - Wird von `install.ps1` / `install.sh` aufgerufen
+
+7. **Makefile normalisiert:**
+   - macOS-Assets: `fluxbot-darwin-arm64` / `fluxbot-darwin-amd64` (war `fluxbot-macos-*`)
+
+8. **Version-Fallback korrigiert:** `v1.1.9` → `v1.2.1`
+
+### Geänderte Dateien:
+- `pkg/system/updater.go` (neu)
+- `pkg/dashboard/api.go` – handleSystemVersion/CheckUpdate/InstallUpdate
+- `pkg/dashboard/server.go` – updater-Feld + SetUpdater() + 3 neue Routen
+- `pkg/dashboard/dashboard.html` – Update-Panel + JS-Funktionen
+- `cmd/fluxbot/main.go` – playwright-Import, --install-playwright Flag, Updater-Init
+- `install.ps1`, `install.sh` – komplett neu (Nativ + Docker Menü)
+- `Makefile` – macOS Asset-Namen normalisiert
+
+### Commit: `ddad7e8`
+
+---
+
 ## Session 47 – Browser Actions, Stealth, Cookie-Banner, OpenVisible, Lucide Fix (2026-03-08)
 
 **Fokus:** Dynamische Browser-Aktionen, Anti-Bot-Detection, Cookie-Banner Auto-Dismiss, sichtbarer Browser
