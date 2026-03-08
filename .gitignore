@@ -89,5 +89,8 @@ memory-md/
 # Fehlerbilder & Debug-Materialien (auto-cleanup, nicht committen)
 Z-FEHLERBILDER/
 
+# Externe Projekte (NICHT Teil von FluxBot)
+O1000-OpenClaw/
+
 # Externe Plugins (z.B. WordPress, unbeabsichtigt hinzugefügt)
 plugins/
