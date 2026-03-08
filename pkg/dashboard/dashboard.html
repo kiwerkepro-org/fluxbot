@@ -439,6 +439,7 @@
         <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
           <button class="btn btn-secondary" onclick="checkUpdate()" id="btn-check-update">🔍 Auf Updates prüfen</button>
           <button class="btn btn-primary" onclick="installUpdate()" id="btn-install-update" style="display:none">⬇️ Update installieren</button>
+          <button class="btn btn-secondary" onclick="restartFluxBot()" id="btn-restart" style="display:none">🔄 Neu starten</button>
         </div>
         <p id="update-status-msg" style="font-size:12px;color:var(--muted);margin-top:8px"></p>
       </div>
@@ -2352,14 +2353,45 @@ async function installUpdate() {
       if (btn) { btn.disabled = false; btn.textContent = '⬇️ Update installieren'; }
       return;
     }
-    if (msg) msg.textContent = '✅ Update installiert – FluxBot startet neu...';
+    if (msg) msg.textContent = '✅ Update installiert – bitte jetzt neu starten.';
     if (btn) { btn.disabled = true; btn.textContent = '✅ Installiert'; }
-    // Nach 8 Sekunden Dashboard neu laden (FluxBot braucht ein paar Sekunden zum Starten)
-    setTimeout(() => location.reload(), 8000);
+    // "Neu starten" Button einblenden
+    const btnRestart = document.getElementById('btn-restart');
+    if (btnRestart) btnRestart.style.display = 'inline-flex';
   } catch(e) {
     if (msg) msg.textContent = `❌ Fehler bei der Installation: ${e.message}`;
     if (btn) { btn.disabled = false; btn.textContent = '⬇️ Update installieren'; }
   }
+}
+
+// FluxBot neu starten
+async function restartFluxBot() {
+  const btn = document.getElementById('btn-restart');
+  const msg = document.getElementById('update-status-msg');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Startet neu...'; }
+  if (msg) msg.textContent = 'FluxBot wird neu gestartet...';
+  try {
+    await api('/api/system/restart', 'POST', {});
+  } catch(e) { /* Verbindungsabbruch ist normal beim Neustart */ }
+  // Warten bis FluxBot wieder erreichbar ist, dann neu laden
+  if (msg) msg.textContent = '⏳ Warte auf FluxBot...';
+  await waitForRestart();
+}
+
+async function waitForRestart() {
+  const msg = document.getElementById('update-status-msg');
+  // Kurz warten bevor wir pollen (FluxBot braucht etwas zum Starten)
+  await new Promise(r => setTimeout(r, 3000));
+  for (let i = 0; i < 20; i++) {
+    try {
+      await api('/api/status');
+      // Erreichbar → neu laden
+      location.reload();
+      return;
+    } catch(e) { /* noch nicht erreichbar */ }
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  if (msg) msg.textContent = '⚠️ FluxBot nicht erreichbar – bitte Seite manuell neu laden.';
 }
 
 // ── CONFIG: Laden ──────────────────────────────────────────────────────────

@@ -159,9 +159,10 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/pairing/stats", s.auth(s.handlePairingStats))          // GET: Statistiken
 
 	// ── System API (P0: Auto-Update) ────────────────────────────────────────
-	mux.HandleFunc("/api/system/version", s.auth(s.handleSystemVersion))                         // GET: Version-Info + Update-Status
-	mux.HandleFunc("/api/system/check-update", s.auth(s.handleSystemCheckUpdate))                // POST: Sofortiger Update-Check
+	mux.HandleFunc("/api/system/version", s.auth(s.handleSystemVersion))                            // GET: Version-Info + Update-Status
+	mux.HandleFunc("/api/system/check-update", s.auth(s.handleSystemCheckUpdate))                   // POST: Sofortiger Update-Check
 	mux.HandleFunc("/api/system/install-update", s.auth(s.hmacVerify(s.handleSystemInstallUpdate))) // POST: Update installieren (HMAC)
+	mux.HandleFunc("/api/system/restart", s.auth(s.hmacVerify(s.handleSystemRestart)))              // POST: Neustart (HMAC)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),

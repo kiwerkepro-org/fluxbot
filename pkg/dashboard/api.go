@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -719,8 +721,34 @@ func (s *Server) handleSystemInstallUpdate(w http.ResponseWriter, r *http.Reques
 
 	writeJSON(w, map[string]string{
 		"status":  "success",
-		"message": "Update installiert. Bitte FluxBot neu starten um die neue Version zu aktivieren.",
+		"message": "Update installiert.",
 	})
+}
+
+// handleSystemRestart startet FluxBot neu (neuer Prozess + os.Exit).
+// HMAC-signiert.
+func (s *Server) handleSystemRestart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpError(w, "Nur POST erlaubt", http.StatusMethodNotAllowed)
+		return
+	}
+	writeJSON(w, map[string]string{"status": "restarting"})
+
+	go func() {
+		time.Sleep(300 * time.Millisecond)
+		exe, err := os.Executable()
+		if err != nil {
+			log.Printf("[Restart] Executable-Pfad nicht ermittelbar: %v", err)
+			os.Exit(1)
+		}
+		cmd := exec.Command(exe, os.Args[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Start(); err != nil {
+			log.Printf("[Restart] Neustart fehlgeschlagen: %v", err)
+		}
+		os.Exit(0)
+	}()
 }
 
 // ── Hilfsfunktionen ───────────────────────────────────────────────────────────
