@@ -1230,14 +1230,6 @@
     <h2>System</h2>
     <p class="subtitle">FluxBot neu starten oder neu bauen – passende Befehle für dein System</p>
 
-    <!-- Quick Actions -->
-    <div style="display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="openBrowser()" style="gap:6px;display:flex;align-items:center">
-        <i data-lucide="chrome" style="width:16px;height:16px"></i>
-        Google Chrome öffnen
-      </button>
-    </div>
-
     <!-- Ebene 1: Haupt-OS -->
     <div style="font-size:13px;color:var(--muted);margin-bottom:8px">
       <strong>Schritt 1:</strong> Wie läuft FluxBot bei dir?
@@ -2788,39 +2780,6 @@ function selectSubOS(key, el) {
   renderSystemCmds();
 }
 
-function openBrowser() {
-  const btn = event.target.closest('button');
-  if (!btn) return;
-  btn.disabled = true;
-  btn.textContent = '⏳ Wird geöffnet...';
-
-  const payload = JSON.stringify({url: `http://localhost:${window.location.port || 9090}`});
-  const timestamp = Math.floor(Date.now() / 1000);
-  const hmacToken = getHmacToken(`${timestamp}.${payload}`);
-
-  fetch('/api/system/open-browser', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Timestamp': timestamp,
-      'X-Signature': hmacToken,
-    },
-    body: payload,
-  })
-  .then(r => r.json())
-  .then(data => {
-    toast(data.status === 'success' ? '✅ Chrome wird geöffnet...' : '❌ ' + data.message);
-    btn.disabled = false;
-    btn.innerHTML = '<i data-lucide="chrome" style="width:16px;height:16px"></i> Google Chrome öffnen';
-    lucide.createIcons();
-  })
-  .catch(err => {
-    toast('❌ Fehler: ' + err.message);
-    btn.disabled = false;
-    btn.innerHTML = '<i data-lucide="chrome" style="width:16px;height:16px"></i> Google Chrome öffnen';
-    lucide.createIcons();
-  });
-}
 
 function renderSystemCmds() {
   const cmds = osCmds[currentOSKey];
