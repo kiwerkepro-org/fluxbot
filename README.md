@@ -1,20 +1,16 @@
 <div align="center">
 
-<table border="0" cellspacing="0" cellpadding="16"><tr>
-<td align="center" valign="middle" width="160">
-  <img src="assets/virustotal-logo.png" width="100" alt="VirusTotal"/><br/>
-  <sub><b>Malware-Schutz</b></sub>
-</td>
-<td align="center" valign="middle">
-  <img src="assets/fluxion-logo.png" alt="FluxBot Logo" width="220"/><br/>
-  <h1>FluxBot</h1>
-  <strong>powered by <a href="https://ki-werke.at">KI-WERKE</a></strong>
-</td>
-<td align="center" valign="middle" width="160">
-  <img src="assets/bitwarden-logo.png" width="100" alt="Bitwarden"/><br/>
-  <sub><b>Secrets-Verwaltung</b></sub>
-</td>
-</tr></table>
+<img src="assets/virustotal-logo.png" width="140" alt="VirusTotal"/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="assets/fluxion-logo.png" alt="FluxBot Logo" width="220"/>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+<img src="assets/bitwarden-logo.png" width="140" alt="Bitwarden"/>
+
+<br/>
+
+# FluxBot
+
+**powered by KI-WERKE**
 
 ![Go](https://img.shields.io/badge/Go-1.22-00ADD8?logo=go&logoColor=white)
 ![License](https://img.shields.io/badge/Lizenz-MIT-green)
@@ -24,13 +20,27 @@
 
 **Dein persönlicher KI-Assistent – selbst gehostet, sicher, grenzenlos erweiterbar.**
 
-[Installation](#-installation) · [Features](#-was-kann-fluxbot) · [Dashboard](#%EF%B8%8F-web-dashboard) · [Skills](#%EF%B8%8F-eigene-skills-hinzuf%C3%BCgen) · [Sicherheit](#-sicherheit) · [Spenden](#-unterstützen)
-
 </div>
 
 ---
 
 FluxBot läuft auf deinem eigenen Rechner oder Server – nicht in der Cloud. Du behältst die volle Kontrolle über deine Daten und kannst jeden KI-Anbieter frei wählen.
+
+---
+
+## 💚 Unterstützen
+
+FluxBot ist Open Source und kostenlos. Wenn dir das Projekt gefällt, kannst du die Entwicklung mit einer Spende unterstützen:
+
+<div align="center">
+
+<a href="https://www.paypal.com/donate/?hosted_button_id=PJAUB53Z734TS" target="_blank"><img src="https://img.shields.io/badge/PayPal-Spenden-blue?logo=paypal&logoColor=white" alt="PayPal Spenden"/></a>
+
+<a href="https://www.paypal.com/donate/?hosted_button_id=PJAUB53Z734TS" target="_blank"><strong>Jetzt via PayPal spenden</strong></a>
+
+</div>
+
+---
 
 ## 🧠 Was kann FluxBot?
 
@@ -89,7 +99,7 @@ FluxBot funktioniert mit allen großen KI-Anbietern. Du wählst deinen Anbieter 
 
 ### Direktinstallation *(empfohlen)*
 
-Lade die passende Datei von der [Releases-Seite](https://github.com/kiwerkepro-org/fluxbot/releases) herunter:
+Lade die passende Datei von der <a href="https://github.com/kiwerkepro-org/fluxbot/releases" target="_blank">Releases-Seite</a> herunter:
 
 | Betriebssystem | Datei |
 |---------------|-------|
@@ -106,18 +116,18 @@ Datei starten → Der Einrichtungsassistent öffnet sich automatisch im Browser 
 
 ## ⬆️ Updaten
 
-Neue Version von der [Releases-Seite](https://github.com/kiwerkepro-org/fluxbot/releases) herunterladen und die alte Datei ersetzen. Konfiguration und Daten bleiben erhalten.
+Neue Version von der <a href="https://github.com/kiwerkepro-org/fluxbot/releases" target="_blank">Releases-Seite</a> herunterladen und die alte Datei ersetzen. Konfiguration und Daten bleiben erhalten.
 
 ---
 
 ## 🌐 Browser-Steuerung
 
-FluxBot kann echte Webseiten steuern – powered by [Playwright](https://playwright.dev/).
+FluxBot kann echte Webseiten steuern – powered by <a href="https://playwright.dev/" target="_blank">Playwright</a>.
 
 | Befehl | Aktion |
 |--------|--------|
 | „Mach einen Screenshot von bild.de" | Screenshot als Bild im Chat |
-| „Rufe ki-werke.at auf" | Öffnet ein sichtbares Browserfenster |
+| „Rufe example.com auf" | Öffnet ein sichtbares Browserfenster |
 | „Lies den Text von example.com" | Extrahiert den Seiteninhalt als Text |
 | „Geh auf google.com, such nach X und mach einen Screenshot" | Multi-Step Browser-Aktionen |
 | „Füll das Kontaktformular auf example.com aus" | Formular automatisch ausfüllen |
@@ -331,23 +341,9 @@ go build -o fluxbot ./cmd/fluxbot/
 
 ---
 
-## 💚 Unterstützen
-
-FluxBot ist Open Source und kostenlos. Wenn dir das Projekt gefällt, kannst du die Entwicklung mit einer Spende unterstützen:
-
-<div align="center">
-
-[![PayPal](https://img.shields.io/badge/PayPal-Spenden-blue?logo=paypal&logoColor=white)](https://www.paypal.com/donate/?hosted_button_id=PJAUB53Z734TS)
-
-[**Jetzt via PayPal spenden**](https://www.paypal.com/donate/?hosted_button_id=PJAUB53Z734TS)
-
-</div>
-
----
-
 ## 📄 Lizenz
 
-MIT License – © [KI-WERKE](https://ki-werke.at)
+MIT License – © KI-WERKE
 
 Du darfst FluxBot frei verwenden, verändern und weitergeben – auch kommerziell.
 
@@ -357,5 +353,5 @@ Du darfst FluxBot frei verwenden, verändern und weitergeben – auch kommerziel
 <br/>
 <strong>Gebaut mit Leidenschaft von KI-WERKE</strong>
 <br/>
-<sub>Fragen? Issues? Pull Requests? → <a href="https://github.com/kiwerkepro-org/fluxbot/issues">GitHub Issues</a> · kiwerke@gmail.com</sub>
+<sub>Fragen? Issues? Pull Requests? → <a href="https://github.com/kiwerkepro-org/fluxbot/issues" target="_blank">GitHub Issues</a> · kiwerke@gmail.com</sub>
 </div>
