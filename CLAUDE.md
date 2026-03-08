@@ -185,10 +185,29 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 49 (2026-03-08) – Chrome-Button Removal (Session 48 Cleanup)
-- **Nächste Aktion:** Weitere Features aus Feature-Roadmap oder Testing
+- **Letzte Session:** 50 (2026-03-08) – P12 Dark/Light Mode Theme Toggle ✅ IMPLEMENTIERT
+- **Nächste Aktion:** Installation & Update System (PRIORITÄT 0) oder weitere Features
 - **Aktueller Release:** `v1.2.1` ✅ RELEASED
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
+- **Dark Mode:** ✅ LIVE – Theme-Toggle im Sidebar-Footer
+
+### Session 50 Summary (2026-03-08) – P12 DARK/LIGHT MODE THEME TOGGLE
+- ✅ **Feature:** Dark/Light Mode Theme Toggle implementiert (P12)
+- ✅ **CSS-Variablen:** Light Mode defaults, Dark Mode via `html[data-theme="dark"]`
+  - Light: white backgrounds (#ffffff), dark text (#1a1a1a), light borders
+  - Dark: dark backgrounds (#0f1117), light text (#e2e8f0), dark borders
+- ✅ **Theme-Toggle Button:** Im Sidebar-Footer (neben Abmelden)
+  - ☀️/🌙 Icons (dynamisch je nach aktuellem Theme)
+  - Label wechselt: "Dark Mode" ↔ "Light Mode"
+- ✅ **Persistierung:** localStorage (`fluxbot-theme`)
+  - Auto-detect System-Preference wenn keine Preference gespeichert
+  - Preference bleibt über Sessions erhalten
+- ✅ **Styling:** Alle UI-Elemente angepasst
+  - Modals, Tooltips, Blur-Overlays, Command-Boxen
+  - Smooth 0.3s Transitions für alle Farben
+  - Modal-Overlays opacity per Theme angepasst
+- ✅ **Build:** `go build -o fluxbot.exe ./cmd/fluxbot` ✅ SUCCESS
+- ✅ **Commit:** `595f322` – "feat: Add Dark/Light Mode Theme Toggle (P12)"
 
 ### Session 49 Summary (2026-03-08) – CHROME BUTTON REMOVAL
 - ⚠️ **Rollback:** Chrome-Button Feature aus Session 48 komplett entfernt
@@ -224,14 +243,14 @@ git push origin main
 - ✅ **Validierung:** OpenVisible funktioniert ✅, Lucide Icons ✅
 - 🔄 **P4 System-Testing:** Auf "später" verschoben (Cal.com, VT Live-Test, Google OAuth)
 
-### Status nach Session 49
+### Status nach Session 50
 - **AutoStart:** ✅ Task Scheduler (AtLogon, Hidden, Auto-Restart)
-- **Dashboard:** http://localhost:9090 erreichbar, Lucide Icons ✅
-- **Chrome Button:** ❌ ENTFERNT (Session 49) – incomplete implementation
+- **Dashboard:** http://localhost:9090 erreichbar, Lucide Icons ✅, Dark Mode ✅
 - **P9 DM-Pairing Mode:** ✅ LIVE & FUNKTIONAL
+- **P12 Dark/Light Mode:** ✅ LIVE – Theme-Toggle im Sidebar, localStorage Persistierung
 - **Self-Extend Feature:** ✅ LIVE – 3 Stufen implementiert
 - **Browser Skills:** ✅ VOLL FUNKTIONAL – Screenshot, Read, Fill, Actions, OpenVisible (Playwright)
 - **OpenVisible:** ✅ FUNKTIONAL (via Heimnetzwerk, öffnet auf Desktop wenn auf Handy Telegram-Befehl kam)
 - **Docker:** ❌ ENTFERNT – FluxBot läuft nur noch nativ auf Windows
 - **Release:** `v1.2.1` ✅ PUBLISHED
-- **Details:** `memory-md/03-session-log.md` (Sessions 1–49)
+- **Details:** `memory-md/03-session-log.md` (Sessions 1–50)
