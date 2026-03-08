@@ -187,7 +187,7 @@ git push origin main
 
 - **Letzte Session:** 51 (2026-03-08) – P0 Installation & Update System ✅ IMPLEMENTIERT
 - **Nächste Aktion:** Features aus Roadmap (P10 Granulare DM-Policy, P11 Dangerous-Tools, P13 OCR)
-- **Aktueller Release:** `v1.2.1` ✅ (nächster Release nach P0: v1.2.2)
+- **Aktueller Release:** `v1.2.2` ✅ RELEASED
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 - **Dark Mode:** ✅ LIVE – Theme-Toggle im Sidebar-Footer
 
