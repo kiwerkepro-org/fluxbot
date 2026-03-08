@@ -1549,7 +1549,7 @@
 
       <div class="field" style="margin-bottom:16px">
         <label>Dangerous-Tools Prüfung <button class="info-btn" onmouseenter="tipShow(this,'Wenn aktiv, werden User-Anfragen auf gefährliche Operationen geprüft. Admins können alle Operationen nutzen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></label>
-        <select id="dt-enabled" onchange="dtSaveConfig()">
+        <select id="dt-enabled">
           <option value="true">✅ Aktiv – gefährliche Anfragen blockieren</option>
           <option value="false">❌ Deaktiviert – alle Anfragen erlaubt</option>
         </select>
@@ -1557,37 +1557,40 @@
 
       <div class="field" style="margin-bottom:16px">
         <label>Gesperrte Kategorien <button class="info-btn" onmouseenter="tipShow(this,'Wähle welche Operationstypen blockiert werden sollen. Admins (siehe unten) sind immer ausgenommen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></label>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">
-          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="dt-block-system-run" onchange="dtSaveConfig()" style="width:16px;height:16px;cursor:pointer">
-            <span><strong>system.run</strong> – Shell-Befehle (bash, PowerShell, cmd.exe, rm -rf, …)</span>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="dt-block-system-run" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
+            <span><code style="background:rgba(91,141,238,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">system.run</code> – Shell-Befehle (bash, PowerShell, cmd.exe, rm -rf …)</span>
           </label>
-          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="dt-block-file-delete" onchange="dtSaveConfig()" style="width:16px;height:16px;cursor:pointer">
-            <span><strong>file.delete</strong> – Dateien löschen (os.remove, shutil.rmtree, …)</span>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="dt-block-file-delete" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
+            <span><code style="background:rgba(91,141,238,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">file.delete</code> – Dateien löschen (os.remove, shutil.rmtree …)</span>
           </label>
-          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="dt-block-file-modify" onchange="dtSaveConfig()" style="width:16px;height:16px;cursor:pointer">
-            <span><strong>file.modify</strong> – Dateien schreiben/überschreiben (sed -i, open(w), …)</span>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="dt-block-file-modify" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
+            <span><code style="background:rgba(91,141,238,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">file.modify</code> – Dateien schreiben/überschreiben (sed -i, open w …)</span>
           </label>
-          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="dt-block-code-eval" onchange="dtSaveConfig()" style="width:16px;height:16px;cursor:pointer">
-            <span><strong>code.eval</strong> – Code ausführen (eval, exec, subprocess, …)</span>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="dt-block-code-eval" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
+            <span><code style="background:rgba(91,141,238,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">code.eval</code> – Code ausführen (eval, exec, subprocess …)</span>
           </label>
-          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
-            <input type="checkbox" id="dt-block-network" onchange="dtSaveConfig()" style="width:16px;height:16px;cursor:pointer">
-            <span><strong>network.unrestricted</strong> – HTTP-Requests ohne Whitelist (curl, wget, requests, …)</span>
+          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="dt-block-network" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
+            <span><code style="background:rgba(91,141,238,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">network.unrestricted</code> – HTTP ohne Whitelist (curl, wget, requests …)</span>
           </label>
         </div>
       </div>
 
       <div class="field">
         <label>Admin-IDs (bypass) <button class="info-btn" onmouseenter="tipShow(this,'Diese User-IDs dürfen alle Operationen nutzen, auch wenn sie geblockt sind. Format: SenderID oder channel:SenderID (z.B. telegram:123456). Eine ID pro Zeile.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></label>
-        <textarea id="dt-admin-ids" rows="3" placeholder="Eine ID pro Zeile, z.B.:&#10;123456789&#10;telegram:987654321" style="width:100%;resize:vertical;font-family:monospace;font-size:12px" oninput="dtSaveConfig()"></textarea>
+        <textarea id="dt-admin-ids" rows="3" placeholder="Eine ID pro Zeile, z.B.:&#10;123456789&#10;telegram:987654321" style="width:100%;resize:vertical;font-family:monospace;font-size:12px;background:var(--input-bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 12px;outline:none;box-sizing:border-box"></textarea>
         <div style="font-size:11px;color:var(--muted);margin-top:4px">Admins können auch gesperrte Operationen nutzen – keine Einschränkung.</div>
       </div>
 
-      <div id="dt-save-status" style="margin-top:12px;font-size:12px;color:var(--green);display:none">✅ Gespeichert</div>
+      <div style="margin-top:20px;display:flex;align-items:center;gap:12px">
+        <button class="btn btn-primary" onclick="dtSaveConfig()">💾 Speichern</button>
+        <span id="dt-save-status" style="font-size:13px;display:none"></span>
+      </div>
     </div>
 
     <p style="font-size:12px;color:var(--muted);margin-top:12px">
@@ -3640,44 +3643,35 @@ async function loadDangerousToolsData() {
   }
 }
 
-let dtSaveTimer = null;
-function dtSaveConfig() {
-  clearTimeout(dtSaveTimer);
-  dtSaveTimer = setTimeout(async () => {
-    const enabled = document.getElementById('dt-enabled').value === 'true';
-    const blocked = [];
-    if (document.getElementById('dt-block-system-run').checked)  blocked.push('system.run');
-    if (document.getElementById('dt-block-file-delete').checked) blocked.push('file.delete');
-    if (document.getElementById('dt-block-file-modify').checked) blocked.push('file.modify');
-    if (document.getElementById('dt-block-code-eval').checked)   blocked.push('code.eval');
-    if (document.getElementById('dt-block-network').checked)     blocked.push('network.unrestricted');
+async function dtSaveConfig() {
+  const enabled = document.getElementById('dt-enabled').value === 'true';
+  const blocked = [];
+  if (document.getElementById('dt-block-system-run').checked)  blocked.push('system.run');
+  if (document.getElementById('dt-block-file-delete').checked) blocked.push('file.delete');
+  if (document.getElementById('dt-block-file-modify').checked) blocked.push('file.modify');
+  if (document.getElementById('dt-block-code-eval').checked)   blocked.push('code.eval');
+  if (document.getElementById('dt-block-network').checked)     blocked.push('network.unrestricted');
 
-    const rawAdmins = document.getElementById('dt-admin-ids').value;
-    const adminIDs = rawAdmins.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+  const rawAdmins = document.getElementById('dt-admin-ids').value;
+  const adminIDs = rawAdmins.split('\n').map(s => s.trim()).filter(s => s.length > 0);
 
-    // Aktuelle Config laden, DangerousTools-Feld aktualisieren, speichern
-    const cfg = await api('/api/config');
-    if (!cfg) return;
-    cfg.dangerousTools = { enabled, blocked, adminIDs };
+  const cfg = await api('/api/config');
+  if (!cfg) return;
+  cfg.dangerousTools = { enabled, blocked, adminIDs };
 
-    const res = await fetch('/api/config', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Basic ' + btoa(currentUser + ':' + currentPass) },
-      body: JSON.stringify(cfg)
-    });
-    const statusEl = document.getElementById('dt-save-status');
-    if (res.ok) {
-      statusEl.style.display = 'block';
-      statusEl.style.color = 'var(--green)';
-      statusEl.textContent = '✅ Gespeichert';
-      setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
-    } else {
-      statusEl.style.display = 'block';
-      statusEl.style.color = 'var(--red)';
-      statusEl.textContent = '❌ Fehler beim Speichern';
-      setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
-    }
-  }, 800);
+  const statusEl = document.getElementById('dt-save-status');
+  const result = await api('/api/config', 'PUT', cfg);
+  if (result !== null) {
+    statusEl.style.display = 'inline';
+    statusEl.style.color = 'var(--green)';
+    statusEl.textContent = '✅ Gespeichert';
+    setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
+  } else {
+    statusEl.style.display = 'inline';
+    statusEl.style.color = 'var(--red)';
+    statusEl.textContent = '❌ Fehler';
+    setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+  }
 }
 
 async function loadPairingData() {

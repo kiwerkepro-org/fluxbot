@@ -82,7 +82,12 @@ func keyringGet(service, key string) (string, error) {
 		}
 		return "", fmt.Errorf("CredReadW fehlgeschlagen: %w", callErr)
 	}
-	defer procCredFreeW.Call(uintptr(unsafe.Pointer(pcred)))
+	// CredFreeW ist auf manchen Windows-Versionen nicht per LazyProc auflösbar –
+	// Find() prüft ohne Panic; bei Fehler wird der Speicher nicht freigegeben
+	// (minimaler Leak, besser als Prozess-Crash).
+	if err := procCredFreeW.Find(); err == nil {
+		defer procCredFreeW.Call(uintptr(unsafe.Pointer(pcred)))
+	}
 
 	if pcred.CredentialBlobSize == 0 {
 		return "", nil
@@ -167,7 +172,9 @@ func keyringEnumDynamic(service string) (map[string]string, error) {
 		}
 		return nil, fmt.Errorf("CredEnumerateW fehlgeschlagen: %w", callErr)
 	}
-	defer procCredFreeW.Call(pcreds)
+	if err := procCredFreeW.Find(); err == nil {
+		defer procCredFreeW.Call(pcreds)
+	}
 
 	result := make(map[string]string, count)
 	// pcreds ist ein Array von *_CREDENTIAL Zeigern
