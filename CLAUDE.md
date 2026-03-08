@@ -185,10 +185,24 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 48 (2026-03-08) – Release v1.2.1, README Redesign, CLAUDE.md Update
-- **Nächste Aktion:** Weitere Feature-Entwicklung oder User-Feedback umsetzen
+- **Letzte Session:** 49 (2026-03-08) – Chrome-Button Removal (Session 48 Cleanup)
+- **Nächste Aktion:** Weitere Features aus Feature-Roadmap oder Testing
 - **Aktueller Release:** `v1.2.1` ✅ RELEASED
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
+
+### Session 49 Summary (2026-03-08) – CHROME BUTTON REMOVAL
+- ⚠️ **Rollback:** Chrome-Button Feature aus Session 48 komplett entfernt
+  - Grund: Incomplete implementation, process management issues, not meeting requirements
+  - User feedback: "Programmiere den Google Chrome öffnen Button wieder komplett raus"
+- ✅ **Removed Files/Code:**
+  - Deleted: `pkg/system/browser.go` (Chrome launcher)
+  - Removed: `handleOpenBrowser()` from `pkg/dashboard/server.go`
+  - Removed: System package import from server.go
+  - Removed: Quick Actions button from dashboard.html UI
+  - Removed: `openBrowser()` JavaScript function from dashboard.html
+- ✅ **Build:** `go build -o fluxbot.exe ./cmd/fluxbot` ✅ SUCCESS (clean build)
+- ✅ **Commit:** `c085a2f` – "feat: Remove Chrome button feature"
+- 📊 **Analysis:** Chrome button was premature optimization – focus on core features instead
 
 ### Session 47 Summary (2026-03-08) – BROWSER ACTIONS + STEALTH + LUCIDE
 - ✅ **Dynamische Browser-Aktionen:** `RunActions()` mit 7 Aktionstypen + `browser-actions.md` Skill
@@ -210,13 +224,14 @@ git push origin main
 - ✅ **Validierung:** OpenVisible funktioniert ✅, Lucide Icons ✅
 - 🔄 **P4 System-Testing:** Auf "später" verschoben (Cal.com, VT Live-Test, Google OAuth)
 
-### Status nach Session 48
+### Status nach Session 49
 - **AutoStart:** ✅ Task Scheduler (AtLogon, Hidden, Auto-Restart)
 - **Dashboard:** http://localhost:9090 erreichbar, Lucide Icons ✅
+- **Chrome Button:** ❌ ENTFERNT (Session 49) – incomplete implementation
 - **P9 DM-Pairing Mode:** ✅ LIVE & FUNKTIONAL
 - **Self-Extend Feature:** ✅ LIVE – 3 Stufen implementiert
 - **Browser Skills:** ✅ VOLL FUNKTIONAL – Screenshot, Read, Fill, Actions, OpenVisible (Playwright)
 - **OpenVisible:** ✅ FUNKTIONAL (via Heimnetzwerk, öffnet auf Desktop wenn auf Handy Telegram-Befehl kam)
 - **Docker:** ❌ ENTFERNT – FluxBot läuft nur noch nativ auf Windows
 - **Release:** `v1.2.1` ✅ PUBLISHED
-- **Details:** `memory-md/03-session-log.md` (Sessions 1–48)
+- **Details:** `memory-md/03-session-log.md` (Sessions 1–49)
