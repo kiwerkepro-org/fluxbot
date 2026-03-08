@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -260,7 +261,7 @@ func (d *DiscordChannel) downloadFile(url, ext string) (string, error) {
 // SaveTempFileFromData speichert Bytes in einer temporären Datei und gibt den Pfad zurück.
 // Diese Funktion wird von mehreren Channels genutzt.
 func SaveTempFileFromData(data []byte, ext string) (string, error) {
-	tmpPath := fmt.Sprintf("/tmp/fluxbot_media_%d%s", time.Now().UnixNano(), ext)
+	tmpPath := filepath.Join(os.TempDir(), fmt.Sprintf("fluxbot_media_%d%s", time.Now().UnixNano(), ext))
 	if err := os.WriteFile(tmpPath, data, 0600); err != nil {
 		return "", fmt.Errorf("temp-datei konnte nicht erstellt werden: %w", err)
 	}

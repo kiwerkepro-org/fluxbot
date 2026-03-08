@@ -275,6 +275,14 @@ func (l *Loader) parseFrontmatter(skill *Skill, frontmatter string) {
 	}
 }
 
+// GetByName gibt einen Skill anhand seines Namens zurück (nil wenn nicht gefunden).
+func (l *Loader) GetByName(name string) *Skill {
+	if s, ok := l.skills[name]; ok {
+		return s
+	}
+	return nil
+}
+
 // FindBestSkill gibt den Skill-Inhalt zurück, der am besten zum Prompt passt.
 // Wird vom Agent für einfache Fälle genutzt (ohne Disambiguierung).
 func (l *Loader) FindBestSkill(userPrompt string) string {
@@ -360,6 +368,7 @@ func (l *Loader) loadDefaultAgents() string {
 }
 
 func splitAndTrim(s string) []string {
+	s = strings.Trim(s, "[] ")
 	parts := strings.Split(s, ",")
 	result := make([]string, 0, len(parts))
 	for _, p := range parts {

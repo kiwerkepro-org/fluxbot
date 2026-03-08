@@ -322,3 +322,18 @@ func (t *TelegramChannel) SendVoice(chatID string, audioData []byte) error {
 	_, err := t.bot.Send(voice)
 	return err
 }
+
+// SendPhotoBytes schickt ein Bild als Rohdaten (z.B. PNG-Screenshot) an einen Telegram-Chat.
+// Implementiert das PhotoBytesChannel Interface.
+// data: rohe Bild-Bytes, filename: Dateiname (z.B. "screenshot.png"), caption: optionaler Text
+func (t *TelegramChannel) SendPhotoBytes(chatID string, data []byte, filename, caption string) error {
+	id := int64(0)
+	fmt.Sscanf(chatID, "%d", &id)
+	photo := tgbotapi.NewPhoto(id, tgbotapi.FileBytes{
+		Name:  filename,
+		Bytes: data,
+	})
+	photo.Caption = caption
+	_, err := t.bot.Send(photo)
+	return err
+}

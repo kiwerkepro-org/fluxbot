@@ -14,12 +14,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ki-werke/fluxbot/pkg/browser"
 	"github.com/ki-werke/fluxbot/pkg/channels"
 	cronpkg "github.com/ki-werke/fluxbot/pkg/cron"
 	"github.com/ki-werke/fluxbot/pkg/email"
 	googleapi "github.com/ki-werke/fluxbot/pkg/google"
 	"github.com/ki-werke/fluxbot/pkg/imagegen"
 	"github.com/ki-werke/fluxbot/pkg/provider"
+	searchpkg "github.com/ki-werke/fluxbot/pkg/search"
 	"github.com/ki-werke/fluxbot/pkg/security"
 	"github.com/ki-werke/fluxbot/pkg/skills"
 	"github.com/ki-werke/fluxbot/pkg/voice"
@@ -51,6 +53,9 @@ type Agent struct {
 	ttsVoice         string           // Stimmen-Name, z.B. "alloy", "nova"
 	ttsMode          string           // "voice", "always", "keyword"
 	systemPromptFn   func(session *Session, rules string) string
+	// Session 42: Browser Skills (Phase 1: Suche, Phase 2: Browser CDP)
+	searchClient  *searchpkg.Client // nil = Web-Suche deaktiviert
+	browserClient *browser.Client   // nil = Browser-Steuerung deaktiviert
 }
 
 // Config enthält die Konfiguration für den Agent
@@ -77,6 +82,9 @@ type Config struct {
 	TTSSpeaker       voice.TTSSpeaker // Optional – nil = TTS deaktiviert
 	TTSVoice         string           // Stimmen-Name, z.B. "alloy", "nova"
 	TTSMode          string           // "voice", "always", "keyword"
+	// Session 42: Browser Skills
+	SearchClient  *searchpkg.Client // Optional – nil = Web-Suche deaktiviert (Vault: SEARCH_API_KEY)
+	BrowserClient *browser.Client   // Optional – nil = Browser deaktiviert (Vault: BROWSER_ENDPOINT)
 }
 
 // New erstellt einen neuen Agent
@@ -108,6 +116,8 @@ func New(cfg Config) *Agent {
 		ttsSpeaker:       cfg.TTSSpeaker,
 		ttsVoice:         cfg.TTSVoice,
 		ttsMode:          cfg.TTSMode,
+		searchClient:     cfg.SearchClient,
+		browserClient:    cfg.BrowserClient,
 	}
 
 	// Session 31: auditLogger vom Guard extrahieren (falls Guard vorhanden)
@@ -193,6 +203,28 @@ func (a *Agent) UpdateTTSSpeaker(speaker voice.TTSSpeaker, voiceName, mode strin
 		log.Println("[Agent] 🔄 TTS deaktiviert (kein API-Key).")
 	} else {
 		log.Printf("[Agent] 🔄 TTS aktiviert: %s | Stimme: %s | Mode: %s", speaker.Name(), a.ttsVoice, a.ttsMode)
+	}
+}
+
+// UpdateSearchClient ersetzt den Web-Such-Client zur Laufzeit (Hot-Reload).
+// Session 42: Tavily API. client == nil → Suche deaktiviert.
+func (a *Agent) UpdateSearchClient(client *searchpkg.Client) {
+	a.searchClient = client
+	if client == nil || !client.IsConfigured() {
+		log.Println("[Agent] 🔄 Web-Suche deaktiviert (kein SEARCH_API_KEY).")
+	} else {
+		log.Println("[Agent] 🔄 Web-Suche (Tavily) aktiviert.")
+	}
+}
+
+// UpdateBrowserClient ersetzt den Browser-CDP-Client zur Laufzeit (Hot-Reload).
+// Session 42: chromedp. client == nil → Browser-Steuerung deaktiviert.
+func (a *Agent) UpdateBrowserClient(client *browser.Client) {
+	a.browserClient = client
+	if client == nil || !client.IsConfigured() {
+		log.Println("[Agent] 🔄 Browser-Steuerung deaktiviert (kein BROWSER_ENDPOINT).")
+	} else {
+		log.Println("[Agent] 🔄 Browser-Steuerung (CDP) aktiviert.")
 	}
 }
 
@@ -612,7 +644,11 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 	}
 
 	// ── BILD-GENERIERUNG ─────────────────────────────────────────────────────
-	if a.isImageRequest(text) {
+	// Browser-Kontext (Screenshot, URL, Webseite) NICHT als Bild-Request behandeln
+	isBrowser := a.isBrowserContext(text)
+	isImage := a.isImageRequest(text)
+	log.Printf("[Agent] DEBUG processText: text=%q isBrowser=%v isImage=%v", text, isBrowser, isImage)
+	if !isBrowser && isImage {
 		if len(a.imageGenerators) == 0 {
 			return "🎨 Bildgenerierung ist aktuell nicht aktiviert.\n\n" +
 				"Du kannst das im Dashboard unter dem Tab *Bilder* ändern – " +
@@ -621,6 +657,27 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 				"→ openrouter.ai"
 		}
 		return a.handleImageRequest(ctx, msg, session, text)
+	}
+
+	// ── BROWSER-KONTEXT: Direktes Skill-Routing (kein generischer Matcher) ──
+	// Wenn isBrowserContext TRUE ist, wählen wir den Browser-Skill direkt aus.
+	// Das verhindert false positives (z.B. "google.com" → GDocs statt browser-screenshot).
+	if isBrowser {
+		lower := strings.ToLower(text)
+		var browserSkillName string
+		switch {
+		case strings.Contains(lower, "screenshot") || strings.Contains(lower, "foto von") || strings.Contains(lower, "fotografier"):
+			browserSkillName = "browser-screenshot"
+		case strings.Contains(lower, "formular") || strings.Contains(lower, "ausfüllen") || strings.Contains(lower, "eintragen"):
+			browserSkillName = "browser-fill"
+		default:
+			browserSkillName = "browser-read"
+		}
+		if skill := a.skillsLoader.GetByName(browserSkillName); skill != nil {
+			log.Printf("[Agent] Browser-Skill (direkt): %s", skill.Name)
+			return a.callAI(ctx, msg, session, text, skill.Content)
+		}
+		log.Printf("[Agent] ⚠️ Browser-Skill %s nicht gefunden, Fallback auf Matcher", browserSkillName)
 	}
 
 	// ── MERKEN-LOGIK ───────────────────────────────────────────────────────
@@ -971,6 +1028,25 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 	// Gmail – E-Mails auflisten
 	if strings.Contains(response, "__GMAIL_LIST__") && strings.Contains(response, "__GMAIL_LIST_END__") {
 		return a.handleGmailList(session, response)
+	}
+
+	// ── Web-Suche + Browser-Steuerung (Session 42) ───────────────────────────
+
+	// Web-Suche (Tavily)
+	if strings.Contains(response, "__WEB_SEARCH__") && strings.Contains(response, "__WEB_SEARCH_END__") {
+		return a.handleWebSearch(response)
+	}
+	// Browser: Seite lesen (CDP)
+	if strings.Contains(response, "__BROWSER_READ__") && strings.Contains(response, "__BROWSER_READ_END__") {
+		return a.handleBrowserRead(response)
+	}
+	// Browser: Screenshot (CDP)
+	if strings.Contains(response, "__BROWSER_SCREENSHOT__") && strings.Contains(response, "__BROWSER_SCREENSHOT_END__") {
+		return a.handleBrowserScreenshot(ctx, msg, response)
+	}
+	// Browser: Formular ausfüllen (CDP)
+	if strings.Contains(response, "__BROWSER_FILL__") && strings.Contains(response, "__BROWSER_FILL_END__") {
+		return a.handleBrowserFill(response)
 	}
 
 	// ── Cron-Reminder Marker ──────────────────────────────────────────────────
@@ -2093,9 +2169,55 @@ func (a *Agent) extractFact(text string) string {
 // ── BILD-GENERIERUNG ───────────────────────────────────────────────────────
 
 // isImageRequest erkennt Anfragen zur Bildgenerierung
+// isBrowserContext erkennt ob der Text einen Browser/Web-Kontext hat
+// (Screenshot, URL, Webseite, etc.) – dann NICHT als Bild-Generierung behandeln.
+func (a *Agent) isBrowserContext(text string) bool {
+	lower := strings.ToLower(text)
+	// Explizite Domain/Website-Indikatoren ZUERST prüfen
+	if strings.Contains(lower, "screenshot") ||
+		strings.Contains(lower, "seite") || // "seite" vor "bild" damit "seite zeigen" nicht als image request interpretiert wird
+		strings.Contains(lower, "webseite") ||
+		strings.Contains(lower, "webpage") ||
+		strings.Contains(lower, "website") ||
+		strings.Contains(lower, "http://") ||
+		strings.Contains(lower, "https://") ||
+		strings.Contains(lower, "www.") ||
+		strings.Contains(lower, "lies") ||
+		strings.Contains(lower, "öffne") ||
+		strings.Contains(lower, "zeig mir") ||
+		strings.Contains(lower, "foto") && strings.Contains(lower, "seite") ||
+		strings.Contains(lower, "formular") ||
+		strings.Contains(lower, "browser") {
+		return true
+	}
+	// Domain-Namen erkennen (.de, .com, .org, etc.)
+	if (strings.Contains(lower, ".de") || strings.Contains(lower, ".com") || strings.Contains(lower, ".org") || strings.Contains(lower, ".net")) &&
+		(strings.Contains(lower, "screenshot") || strings.Contains(lower, "zeig") || strings.Contains(lower, "foto") || strings.Contains(lower, "von ")) {
+		return true
+	}
+	return false
+}
+
 func (a *Agent) isImageRequest(text string) bool {
 	lower := strings.ToLower(text)
-	hasTrigger := strings.Contains(lower, "generiere") ||
+	// Browser/Screenshot-Kontext ausschließen – kein Bild-KI-Request
+	if strings.Contains(lower, "screenshot") ||
+		strings.Contains(lower, "seite") ||
+		strings.Contains(lower, "webseite") ||
+		strings.Contains(lower, "webpage") ||
+		strings.Contains(lower, "http://") ||
+		strings.Contains(lower, "https://") ||
+		strings.Contains(lower, "www.") ||
+		strings.Contains(lower, ".de") ||
+		strings.Contains(lower, ".com") ||
+		strings.Contains(lower, ".org") ||
+		strings.Contains(lower, ".net") ||
+		strings.Contains(lower, "zeig mir") ||
+		strings.Contains(lower, "öffne") {
+		return false
+	}
+	// Nur explizite Bildgenerierungs-Trigger
+	return strings.Contains(lower, "generiere") ||
 		strings.Contains(lower, "erstelle ein bild") ||
 		strings.Contains(lower, "male") ||
 		strings.Contains(lower, "zeichne") ||
@@ -2103,15 +2225,7 @@ func (a *Agent) isImageRequest(text string) bool {
 		strings.Contains(lower, "mach mir ein bild") ||
 		strings.Contains(lower, "create an image") ||
 		strings.Contains(lower, "generate an image") ||
-		strings.Contains(lower, "generate image") ||
-		strings.Contains(lower, "ein foto von") ||
-		strings.Contains(lower, "ein bild von")
-	hasBild := strings.Contains(lower, "bild") ||
-		strings.Contains(lower, "foto") ||
-		strings.Contains(lower, "image") ||
-		strings.Contains(lower, "illustration") ||
-		strings.Contains(lower, "artwork")
-	return hasTrigger || (hasBild && (strings.Contains(lower, "von ") || strings.Contains(lower, "zeig")))
+		strings.Contains(lower, "generate image")
 }
 
 // extractImagePrompt extrahiert den Bildprompt aus dem Text
@@ -2392,4 +2506,183 @@ func (a *Agent) handleReminderDelete(msg channels.Message, response string) stri
 		return fmt.Sprintf("❌ %v", err)
 	}
 	return confirm
+}
+
+// ── WEB-SUCHE (Session 42) ────────────────────────────────────────────────
+
+// webSearchPayload beschreibt die JSON-Daten aus dem __WEB_SEARCH__-Marker.
+type webSearchPayload struct {
+	Query         string `json:"query"`
+	MaxResults    int    `json:"max_results"`
+	IncludeAnswer bool   `json:"include_answer"`
+	SearchDepth   string `json:"search_depth"`
+}
+
+// handleWebSearch parst den __WEB_SEARCH__-Marker und führt eine Tavily-Suche durch.
+// Marker-Format: __WEB_SEARCH__\n{"query":"...","max_results":5}\n__WEB_SEARCH_END__
+func (a *Agent) handleWebSearch(response string) string {
+	if a.searchClient == nil || !a.searchClient.IsConfigured() {
+		return "🔍 Web-Suche ist aktuell nicht aktiviert.\n\n" +
+			"Trage deinen Tavily API-Key im Dashboard unter *Secrets → SEARCH_API_KEY* ein.\n" +
+			"→ Kostenloser API-Key: https://tavily.com"
+	}
+
+	start := strings.Index(response, "__WEB_SEARCH__")
+	end := strings.Index(response, "__WEB_SEARCH_END__")
+	if start < 0 || end < 0 || end <= start {
+		return "❌ Web-Suche: Interner Marker-Fehler."
+	}
+	jsonStr := strings.TrimSpace(response[start+len("__WEB_SEARCH__") : end])
+
+	var p webSearchPayload
+	p.IncludeAnswer = true // Default
+	p.MaxResults = 5       // Default
+	p.SearchDepth = "basic"
+
+	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil || p.Query == "" {
+		return "❌ Web-Suche: Ungültige Suchanfrage."
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	result, err := a.searchClient.Search(ctx, p.Query, searchpkg.SearchOptions{
+		MaxResults:    p.MaxResults,
+		IncludeAnswer: p.IncludeAnswer,
+		SearchDepth:   p.SearchDepth,
+	})
+	if err != nil {
+		log.Printf("[Agent] ❌ Web-Suche fehlgeschlagen: %v", err)
+		return fmt.Sprintf("❌ Web-Suche fehlgeschlagen: %v", err)
+	}
+
+	return searchpkg.FormatResults(result)
+}
+
+// ── BROWSER-STEUERUNG (Session 42) ───────────────────────────────────────
+
+// browserReadPayload beschreibt die JSON-Daten aus dem __BROWSER_READ__-Marker.
+type browserReadPayload struct {
+	URL string `json:"url"`
+}
+
+// handleBrowserRead öffnet eine URL und gibt den Textinhalt zurück.
+// Marker-Format: __BROWSER_READ__\n{"url":"https://..."}\n__BROWSER_READ_END__
+func (a *Agent) handleBrowserRead(response string) string {
+	if a.browserClient == nil || !a.browserClient.IsConfigured() {
+		return "🌐 Browser-Steuerung ist aktuell nicht aktiviert.\n\n" +
+			"*Einrichtung:*\n" +
+			"1. Chrome starten mit: `chrome.exe --remote-debugging-port=9222`\n" +
+			"2. Im Dashboard unter *Secrets* den Key `BROWSER_ENDPOINT` auf `ws://localhost:9222` setzen."
+	}
+
+	start := strings.Index(response, "__BROWSER_READ__")
+	end := strings.Index(response, "__BROWSER_READ_END__")
+	if start < 0 || end < 0 {
+		return "❌ Browser Read: Interner Marker-Fehler."
+	}
+	jsonStr := strings.TrimSpace(response[start+len("__BROWSER_READ__") : end])
+
+	var p browserReadPayload
+	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil || p.URL == "" {
+		return "❌ Browser Read: Ungültige URL."
+	}
+
+	text, err := a.browserClient.ReadPage(p.URL)
+	if err != nil {
+		log.Printf("[Agent] ❌ Browser ReadPage: %v", err)
+		return fmt.Sprintf("❌ Seite konnte nicht geladen werden: %v", err)
+	}
+
+	return fmt.Sprintf("🌐 *Inhalt von %s:*\n\n%s", p.URL, text)
+}
+
+// browserScreenshotPayload beschreibt die JSON-Daten aus dem __BROWSER_SCREENSHOT__-Marker.
+type browserScreenshotPayload struct {
+	URL string `json:"url"`
+}
+
+// handleBrowserScreenshot macht einen Screenshot und sendet ihn als Bild.
+// Marker-Format: __BROWSER_SCREENSHOT__\n{"url":"https://..."}\n__BROWSER_SCREENSHOT_END__
+func (a *Agent) handleBrowserScreenshot(ctx context.Context, msg channels.Message, response string) string {
+	if a.browserClient == nil || !a.browserClient.IsConfigured() {
+		return "🌐 Browser-Steuerung ist aktuell nicht aktiviert.\n\n" +
+			"*Einrichtung:* Chrome mit `--remote-debugging-port=9222` starten und " +
+			"`BROWSER_ENDPOINT` im Dashboard setzen."
+	}
+
+	start := strings.Index(response, "__BROWSER_SCREENSHOT__")
+	end := strings.Index(response, "__BROWSER_SCREENSHOT_END__")
+	if start < 0 || end < 0 {
+		return "❌ Browser Screenshot: Interner Marker-Fehler."
+	}
+	jsonStr := strings.TrimSpace(response[start+len("__BROWSER_SCREENSHOT__") : end])
+
+	var p browserScreenshotPayload
+	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil || p.URL == "" {
+		return "❌ Browser Screenshot: Ungültige URL."
+	}
+
+	imgData, err := a.browserClient.Screenshot(p.URL)
+	if err != nil {
+		log.Printf("[Agent] ❌ Browser Screenshot: %v", err)
+		return fmt.Sprintf("❌ Screenshot fehlgeschlagen: %v", err)
+	}
+
+	// Screenshot als Bild an den User senden (PhotoBytesChannel Interface)
+	caption := fmt.Sprintf("📸 %s", p.URL)
+	if err := a.manager.ReplyPhotoBytes(msg, imgData, "screenshot.png", caption); err != nil {
+		log.Printf("[Agent] ❌ Screenshot senden fehlgeschlagen: %v", err)
+		return fmt.Sprintf("❌ Screenshot wurde gemacht (%d bytes), konnte aber nicht gesendet werden: %v", len(imgData), err)
+	}
+
+	return fmt.Sprintf("📸 Screenshot von %s wurde aufgenommen.", p.URL)
+}
+
+// browserFillPayload beschreibt die JSON-Daten aus dem __BROWSER_FILL__-Marker.
+type browserFillPayload struct {
+	URL            string              `json:"url"`
+	Fields         []browser.FillField `json:"fields"`
+	SubmitSelector string              `json:"submit_selector"`
+}
+
+// handleBrowserFill füllt ein Webformular aus.
+// Marker-Format: __BROWSER_FILL__\n{"url":"...","fields":[...],"submit_selector":"..."}\n__BROWSER_FILL_END__
+func (a *Agent) handleBrowserFill(response string) string {
+	if a.browserClient == nil || !a.browserClient.IsConfigured() {
+		return "🌐 Browser-Steuerung ist aktuell nicht aktiviert.\n\n" +
+			"*Einrichtung:* Chrome mit `--remote-debugging-port=9222` starten und " +
+			"`BROWSER_ENDPOINT` im Dashboard setzen."
+	}
+
+	start := strings.Index(response, "__BROWSER_FILL__")
+	end := strings.Index(response, "__BROWSER_FILL_END__")
+	if start < 0 || end < 0 {
+		return "❌ Browser Fill: Interner Marker-Fehler."
+	}
+	jsonStr := strings.TrimSpace(response[start+len("__BROWSER_FILL__") : end])
+
+	var p browserFillPayload
+	if err := json.Unmarshal([]byte(jsonStr), &p); err != nil || p.URL == "" {
+		return "❌ Browser Fill: Ungültiger JSON-Block."
+	}
+
+	if len(p.Fields) == 0 {
+		return "❌ Browser Fill: Keine Felder angegeben."
+	}
+
+	result, err := a.browserClient.FillForm(p.URL, p.Fields, p.SubmitSelector)
+	if err != nil {
+		log.Printf("[Agent] ❌ Browser FillForm: %v", err)
+		return fmt.Sprintf("❌ Formular ausfüllen fehlgeschlagen: %v", err)
+	}
+
+	if p.SubmitSelector != "" {
+		msg := fmt.Sprintf("✅ Formular auf %s ausgefüllt und abgesendet.", p.URL)
+		if result != "" {
+			msg += "\n\n*Seiteninhalt nach dem Absenden:*\n" + result
+		}
+		return msg
+	}
+	return fmt.Sprintf("✅ Formular auf %s wurde ausgefüllt (nicht abgesendet – bitte selbst prüfen und bestätigen).", p.URL)
 }

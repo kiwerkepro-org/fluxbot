@@ -58,3 +58,16 @@ type VoiceChannel interface {
 	// audioData: rohe OGG/Opus-Bytes (direkt von OpenAI TTS lieferbar)
 	SendVoice(chatID string, audioData []byte) error
 }
+
+// PhotoBytesChannel erweitert Channel um das Senden von Bild-Rohdaten.
+// Nur Kanäle die Bilder als Bytes empfangen können (z.B. Telegram) implementieren dieses Interface.
+// Manager.ReplyPhotoBytes() prüft per type-assert ob der Kanal PhotoBytesChannel implementiert.
+type PhotoBytesChannel interface {
+	Channel
+
+	// SendPhotoBytes schickt ein Bild als Rohdaten (z.B. PNG-Bytes) an einen Chat.
+	// data: rohe Bild-Bytes (z.B. PNG von Browser-Screenshot)
+	// filename: Dateiname inkl. Endung (z.B. "screenshot.png")
+	// caption: optionaler Bildtext (leer = kein Caption)
+	SendPhotoBytes(chatID string, data []byte, filename, caption string) error
+}

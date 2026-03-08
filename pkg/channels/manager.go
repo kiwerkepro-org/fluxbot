@@ -116,6 +116,24 @@ func (m *Manager) ReplyPhoto(msg Message, imageURL, caption string) error {
 	return ch.SendPhoto(msg.ChatID, imageURL, caption)
 }
 
+// ReplyPhotoBytes sendet ein Bild als Rohdaten als Antwort.
+// Prüft per type-assert ob der Kanal PhotoBytesChannel implementiert.
+// Falls nicht (z.B. Discord, Slack), wird ein Fehler zurückgegeben – der Aufrufer
+// kann dann auf Text-Antwort zurückfallen.
+func (m *Manager) ReplyPhotoBytes(msg Message, data []byte, filename, caption string) error {
+	m.mu.RLock()
+	ch, ok := m.channels[msg.ChannelID]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("channel '%s' nicht gefunden", msg.ChannelID)
+	}
+	pc, ok := ch.(PhotoBytesChannel)
+	if !ok {
+		return fmt.Errorf("kanal '%s' unterstützt keine Bild-Bytes", msg.ChannelID)
+	}
+	return pc.SendPhotoBytes(msg.ChatID, data, filename, caption)
+}
+
 // ReplyVoice sendet eine Sprachnachricht als Antwort.
 // Prüft per type-assert ob der Kanal VoiceChannel implementiert.
 // Falls nicht (z.B. Discord, Slack), wird ein Fehler zurückgegeben – der Aufrufer

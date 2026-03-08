@@ -17,10 +17,20 @@ type Config struct {
 	ImageGen     ImageGenConfig  `json:"imageGen"`
 	VideoGen     VideoGenConfig  `json:"videoGen"`
 	Dashboard    DashboardConfig `json:"dashboard"`
-	Pairing      PairingConfig   `json:"pairing"`                // DM-Pairing Mode (P9)
-	Integrations []Integration   `json:"integrations,omitempty"` // externe API-Keys für Skills
-	SkillSecret  string          `json:"skillSecret,omitempty"`  // HMAC-Key für Skill-Signierung
-	Security     SecurityConfig  `json:"security"`               // vt-go Implementierung
+	Pairing      PairingConfig      `json:"pairing"`                // DM-Pairing Mode (P9)
+	Integrations []Integration      `json:"integrations,omitempty"` // externe API-Keys für Skills
+	SkillSecret  string             `json:"skillSecret,omitempty"`  // HMAC-Key für Skill-Signierung
+	Security     SecurityConfig     `json:"security"`               // vt-go Implementierung
+	BrowserSkills BrowserSkillsConfig `json:"browserSkills,omitempty"` // Session 42: Web-Suche + Browser CDP
+}
+
+// BrowserSkillsConfig konfiguriert die Browser Skills (Playwright).
+// Keys werden aus dem Vault geladen (SEARCH_API_KEY, BROWSER_TYPE, BROWSER_ALLOWED_DOMAINS).
+type BrowserSkillsConfig struct {
+	SearchAPIKey    string `json:"searchAPIKey,omitempty"`    // Tavily API-Key (SEARCH_API_KEY im Vault)
+	BrowserEndpoint string `json:"browserEndpoint,omitempty"` // Deprecated – wird ignoriert (Playwright verwaltet Browser selbst)
+	BrowserType     string `json:"browserType,omitempty"`     // Browser-Engine: "chromium" (default), "firefox", "webkit"
+	AllowedDomains  string `json:"allowedDomains,omitempty"`  // Kommagetrennte Domain-Whitelist (leer = alle)
 }
 
 // PairingConfig konfiguriert den DM-Pairing Mode (P9).

@@ -14,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/ki-werke/fluxbot/pkg/agent"
+	"github.com/ki-werke/fluxbot/pkg/browser"
 	"github.com/ki-werke/fluxbot/pkg/channels"
 	cronpkg "github.com/ki-werke/fluxbot/pkg/cron"
 	"github.com/ki-werke/fluxbot/pkg/config"
@@ -23,6 +24,7 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/imagegen"
 	"github.com/ki-werke/fluxbot/pkg/pairing"
 	"github.com/ki-werke/fluxbot/pkg/provider"
+	searchpkg "github.com/ki-werke/fluxbot/pkg/search"
 	"github.com/ki-werke/fluxbot/pkg/security"
 	"github.com/ki-werke/fluxbot/pkg/setup"
 	"github.com/ki-werke/fluxbot/pkg/skills"
@@ -315,6 +317,10 @@ func runBot(ctx context.Context, configPath string) {
 
 	googleClient := buildGoogleClient(cfg, vault)
 
+	// Session 42: Browser Skills – Search + Browser CDP initialisieren
+	searchClient := buildSearchClient(cfg)
+	browserClient := buildBrowserClient(cfg)
+
 	// Cron-Manager: sendFn nutzt den Channel-Manager (nach dessen Start)
 	cronStorePath := filepath.Join(cfg.Workspace.Path, "reminders.json")
 	cronSendFn := func(channelID, chatID, text string) {
@@ -347,6 +353,8 @@ func runBot(ctx context.Context, configPath string) {
 		TTSSpeaker:       ttsSpeaker,
 		TTSVoice:         cfg.Voice.TTSVoice,
 		TTSMode:          cfg.Voice.TTSMode,
+		SearchClient:     searchClient,
+		BrowserClient:    browserClient,
 	})
 
 	if cfg.Dashboard.Enabled {
@@ -383,6 +391,10 @@ func runBot(ctx context.Context, configPath string) {
 				parseIntegrationInt(newCfg, "CALCOM_EVENT_TYPE_ID"),
 			)
 			fluxAgent.UpdateGoogleClient(buildGoogleClient(newCfg, vault))
+
+			// Session 42: Browser Skills Hot-Reload
+			fluxAgent.UpdateSearchClient(buildSearchClient(newCfg))
+			fluxAgent.UpdateBrowserClient(buildBrowserClient(newCfg))
 
 			// TTS Hot-Reload: aktiviert sich automatisch wenn VOICE_TTS_API_KEY gesetzt wird,
 			// deaktiviert sich automatisch wenn Key entfernt wird – kein Neustart nötig.
@@ -688,6 +700,17 @@ func applySecrets(cfg *config.Config, vault security.SecretProvider) {
 	} else {
 		log.Println("[Config] Cal.com deaktiviert (CALCOM_ENABLED=false) – Credentials werden nicht verwendet.")
 	}
+
+	// Session 42: Browser Skills – Keys aus Vault in Config übernehmen
+	if v := get("SEARCH_API_KEY"); v != "" {
+		cfg.BrowserSkills.SearchAPIKey = v
+	}
+	if v := get("BROWSER_ENDPOINT"); v != "" {
+		cfg.BrowserSkills.BrowserEndpoint = v
+	}
+	if v := get("BROWSER_ALLOWED_DOMAINS"); v != "" {
+		cfg.BrowserSkills.AllowedDomains = v
+	}
 }
 
 // clearSecretsFromConfig setzt alle sensitiven Felder der Config auf "".
@@ -965,4 +988,46 @@ func parseIntegrationInt(cfg *config.Config, name string) int {
 		return 0
 	}
 	return n
+}
+
+// ── SESSION 42: Browser Skills ─────────────────────────────────────────────
+
+// buildSearchClient erstellt den Tavily-Such-Client (nil wenn kein Key konfiguriert).
+func buildSearchClient(cfg *config.Config) *searchpkg.Client {
+	key := cfg.BrowserSkills.SearchAPIKey
+	if key == "" {
+		return nil
+	}
+	client := searchpkg.New(key)
+	log.Println("[Main] ✅ Web-Suche (Tavily) aktiviert.")
+	return client
+}
+
+// buildBrowserClient erstellt den Playwright-Browser-Client.
+// Mit Playwright wird der Browser automatisch gestartet – kein externer Endpoint nötig.
+func buildBrowserClient(cfg *config.Config) *browser.Client {
+	// Browser Skills sind immer verfügbar mit Playwright
+	var domains []string
+	if cfg.BrowserSkills.AllowedDomains != "" {
+		for _, d := range strings.Split(cfg.BrowserSkills.AllowedDomains, ",") {
+			d = strings.TrimSpace(d)
+			if d != "" {
+				domains = append(domains, d)
+			}
+		}
+	}
+	// BrowserType aus Config lesen (default: chromium)
+	browserType := cfg.BrowserSkills.BrowserType
+	if browserType == "" {
+		browserType = "chromium"
+	}
+
+	// Playwright startet den Browser automatisch im Hintergrund
+	client := browser.New("", domains, browserType)
+	if len(domains) > 0 {
+		log.Printf("[Main] ✅ Browser Skills aktiviert (Playwright/%s) | Whitelist: %v", browserType, domains)
+	} else {
+		log.Printf("[Main] ⚠️ Browser Skills aktiviert (Playwright/%s) | KEINE Domain-Whitelist – alle URLs erlaubt!", browserType)
+	}
+	return client
 }
