@@ -21,6 +21,7 @@ import (
 	"github.com/ki-werke/fluxbot/pkg/pairing"
 	"github.com/ki-werke/fluxbot/pkg/security"
 	"github.com/ki-werke/fluxbot/pkg/skills"
+	"github.com/ki-werke/fluxbot/pkg/system"
 )
 
 //go:embed dashboard.html
@@ -150,6 +151,9 @@ func (s *Server) Start(ctx context.Context) {
 	// ── Pairing API (P9: DM-Pairing Mode) ─────────────────────────────────
 	mux.HandleFunc("/api/pairing", s.auth(s.hmacVerify(s.handlePairing)))       // GET: Liste, POST: Approve/Block/Remove (HMAC)
 	mux.HandleFunc("/api/pairing/stats", s.auth(s.handlePairingStats))          // GET: Statistiken
+
+	// ── System API ──────────────────────────────────────────────────────────
+	mux.HandleFunc("/api/system/open-browser", s.auth(s.handleOpenBrowser))     // POST: Browser öffnen
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),
@@ -309,6 +313,50 @@ func (s *Server) handleHMACToken(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"enabled": secret != "",
 		"secret":  secret,
+	})
+}
+
+// handleOpenBrowser öffnet einen Browser (Chrome/Chromium) auf dem lokalen System
+func (s *Server) handleOpenBrowser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Nur POST erlaubt", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Nur vom lokalen System aus erlaubt (Safety)
+	if r.Header.Get("X-Forwarded-For") != "" && r.Header.Get("X-Forwarded-For") != "127.0.0.1" {
+		http.Error(w, "Nur von localhost erlaubt", http.StatusForbidden)
+		return
+	}
+
+	// Optional: URL aus Body lesen, sonst default
+	var req struct {
+		URL string `json:"url"`
+	}
+	json.NewDecoder(r.Body).Decode(&req)
+
+	if req.URL == "" {
+		req.URL = fmt.Sprintf("http://localhost:%d", s.port)
+	}
+
+	err := system.OpenBrowser(req.URL)
+	if err != nil {
+		log.Printf("[Dashboard] ⚠️  Browser konnte nicht geöffnet werden: %v", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":  "error",
+			"message": err.Error(),
+		})
+		return
+	}
+
+	log.Printf("[Dashboard] ✅ Browser geöffnet: %s", req.URL)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":  "success",
+		"message": "Browser wird geöffnet...",
+		"url":     req.URL,
 	})
 }
 

@@ -18,13 +18,13 @@
 
 | Datei | Inhalt |
 |-------|--------|
-| `memory-md/01-features.md` | Alle implementierten Features (P1–P8) + offene Punkte |
+| `memory-md/01-features.md` | Alle implementierten Features (P1–P10) + offene Punkte |
 | `memory-md/02-architektur.md` | Architektur-Entscheidungen + Secret-Strategie + Keyring |
-| `memory-md/03-session-log.md` | Chronologisches Session-Protokoll (Sessions 1–36) |
+| `memory-md/03-session-log.md` | Chronologisches Session-Protokoll (Sessions 1–48) |
 | `memory-md/04-redesign-spec.md` | Dashboard Redesign Spezifikation (Session 20+) |
 | `memory-md/05-bugreports.md` | Bugs & Issues (Session 30+) |
-| `memory-md/06-feature-roadmap.md` | Zukunfts-Features & Ideen (Session 30+) |
-| `memory-md/07-openclaw-research.md` | OpenClaw Referenz-Study (Session 37) – Security-Patterns, Trust-Based Design, DM-Pairing |
+| `memory-md/06-feature-roadmap.md` | Zukunfts-Features & Ideen aus INBOX.md → priorisiert |
+| `memory-md/07-openclaw-research.md` | OpenClaw Security-Learnings (Session 37) – Best-Practices für FluxBot |
 
 ---
 
@@ -56,7 +56,7 @@
 **Dashboard:** http://localhost:9090 (nur via Tailscale oder lokal)
 
 ### Versioning-Konvention
-- **Aktueller Release:** `v1.1.4`
+- **Aktueller Release:** `v1.2.1` (2026-03-08)
 - **Schema:** `vMAJOR.MINOR.PATCH`
 - **Regel:** Die letzte Ziffer (PATCH) wird bei jedem Release um 1 erhöht, solange JJ nichts anderes angibt.
 - Release-Tag wird nach jedem abgeschlossenen Feature-Block auf GitHub gepusht (`git tag -a vX.Y.Z && git push origin vX.Y.Z`)
@@ -185,9 +185,9 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 47 (2026-03-08) – Browser Actions, Stealth, Cookie-Banner, OpenVisible, Lucide
-- **Nächste Aktion:** Release v1.2.1 taggen + pushen
-- **Aktueller Release:** `v1.2.0` → `v1.2.1` vorbereitet
+- **Letzte Session:** 48 (2026-03-08) – Release v1.2.1, README Redesign, CLAUDE.md Update
+- **Nächste Aktion:** Weitere Feature-Entwicklung oder User-Feedback umsetzen
+- **Aktueller Release:** `v1.2.1` ✅ RELEASED
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 
 ### Session 47 Summary (2026-03-08) – BROWSER ACTIONS + STEALTH + LUCIDE
@@ -199,11 +199,24 @@ git push origin main
 - ✅ **Lucide CDN:** Script fehlte → eingebunden, Nav-Icons wieder sichtbar
 - ✅ **Unsignierte Skills:** `isSignatureInvalid()` erkennt fehlende `.sig` → Warnung im Dashboard
 
-### Status nach Session 47
+### Session 48 Summary (2026-03-08) – RELEASE V1.2.1 + README REDESIGN
+- ✅ **README komplett überarbeitet:** Neue Header-Layout (inline Bilder, keine Tabelle), Partner-Logos 140px
+- ✅ **PayPal Spende:** Vor Features-Section, mit direktem Link, mit Badge & CTA
+- ✅ **Alle Links:** `target="_blank"` für neue Tabs
+- ✅ **KI-WERKE Links:** Entfernt → nur noch "powered by KI-WERKE" als Text
+- ✅ **Neue Features dokumentiert:** Browser (Playwright), Google Workspace, DM-Pairing, Self-Extend
+- ✅ **Release v1.2.1:** Committed, tagged, gepusht, GitHub Release mit Release-Notes ✅
+- ✅ **Git History clean:** O1000-OpenClaw komplett entfernt + purged
+- ✅ **Validierung:** OpenVisible funktioniert ✅, Lucide Icons ✅
+- 🔄 **P4 System-Testing:** Auf "später" verschoben (Cal.com, VT Live-Test, Google OAuth)
+
+### Status nach Session 48
 - **AutoStart:** ✅ Task Scheduler (AtLogon, Hidden, Auto-Restart)
 - **Dashboard:** http://localhost:9090 erreichbar, Lucide Icons ✅
 - **P9 DM-Pairing Mode:** ✅ LIVE & FUNKTIONAL
 - **Self-Extend Feature:** ✅ LIVE – 3 Stufen implementiert
-- **Browser Skills:** ✅ VOLL FUNKTIONAL – Screenshot, Read, Fill, Actions, OpenVisible (Playwright/chromium)
+- **Browser Skills:** ✅ VOLL FUNKTIONAL – Screenshot, Read, Fill, Actions, OpenVisible (Playwright)
+- **OpenVisible:** ✅ FUNKTIONAL (via Heimnetzwerk, öffnet auf Desktop wenn auf Handy Telegram-Befehl kam)
 - **Docker:** ❌ ENTFERNT – FluxBot läuft nur noch nativ auf Windows
-- **Details:** `memory-md/03-session-log.md` (Sessions 1–47)
+- **Release:** `v1.2.1` ✅ PUBLISHED
+- **Details:** `memory-md/03-session-log.md` (Sessions 1–48)

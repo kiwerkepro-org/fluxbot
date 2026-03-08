@@ -673,13 +673,19 @@ func (a *Agent) processText(ctx context.Context, msg channels.Message, session *
 				!strings.Contains(lower, "text") && !strings.Contains(lower, "formular") &&
 				!strings.Contains(lower, "klick") {
 				url := extractURL(text)
-				if url != "" && a.browserClient != nil && a.browserClient.IsConfigured() {
+				if url != "" {
+					if a.browserClient == nil || !a.browserClient.IsConfigured() {
+						return "❌ Browser-Steuerung ist nicht konfiguriert. Bitte im Dashboard konfigurieren."
+					}
 					log.Printf("[Agent] Browser öffne sichtbar: %s", url)
 					if err := a.browserClient.OpenVisible(url); err != nil {
 						log.Printf("[Agent] ❌ OpenVisible: %v", err)
 						return fmt.Sprintf("❌ Seite konnte nicht geöffnet werden: %v", err)
 					}
 					return fmt.Sprintf("🌐 %s wurde im Browser geöffnet.", url)
+				} else {
+					// URL konnte nicht extrahiert werden – freundliche Hilfe
+					return "Ich konnte keine gültige Webseite erkennen. Versuch: \"Rufe google.de auf\" oder \"Öffne example.com\""
 				}
 			}
 		}
@@ -2201,19 +2207,27 @@ func (a *Agent) extractFact(text string) string {
 // ── BILD-GENERIERUNG ───────────────────────────────────────────────────────
 
 // extractURL versucht eine URL oder Domain aus dem Text zu extrahieren.
-// Erkennt "https://...", "http://...", "www.xyz.de" und nackte Domains wie "kiwerkepro.com".
+// Erkennt folgende Formate:
+//   - Vollständige URLs: "https://example.com", "http://example.com"
+//   - www-Domains: "www.example.com" → "https://www.example.com"
+//   - Nackte Domains: "example.com", "google.de" → "https://example.com"
+//
+// Unterstützte TLDs: .com, .de, .org, .net, .at, .ch, .io, .eu, .info, .biz, .co, .ai, .app, .dev
 func extractURL(text string) string {
-	// Zuerst vollständige URLs
-	urlRe := regexp.MustCompile(`https?://[^\s"'<>]+`)
+	// Zuerst vollständige URLs (mit http/https)
+	// Normalisiere mehrfache Slashes (http:/// → http://)
+	urlRe := regexp.MustCompile(`https?://+[^\s"'<>]+`)
 	if m := urlRe.FindString(text); m != "" {
+		// Ersetze mehrfache Slashes nach http:
+		m = regexp.MustCompile(`(https?:)//+`).ReplaceAllString(m, "${1}//")
 		return m
 	}
-	// www.-Domains
+	// www.-Domains (z.B. "www.google.de")
 	wwwRe := regexp.MustCompile(`www\.[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}`)
 	if m := wwwRe.FindString(text); m != "" {
 		return "https://" + m
 	}
-	// Nackte Domains (z.B. "kiwerkepro.com", "bild.de")
+	// Nackte Domains (z.B. "google.com", "bild.de")
 	domainRe := regexp.MustCompile(`[a-zA-Z0-9][-a-zA-Z0-9]*\.(com|de|org|net|at|ch|io|eu|info|biz|co|ai|app|dev)`)
 	if m := domainRe.FindString(text); m != "" {
 		return "https://" + m

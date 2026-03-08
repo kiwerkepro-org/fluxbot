@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go run:*)",
+      "Bash(go build:*)",
+      "Bash(Stop-Process:*)",
+      "Bash(taskkill:*)",
+      "Bash(__NEW_LINE_a6b3f5ef6ecd9b5f__ cd:*)",
+      "Bash(grep -l \"bild\\\\|screenshot\\\\|foto\" *.md)",
+      "Bash(while read f)",
+      "Bash(do echo \"=== $f ===\")",
+      "Read(//c/Users/jjs-w/DEVELOPING/F1000-FLUXBOT/**)",
+      "Bash(done)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(head:*)",
+      "Bash(powershell:*)",
+      "Bash(timeout 15 ./fluxbot.exe:*)",
+      "Bash(docker:*)",
+      "Bash(start:*)",
+      "Bash(tasklist:*)",
+      "Bash(go mod:*)",
+      "Bash(gh release:*)",
+      "Bash(git filter-repo:*)",
+      "Bash(pip install:*)",
+      "Bash(C:/Users/jjs-w/AppData/Roaming/Python/Python314/Scripts/git-filter-repo.exe:*)",
+      "Bash(find:*)",
+      "Bash(do echo:*)",
+      "Bash(git:*)"
+    ]
+  }
+}
