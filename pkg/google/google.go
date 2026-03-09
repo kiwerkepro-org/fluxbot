@@ -243,6 +243,7 @@ func (c *Client) CalendarCreate(ev CalendarEvent) (*CalendarCreateResult, error)
 
 // CalendarListEvent ist ein einzelner Termin in der Liste.
 type CalendarListEvent struct {
+	ID          string
 	Title       string
 	Start       string
 	End         string
@@ -288,6 +289,7 @@ func (c *Client) CalendarListWithRange(calendarID string, maxResults int, timeMi
 
 	var result struct {
 		Items []struct {
+			ID          string `json:"id"`
 			Summary     string `json:"summary"`
 			Description string `json:"description"`
 			Location    string `json:"location"`
@@ -316,6 +318,7 @@ func (c *Client) CalendarListWithRange(calendarID string, maxResults int, timeMi
 			end = item.End.Date
 		}
 		events = append(events, CalendarListEvent{
+			ID:          item.ID,
 			Title:       item.Summary,
 			Start:       start,
 			End:         end,
@@ -324,6 +327,23 @@ func (c *Client) CalendarListWithRange(calendarID string, maxResults int, timeMi
 		})
 	}
 	return events, nil
+}
+
+// CalendarDelete löscht einen Kalender-Eintrag anhand seiner Event-ID.
+func (c *Client) CalendarDelete(calendarID, eventID string) error {
+	if calendarID == "" {
+		calendarID = "primary"
+	}
+	apiURL := fmt.Sprintf("https://www.googleapis.com/calendar/v3/calendars/%s/events/%s",
+		url.PathEscape(calendarID), url.PathEscape(eventID))
+	body, status, err := c.doRequest("DELETE", apiURL, nil)
+	if err != nil {
+		return err
+	}
+	if status >= 400 {
+		return fmt.Errorf("Google Calendar Delete Fehler (%d): %s", status, string(body))
+	}
+	return nil
 }
 
 // ─────────────────────────────────────────────

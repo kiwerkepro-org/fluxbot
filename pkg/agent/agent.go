@@ -323,13 +323,15 @@ func (a *Agent) handleMessage(ctx context.Context, msg channels.Message) {
 		if response == "" {
 			break
 		}
-		// Gesprächsverlauf speichern
+		// Gesprächsverlauf speichern (inkl. interner Marker für KI-Kontext)
 		session.AddToHistory("user", text)
 		session.AddToHistory("assistant", response)
+		// Interne Marker aus user-sichtbarer Antwort entfernen
+		userResponse := stripInternalMarkers(response)
 		if ttsTriggered {
-			a.sendTTSReply(ctx, msg, response)
+			a.sendTTSReply(ctx, msg, userResponse)
 		} else {
-			if err := a.manager.Reply(msg, response); err != nil {
+			if err := a.manager.Reply(msg, userResponse); err != nil {
 				log.Printf("[Agent] Fehler beim Senden: %v", err)
 			}
 		}
@@ -405,10 +407,11 @@ func (a *Agent) handleVoice(ctx context.Context, msg channels.Message, session *
 	a.manager.Reply(msg, fmt.Sprintf("🎙️ _%s_", text))
 
 	// TTS: Bei mode "voice" oder "always" → Antwort als Sprachnachricht
+	userResponse := stripInternalMarkers(response)
 	if a.ttsSpeaker != nil && (a.ttsMode == "voice" || a.ttsMode == "always") {
-		a.sendTTSReply(ctx, msg, response)
+		a.sendTTSReply(ctx, msg, userResponse)
 	} else {
-		a.manager.Reply(msg, response)
+		a.manager.Reply(msg, userResponse)
 	}
 }
 
@@ -1058,6 +1061,10 @@ func (a *Agent) callAI(ctx context.Context, msg channels.Message, session *Sessi
 	// Google Calendar – Termine auflisten (optional mit Datumsfilter)
 	if strings.Contains(response, "__GOOGLE_CAL_LIST__") {
 		return a.handleGoogleCalList(session, response)
+	}
+	// Google Calendar – Termin löschen
+	if strings.Contains(response, "__GOOGLE_CAL_DELETE__") && strings.Contains(response, "__GOOGLE_CAL_DELETE_END__") {
+		return a.handleGoogleCalDelete(session, response)
 	}
 	// Google Docs – neues Dokument erstellen
 	if strings.Contains(response, "__GOOGLE_DOCS_CREATE__") && strings.Contains(response, "__GOOGLE_DOCS_CREATE_END__") {
@@ -1712,17 +1719,20 @@ func (a *Agent) handleGoogleCalList(session *Session, response string) string {
 		return fmt.Sprintf("❌ Google Calendar Fehler: %v", err)
 	}
 
-	// Filter: nur Events mit Title (ignoriere Private Events ohne Summary)
+	// Filter: Events mit und ohne Titel trennen
 	var validEvents []googleapi.CalendarListEvent
+	var emptyEvents []googleapi.CalendarListEvent
 	for _, e := range events {
 		if strings.TrimSpace(e.Title) != "" {
 			validEvents = append(validEvents, e)
+		} else if e.ID != "" {
+			emptyEvents = append(emptyEvents, e)
 		}
 	}
 
 	a.logGoogleAudit(session, "Kalender-Anfrage", int(time.Since(startTime).Milliseconds()), "", "")
 
-	if len(validEvents) == 0 {
+	if len(validEvents) == 0 && len(emptyEvents) == 0 {
 		if dateLabel != "" {
 			return fmt.Sprintf("Keine Termine %s in deinem Kalender.", dateLabel)
 		}
@@ -1745,7 +1755,14 @@ func (a *Agent) handleGoogleCalList(session *Session, response string) string {
 	}
 
 	var sb strings.Builder
-	if len(validEvents) == 1 {
+	if len(validEvents) == 0 {
+		// Nur leere Events gefunden
+		if dateLabel != "" {
+			sb.WriteString(fmt.Sprintf("Keine Termine mit Titel %s in deinem Kalender.", dateLabel))
+		} else {
+			sb.WriteString("Du hast keine bevorstehenden Termine mit Titel.")
+		}
+	} else if len(validEvents) == 1 {
 		// Einzeltermin: als Satz
 		e := validEvents[0]
 		sb.WriteString(fmt.Sprintf("Du hast einen Termin: *%s* am %s", e.Title, formatEventTime(e.Start)))
@@ -1754,7 +1771,7 @@ func (a *Agent) handleGoogleCalList(session *Session, response string) string {
 		}
 		sb.WriteString(".")
 	} else {
-		// Mehrere Termine: kompakte Liste ohne Kopfzeile mit "Google Calendar"
+		// Mehrere Termine: kompakte Liste
 		if dateLabel != "" {
 			sb.WriteString(fmt.Sprintf("Deine Termine %s:\n\n", dateLabel))
 		} else {
@@ -1769,7 +1786,66 @@ func (a *Agent) handleGoogleCalList(session *Session, response string) string {
 		}
 	}
 
+	// Leere Events (ohne Titel) als Cleanup-Hinweis anhängen
+	if len(emptyEvents) > 0 {
+		sb.WriteString("\n")
+		if len(emptyEvents) == 1 {
+			sb.WriteString(fmt.Sprintf("⚠️ Ich habe außerdem 1 Event ohne Titel in deinem Kalender gefunden (am %s). Soll ich es löschen?", formatEventTime(emptyEvents[0].Start)))
+		} else {
+			sb.WriteString(fmt.Sprintf("⚠️ Ich habe außerdem %d Events ohne Titel in deinem Kalender gefunden. Soll ich sie löschen?", len(emptyEvents)))
+		}
+		// Event-IDs für den Agent intern merken (als versteckter Kontext)
+		sb.WriteString("\n__EMPTY_CAL_IDS__")
+		for _, e := range emptyEvents {
+			sb.WriteString("|" + e.ID)
+		}
+		sb.WriteString("__EMPTY_CAL_IDS_END__")
+	}
+
 	return strings.TrimRight(sb.String(), "\n")
+}
+
+// handleGoogleCalDelete löscht einen Google Calendar-Termin anhand seiner Event-ID.
+// Marker-Format: __GOOGLE_CAL_DELETE__\n{"id":"<eventID>","calendarId":"primary"}\n__GOOGLE_CAL_DELETE_END__
+func (a *Agent) handleGoogleCalDelete(session *Session, response string) string {
+	startTime := time.Now()
+
+	if a.googleClient == nil || !a.googleClient.IsConfigured() {
+		return a.googleNotConfigured()
+	}
+
+	data, err := parseGoogleMarker(response, "__GOOGLE_CAL_DELETE__", "__GOOGLE_CAL_DELETE_END__")
+	if err != nil {
+		return "❌ Fehler beim Lesen der Lösch-Anfrage."
+	}
+
+	var req struct {
+		ID         string `json:"id"`
+		CalendarID string `json:"calendarId"`
+	}
+	if err := json.Unmarshal(data, &req); err != nil || req.ID == "" {
+		return "❌ Event-ID fehlt oder ist ungültig."
+	}
+	if req.CalendarID == "" {
+		req.CalendarID = "primary"
+	}
+
+	if err := a.googleClient.CalendarDelete(req.CalendarID, req.ID); err != nil {
+		a.logGoogleAudit(session, "Termin löschen", int(time.Since(startTime).Milliseconds()), "API_ERROR", fmt.Sprintf("%v", err))
+		log.Printf("[Agent] ❌ Google Calendar Delete Fehler: %v", err)
+		return fmt.Sprintf("❌ Konnte den Termin nicht löschen: %v", err)
+	}
+
+	a.logGoogleAudit(session, "Termin löschen", int(time.Since(startTime).Milliseconds()), "", "")
+	return "✅ Event gelöscht."
+}
+
+// stripInternalMarkers entfernt interne Marker aus der Antwort, die nur für die KI-History gedacht sind.
+// Muss vor dem Senden an den User aufgerufen werden.
+var reInternalMarkers = regexp.MustCompile(`(?s)\n?__EMPTY_CAL_IDS__\|[^_]*__EMPTY_CAL_IDS_END__`)
+
+func stripInternalMarkers(s string) string {
+	return strings.TrimRight(reInternalMarkers.ReplaceAllString(s, ""), "\n")
 }
 
 // handleGoogleDocsCreate erstellt ein neues Google Docs-Dokument.
@@ -2130,7 +2206,9 @@ func (a *Agent) buildSystemPrompt(session *Session, rules string) string {
 			"  3. Frage nach Bestätigung BEVOR du die Anfrage verarbeitest.\n" +
 			"  4. Diese Regel gilt für ALLE Kalender-Operationen!\n\n" +
 			"Termin erstellen:\n__GOOGLE_CAL_CREATE__\n{\"title\":\"<Titel>\",\"start\":\"<RFC3339+01:00>\",\"end\":\"<RFC3339+01:00>\",\"description\":\"<optional>\",\"location\":\"<optional>\"}\n__GOOGLE_CAL_CREATE_END__\n" +
-			"Termine auflisten: antworte NUR mit: __GOOGLE_CAL_LIST__\n\n" +
+			"Termine auflisten: antworte NUR mit: __GOOGLE_CAL_LIST__\n" +
+			"Termin löschen (nur wenn User explizit bestätigt):\n__GOOGLE_CAL_DELETE__\n{\"id\":\"<eventID>\",\"calendarId\":\"primary\"}\n__GOOGLE_CAL_DELETE_END__\n" +
+			"Hinweis: Wenn du Events ohne Titel in der Antwort von __GOOGLE_CAL_LIST__ siehst (Marker __EMPTY_CAL_IDS__|...|__EMPTY_CAL_IDS_END__), frage den User ob er sie löschen möchte. Zeige dem User NUR den freundlichen Hinweis, NICHT den technischen Marker.\n\n" +
 			"GOOGLE DOCS:\n" +
 			"Dokument erstellen:\n__GOOGLE_DOCS_CREATE__\n{\"title\":\"<Titel>\",\"content\":\"<Inhalt>\"}\n__GOOGLE_DOCS_CREATE_END__\n" +
 			"Text anhängen:\n__GOOGLE_DOCS_APPEND__\n{\"docId\":\"<ID>\",\"content\":\"<Text>\"}\n__GOOGLE_DOCS_APPEND_END__\n" +
