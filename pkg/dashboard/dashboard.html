@@ -153,14 +153,16 @@
   html[data-theme="dark"] .blur-overlay { background: rgba(15,17,23,0.35); }
   .blur-overlay:hover { background: rgba(91,141,238,0.1); }
   .blur-hint { text-align: center; padding: 28px; }
-  .blur-hint .lock-icon { font-size: 36px; display: block; margin-bottom: 12px; }
+  .blur-hint .lock-icon { font-size: 36px; display: flex; justify-content: center; align-items: center; margin-bottom: 12px; }
+  .blur-hint .lock-icon svg { width: 36px; height: 36px; }
   .blur-hint strong { font-size: 16px; color: var(--text); display: block; margin-bottom: 6px; }
   .blur-hint p { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
   .blur-hint .click-btn { display: inline-block; background: var(--accent); color: #fff; border-radius: 7px; padding: 8px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
 
   /* ── Warning Banner ── */
   .warn-banner { background: rgba(226,93,93,0.08); border: 1px solid rgba(226,93,93,0.28); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: #f08080; margin-bottom: 14px; display: flex; gap: 10px; align-items: flex-start; }
-  .warn-banner .warn-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .warn-banner .warn-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; }
+  .warn-banner .warn-icon svg { width: 18px; height: 18px; flex-shrink: 0; }
   .warn-banner strong { display: block; color: var(--red); font-size: 13px; margin-bottom: 2px; }
 
   /* ── Confirmation Modal ── */
@@ -297,7 +299,7 @@
 <div id="login-overlay">
   <div class="login-box">
     <div class="login-logo">
-      <h1>🤖 FluxBot</h1>
+      <h1><i data-lucide="bot" style="width:22px;height:22px;vertical-align:middle;margin-right:6px"></i>FluxBot</h1>
       <span>KI-WERKE Dashboard</span>
     </div>
     <div class="login-field">
@@ -317,7 +319,7 @@
 <!-- ── Recovery Modal ── -->
 <div class="modal-overlay" id="recovery-modal" style="display:none" onclick="if(event.target===this)this.style.display='none'">
   <div class="modal" style="max-width:480px">
-    <h3>🔑 Zugangsdaten wiederherstellen</h3>
+    <h3 style="display:flex;align-items:center;gap:8px"><i data-lucide="key" style="width:18px;height:18px"></i> Zugangsdaten wiederherstellen</h3>
     <p style="color:var(--muted);font-size:13px;margin-bottom:4px">Da du lokal (localhost) verbunden bist, können die Zugangsdaten sicher abgerufen werden.</p>
     <div class="recovery-credentials" id="recovery-content">
       <div style="text-align:center;color:var(--muted)">Lade...</div>
@@ -332,7 +334,7 @@
 <!-- ── Sidebar ── -->
 <div class="sidebar">
   <div class="logo">
-    <h1>🤖 FluxBot</h1>
+    <h1><i data-lucide="bot" style="width:20px;height:20px;vertical-align:middle;margin-right:6px"></i>FluxBot</h1>
     <span>Dashboard</span>
   </div>
   <div class="nav-item active" onclick="showSection('status', this)">
@@ -370,7 +372,7 @@
   <div class="sidebar-footer">
     <div style="margin-bottom:8px">KI-WERKE · FluxBot <span id="footer-version">…</span></div>
     <button onclick="toggleTheme()" style="width:100%;padding:6px 10px;margin-bottom:8px;background:rgba(91,141,238,0.1);border:1px solid rgba(91,141,238,0.25);border-radius:6px;color:var(--accent);font-size:12px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px" onmouseover="this.style.background='rgba(91,141,238,0.2)'" onmouseout="this.style.background='rgba(91,141,238,0.1)'"><i data-lucide="sun" style="width:14px;height:14px" id="theme-icon-sun"></i><i data-lucide="moon" style="width:14px;height:14px;display:none" id="theme-icon-moon"></i> <span id="theme-label">Dark Mode</span></button>
-    <button onclick="doLogout()" style="width:100%;padding:6px 10px;background:rgba(226,93,93,0.1);border:1px solid rgba(226,93,93,0.25);border-radius:6px;color:var(--red);font-size:12px;cursor:pointer;transition:all 0.15s" onmouseover="this.style.background='rgba(226,93,93,0.2)'" onmouseout="this.style.background='rgba(226,93,93,0.1)'">⎋ Abmelden</button>
+    <button onclick="doLogout()" style="width:100%;padding:6px 10px;background:rgba(226,93,93,0.1);border:1px solid rgba(226,93,93,0.25);border-radius:6px;color:var(--red);font-size:12px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px" onmouseover="this.style.background='rgba(226,93,93,0.2)'" onmouseout="this.style.background='rgba(226,93,93,0.1)'"><i data-lucide="log-out" style="width:13px;height:13px"></i> Abmelden</button>
   </div>
 </div>
 
@@ -396,11 +398,11 @@
       </div>
     </div>
     <div class="panel">
-      <div class="panel-title">📡 Verbundene Kanäle</div>
+      <div class="panel-title"><i data-lucide="radio" style="width:15px;height:15px"></i> Verbundene Kanäle</div>
       <div class="channel-list" id="status-channels">Lädt...</div>
     </div>
     <div class="panel">
-      <div class="panel-title">🔐 Secret-Backend</div>
+      <div class="panel-title"><i data-lucide="lock" style="width:15px;height:15px"></i> Secret-Backend</div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px">
         <span id="secret-backend-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(91,141,238,0.12);color:var(--accent);border:1px solid rgba(91,141,238,0.3)">⏳ Laden…</span>
         <span id="secret-backend-mode" style="font-size:12px;color:var(--muted)"></span>
@@ -414,7 +416,7 @@
     <button class="btn btn-secondary" onclick="loadStatus()">🔄 Aktualisieren</button>
 
     <div id="status-vt-warning" class="warn-banner" style="display:none">
-      <span class="warn-icon">⚠️</span>
+      <span class="warn-icon"><i data-lucide="alert-triangle" style="width:18px;height:18px"></i></span>
       <div>
         <strong>VirusTotal nicht aktiv</strong>
         Dateien und Links werden ungeprüft weitergeleitet.
@@ -426,7 +428,7 @@
 
     <!-- Update-Panel -->
     <div id="update-panel" class="panel" style="margin-top:20px">
-      <div class="panel-title">🔄 Software-Update</div>
+      <div class="panel-title"><i data-lucide="refresh-cw" style="width:15px;height:15px"></i> Software-Update</div>
       <div id="update-content">
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px">
           <div>
@@ -468,7 +470,7 @@
     <!-- ── Kanäle ── -->
     <div class="tab-content active" id="tab-channels">
       <div class="panel">
-        <div class="panel-title">📱 Kommunikationskanäle</div>
+        <div class="panel-title"><i data-lucide="message-circle" style="width:15px;height:15px"></i> Kommunikationskanäle</div>
 
         <!-- Telegram Accordion -->
         <div class="ch-acc">
@@ -664,7 +666,7 @@
     <div class="tab-content" id="tab-providers">
       <div class="tile-layout">
         <div class="panel" style="margin-bottom:0">
-          <div class="panel-title">🤖 KI-Provider (Sprache / Text)</div>
+          <div class="panel-title"><i data-lucide="bot" style="width:15px;height:15px"></i> KI-Provider (Sprache / Text)</div>
           <div class="field">
             <label>Aktiver Anbieter</label>
             <select id="ai-provider" onchange="onDashProviderChange()">
@@ -752,7 +754,7 @@
     <div class="tab-content" id="tab-imagegen">
       <div class="tile-layout">
         <div class="panel" style="margin-bottom:0">
-          <div class="panel-title">🎨 Bild-Generierung</div>
+          <div class="panel-title"><i data-lucide="image" style="width:15px;height:15px"></i> Bild-Generierung</div>
           <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
             Wähle einen Provider und trage deinen API-Key ein. FluxBot fragt beim Nutzer automatisch nach Format und Modell.
             Wenn kein Provider aktiv ist, teilt FluxBot dem Nutzer mit, dass Bildgenerierung deaktiviert ist.
@@ -854,7 +856,7 @@
     <div class="tab-content" id="tab-videogen">
       <div class="tile-layout">
         <div class="panel" style="margin-bottom:0">
-          <div class="panel-title">🎬 Video-Generierung</div>
+          <div class="panel-title"><i data-lucide="film" style="width:15px;height:15px"></i> Video-Generierung</div>
           <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
             Wähle einen Provider und trage deinen API-Key ein. Wenn kein Provider aktiv ist, teilt FluxBot dem Nutzer mit, dass Video-Generierung deaktiviert ist.
           </p>
@@ -945,7 +947,7 @@
 
         <!-- STT Panel -->
         <div class="panel" style="margin-bottom:0">
-          <div class="panel-title">🎙️ Spracherkennung (STT)</div>
+          <div class="panel-title"><i data-lucide="mic" style="width:15px;height:15px"></i> Spracherkennung (STT)</div>
           <div class="toggle-row">
             <div><div class="toggle-label">Voice aktivieren</div><div class="toggle-sub">Sprachnachrichten werden transkribiert</div></div>
             <label class="toggle"><input type="checkbox" id="voice-enabled"><span class="toggle-slider"></span></label>
@@ -988,7 +990,7 @@
 
         <!-- TTS Panel -->
         <div class="panel" style="margin-bottom:0">
-          <div class="panel-title">🔊 Sprachausgabe (TTS)</div>
+          <div class="panel-title"><i data-lucide="volume-2" style="width:15px;height:15px"></i> Sprachausgabe (TTS)</div>
           <div class="toggle-row">
             <div><div class="toggle-label">TTS aktivieren</div><div class="toggle-sub">Bot antwortet mit Sprache</div></div>
             <label class="toggle"><input type="checkbox" id="tts-enabled" onchange="ttsToggleChanged()"><span class="toggle-slider"></span></label>
@@ -1067,7 +1069,7 @@
 
           <!-- Panel 1: OAuth2 -->
           <div class="panel" style="margin-bottom:0">
-            <div class="panel-title">🔵 Google OAuth2 (Master-Zugangsdaten)</div>
+            <div class="panel-title"><i data-lucide="key" style="width:15px;height:15px"></i> Google OAuth2 (Master-Zugangsdaten)</div>
             <div style="background:rgba(91,141,238,0.07);border:1px solid rgba(91,141,238,0.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.7">
               FluxBot benötigt ein <strong>Google OAuth2 App-Zugangsdaten</strong> (Client ID + Client Secret) sowie einen <strong>Refresh Token</strong> für deinen Account.<br>
               <strong>Einmalige Einrichtung:</strong>
@@ -1107,7 +1109,7 @@
 
           <!-- Panel 2: Dienste aktivieren -->
           <div class="panel" style="margin-bottom:0">
-            <div class="panel-title">🔧 Dienste aktivieren</div>
+            <div class="panel-title"><i data-lucide="sliders-horizontal" style="width:15px;height:15px"></i> Dienste aktivieren</div>
             <div class="gsvc-grid">
               <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)">
                 <label style="font-size:13px;color:var(--text)">Gmail</label>
@@ -1158,7 +1160,7 @@
         <!-- Info-Card rechts -->
         <div>
           <div class="info-card">
-            <h4>🔵 Google Cloud Console</h4>
+            <h4 style="display:flex;align-items:center;gap:6px"><i data-lucide="cloud" style="width:15px;height:15px"></i> Google Cloud Console</h4>
             <p>Schritt-für-Schritt Anleitung zur Einrichtung von Google OAuth2:</p>
             <a href="https://console.cloud.google.com/apis/credentials" target="_blank" class="info-link">→ Google Cloud Console öffnen</a>
             <hr class="divider">
@@ -1182,7 +1184,7 @@
 
           <!-- SMTP E-Mail Panel -->
           <div class="panel" style="margin-bottom:0">
-            <div class="panel-title">📧 E-Mail-Versand (SMTP)</div>
+            <div class="panel-title"><i data-lucide="mail" style="width:15px;height:15px"></i> E-Mail-Versand (SMTP)</div>
             <p style="font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6">
               FluxBot kann E-Mails direkt versenden – aber <strong>nur wenn du es explizit befiehlst</strong>. Wähle deinen Anbieter und trage die Zugangsdaten ein.
             </p>
@@ -1235,7 +1237,7 @@
           <!-- Cal.com Panel -->
           <div class="panel" style="margin-bottom:0" id="calcom-integ-panel">
             <div class="panel-title" style="justify-content:space-between">
-              <span>📅 Cal.com – Kalender & Termine</span>
+              <span style="display:flex;align-items:center;gap:6px"><i data-lucide="calendar" style="width:15px;height:15px"></i> Cal.com – Kalender & Termine</span>
               <div style="display:flex;align-items:center;gap:10px">
                 <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--muted)">
                   <input type="checkbox" id="calcom-enabled" onchange="updateCalcomBadge();toggleCalcomFields()" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer">
@@ -1281,7 +1283,7 @@
 
           <!-- Generische API-Keys Panel -->
           <div class="panel" style="margin-bottom:0">
-            <div class="panel-title">🔌 Weitere Integrationen</div>
+            <div class="panel-title"><i data-lucide="plug" style="width:15px;height:15px"></i> Weitere Integrationen</div>
             <p style="font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6">
               Für Skills die eigene Zugangsdaten benötigen. Name und Wert eintragen – FluxBot verbindet beides automatisch mit dem passenden Skill.
             </p>
@@ -1294,7 +1296,7 @@
         <!-- Info-Card rechts -->
         <div>
           <div class="info-card">
-            <h4>📧 App-Passwörter erstellen</h4>
+            <h4 style="display:flex;align-items:center;gap:6px"><i data-lucide="mail" style="width:15px;height:15px"></i> App-Passwörter erstellen</h4>
             <p style="margin-bottom:12px;font-size:13px">Die meisten Anbieter verlangen ein spezielles App-Passwort statt deines normalen Passworts. Klicke auf den Link für deinen Anbieter:</p>
             <div class="other-list" style="gap:10px">
               <div>
@@ -1324,7 +1326,7 @@
               </div>
             </div>
             <hr class="divider">
-            <h4>🔌 Weitere API-Keys</h4>
+            <h4 style="display:flex;align-items:center;gap:6px"><i data-lucide="plug" style="width:15px;height:15px"></i> Weitere API-Keys</h4>
             <div class="other-list">
               <div>📅 <strong>Cal.com</strong> – Terminbuchungen</div>
               <div>💳 <strong>Stripe</strong> – Zahlungen</div>
@@ -1341,7 +1343,7 @@
     </div>
     <div class="actions">
       <button class="btn btn-primary" onclick="saveConfig()">💾 Speichern</button>
-      <button class="btn btn-secondary" onclick="loadConfig()">↺ Verwerfen</button>
+      <button class="btn btn-secondary" onclick="loadConfig()"><i data-lucide="undo-2" style="width:14px;height:14px"></i> Verwerfen</button>
     </div>
   </div>
 
@@ -1377,7 +1379,7 @@
     <div class="system-tiles" id="system-os-tiles">
       <!-- Restart -->
       <div class="system-tile">
-        <h3>🔄 Neustart <span class="tile-badge restart">Schnell · ~5 Sek.</span></h3>
+        <h3 style="display:flex;align-items:center;gap:8px"><i data-lucide="refresh-cw" style="width:18px;height:18px"></i> Neustart <span class="tile-badge restart">Schnell · ~5 Sek.</span></h3>
         <p class="tile-desc">Stoppt FluxBot und startet ihn sofort neu. Nutze das wenn du Einstellungen im Dashboard gespeichert hast und sichergehen willst, dass alles übernommen wurde. <strong>Keine Daten gehen verloren.</strong></p>
         <div id="restart-steps"></div>
         <div class="howto-box" id="restart-howto"></div>
@@ -1385,7 +1387,7 @@
 
       <!-- Rebuild -->
       <div class="system-tile">
-        <h3>🔨 Neu bauen <span class="tile-badge rebuild">Update · ~2 Min.</span></h3>
+        <h3 style="display:flex;align-items:center;gap:8px"><i data-lucide="hammer" style="width:18px;height:18px"></i> Neu bauen <span class="tile-badge rebuild">Update · ~2 Min.</span></h3>
         <p class="tile-desc">Lädt den neuesten Code herunter und kompiliert FluxBot komplett neu. Notwendig nach <strong>Updates vom Entwickler</strong> (neue Funktionen, Bugfixes). Dauert etwas länger als ein einfacher Neustart.</p>
         <div id="rebuild-steps"></div>
         <div class="howto-box" id="rebuild-howto"></div>
@@ -1393,14 +1395,14 @@
     </div>
 
     <div class="cache-hint">
-      <strong>🌐 Browser-Cache leeren nach Rebuild:</strong>
+      <strong style="display:flex;align-items:center;gap:6px"><i data-lucide="globe" style="width:14px;height:14px"></i> Browser-Cache leeren nach Rebuild:</strong>
       Nach einem Neu-Build zeigt der Browser manchmal noch das alte Dashboard.
       Drücke <kbd>Strg + Shift + R</kbd> (Windows/Linux) oder <kbd>Cmd + Shift + R</kbd> (Mac) – das lädt alles frisch.
     </div>
 
     <div id="system-skills-panel" style="display:none">
       <div class="panel">
-        <div class="panel-title">📝 Skill-Verwaltung</div>
+        <div class="panel-title"><i data-lucide="file-text" style="width:15px;height:15px"></i> Skill-Verwaltung</div>
         <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px">
           <div class="field" style="flex:1;margin:0;min-width:200px">
             <label>Skills auswählen <span style="font-weight:400;font-size:11px;opacity:0.6">(Strg+Klick = Mehrfachauswahl)</span></label>
@@ -1408,9 +1410,9 @@
             </select>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end">
-            <button id="skill-sign-btn" class="btn btn-secondary" onclick="signSkill()" disabled style="opacity:0.5">🔏 Ausgewählte signieren</button>
-            <button class="btn btn-secondary" onclick="selectAllSkills()">☑️ Alle auswählen</button>
-            <button class="btn btn-secondary" onclick="reloadSkills()">🔄 Neu laden</button>
+            <button id="skill-sign-btn" class="btn btn-secondary" onclick="signSkill()" disabled style="opacity:0.5"><i data-lucide="badge-check" style="width:14px;height:14px"></i> Ausgewählte signieren</button>
+            <button class="btn btn-secondary" onclick="selectAllSkills()"><i data-lucide="check-square" style="width:14px;height:14px"></i> Alle auswählen</button>
+            <button class="btn btn-secondary" onclick="reloadSkills()"><i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Neu laden</button>
           </div>
         </div>
         <div id="skill-sign-result" style="display:none"></div>
@@ -1423,9 +1425,9 @@
 
     <div id="system-logs-panel" style="display:none">
       <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
-        <button class="tab-btn active" id="log-tab-terminal" onclick="switchLogTab('terminal')">🖥️ Terminal</button>
-        <button class="tab-btn" id="log-tab-audit" onclick="switchLogTab('audit')">📋 Audit-Log</button>
-        <button class="btn btn-secondary" style="margin-left:auto" onclick="loadCurrentLogs()">🔄 Aktualisieren</button>
+        <button class="tab-btn active" id="log-tab-terminal" onclick="switchLogTab('terminal')"><i data-lucide="terminal" style="width:13px;height:13px"></i> Terminal</button>
+        <button class="tab-btn" id="log-tab-audit" onclick="switchLogTab('audit')"><i data-lucide="clipboard-list" style="width:13px;height:13px"></i> Audit-Log</button>
+        <button class="btn btn-secondary" style="margin-left:auto" onclick="loadCurrentLogs()"><i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Aktualisieren</button>
         <span class="log-filename" id="log-filename">–</span>
       </div>
       <div class="log-box" id="log-box">Lade Logs...</div>
@@ -1434,7 +1436,7 @@
 
   <!-- VIRUSTOTAL -->
   <div class="section" id="section-virustotal">
-    <h2>🛡️ VirusTotal</h2>
+    <h2 style="display:flex;align-items:center;gap:10px"><i data-lucide="shield" style="width:22px;height:22px"></i>VirusTotal</h2>
     <p class="subtitle">Scan-Status, Statistiken und Scan-History in Echtzeit</p>
 
     <!-- Status + Stats Karten -->
@@ -1465,7 +1467,7 @@
 
     <!-- Info-Banner wenn VT inaktiv -->
     <div id="vt-inactive-banner" style="display:none" class="warn-banner">
-      <span class="warn-icon">⚠️</span>
+      <span class="warn-icon"><i data-lucide="alert-triangle" style="width:18px;height:18px"></i></span>
       <div>
         <strong>VirusTotal nicht aktiv</strong>
         Kein API-Key konfiguriert. Trage <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px">VIRUSTOTAL_API_KEY</code> in der Danger Zone ein (Danger Zone → Sicherheits-Keys) um den Scan zu aktivieren.<br>
@@ -1476,11 +1478,11 @@
     <!-- History Tabelle -->
     <div class="panel">
       <div class="panel-title" style="justify-content:space-between">
-        <span>📋 Scan-History</span>
+        <span style="display:flex;align-items:center;gap:6px"><i data-lucide="list" style="width:15px;height:15px"></i> Scan-History</span>
         <div style="display:flex;gap:10px;align-items:center">
           <span id="vt-history-count" style="font-size:12px;color:var(--muted);font-weight:400">–</span>
-          <button class="btn btn-secondary" onclick="loadVTData()" style="padding:5px 12px;font-size:12px">🔄 Aktualisieren</button>
-          <button class="btn btn-danger" onclick="clearVTHistory()" style="padding:5px 12px;font-size:12px" id="vt-clear-btn">🗑 Leeren</button>
+          <button class="btn btn-secondary" onclick="loadVTData()" style="padding:5px 12px;font-size:12px"><i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Aktualisieren</button>
+          <button class="btn btn-danger" onclick="clearVTHistory()" style="padding:5px 12px;font-size:12px" id="vt-clear-btn"><i data-lucide="trash-2" style="width:13px;height:13px"></i> Leeren</button>
         </div>
       </div>
       <div style="overflow-x:auto">
@@ -1512,7 +1514,7 @@
   <!-- PAIRING (P9) -->
   <!-- ═══════════════════ DANGEROUS TOOLS (P11) ═════════════════════════ -->
   <div class="section" id="section-dangerous-tools">
-    <h2>⛔ Dangerous Tools</h2>
+    <h2 style="display:flex;align-items:center;gap:10px"><i data-lucide="ban" style="width:22px;height:22px"></i>Dangerous Tools</h2>
     <p class="subtitle">Blockiert gefährliche Operationen wie Shell-Befehle, Datei-Löschung und Code-Ausführung</p>
 
     <!-- Stats-Karten -->
@@ -1545,7 +1547,7 @@
 
     <!-- Konfiguration -->
     <div class="card" style="margin-top:16px">
-      <div class="card-label" style="margin-bottom:16px;font-size:15px;font-weight:600">⚙️ Konfiguration</div>
+      <div class="card-label" style="margin-bottom:16px;font-size:15px;font-weight:600;display:flex;align-items:center;gap:6px"><i data-lucide="settings" style="width:15px;height:15px"></i> Konfiguration</div>
 
       <div class="field" style="margin-bottom:16px">
         <label>Dangerous-Tools Prüfung <button class="info-btn" onmouseenter="tipShow(this,'Wenn aktiv, werden User-Anfragen auf gefährliche Operationen geprüft. Admins können alle Operationen nutzen.')" onmouseleave="tipHide()" onclick="event.stopPropagation()">ⓘ</button></label>
@@ -1588,7 +1590,7 @@
       </div>
 
       <div style="margin-top:20px;display:flex;align-items:center;gap:12px">
-        <button class="btn btn-primary" onclick="dtSaveConfig()">💾 Speichern</button>
+        <button class="btn btn-primary" onclick="dtSaveConfig()"><i data-lucide="save" style="width:14px;height:14px"></i> Speichern</button>
         <span id="dt-save-status" style="font-size:13px;display:none"></span>
       </div>
     </div>
@@ -1599,7 +1601,7 @@
   </div>
 
   <div class="section" id="section-pairing">
-    <h2>🤝 DM-Pairing</h2>
+    <h2 style="display:flex;align-items:center;gap:10px"><i data-lucide="user-check" style="width:22px;height:22px"></i>DM-Pairing</h2>
     <p class="subtitle">Steuere, welche User deinen Bot per DM nutzen dürfen</p>
 
     <!-- Stats-Karten -->
@@ -1624,7 +1626,7 @@
 
     <!-- Info-Banner wenn Pairing deaktiviert -->
     <div id="pairing-inactive-banner" style="display:none" class="warn-banner">
-      <span class="warn-icon">ℹ️</span>
+      <span class="warn-icon"><i data-lucide="info" style="width:18px;height:18px"></i></span>
       <div>
         <strong>DM-Pairing nicht aktiv</strong>
         Aktiviere <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:4px">pairing.enabled: true</code> in der config.json, um unbekannte DMs zu blockieren und neue User über das Dashboard freizugeben.
@@ -1634,10 +1636,10 @@
     <!-- Filter-Tabs -->
     <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
       <button class="btn btn-secondary pair-filter active" onclick="filterPairing('',this)" style="padding:6px 14px;font-size:13px">Alle</button>
-      <button class="btn btn-secondary pair-filter" onclick="filterPairing('pending',this)" style="padding:6px 14px;font-size:13px">⏳ Wartend</button>
+      <button class="btn btn-secondary pair-filter" onclick="filterPairing('pending',this)" style="padding:6px 14px;font-size:13px"><i data-lucide="clock" style="width:13px;height:13px"></i> Wartend</button>
       <button class="btn btn-secondary pair-filter" onclick="filterPairing('approved',this)" style="padding:6px 14px;font-size:13px">✅ Gepairt</button>
-      <button class="btn btn-secondary pair-filter" onclick="filterPairing('blocked',this)" style="padding:6px 14px;font-size:13px">🚫 Blockiert</button>
-      <button class="btn btn-secondary" onclick="loadPairingData()" style="padding:6px 14px;font-size:13px;margin-left:auto">🔄 Aktualisieren</button>
+      <button class="btn btn-secondary pair-filter" onclick="filterPairing('blocked',this)" style="padding:6px 14px;font-size:13px"><i data-lucide="ban" style="width:13px;height:13px"></i> Blockiert</button>
+      <button class="btn btn-secondary" onclick="loadPairingData()" style="padding:6px 14px;font-size:13px;margin-left:auto"><i data-lucide="refresh-cw" style="width:13px;height:13px"></i> Aktualisieren</button>
     </div>
 
     <!-- Tabelle -->
@@ -1674,7 +1676,7 @@
 
   <!-- HILFE -->
   <div class="section" id="section-help">
-    <h2>❓ Hilfe & Dokumentation</h2>
+    <h2 style="display:flex;align-items:center;gap:10px"><i data-lucide="help-circle" style="width:22px;height:22px"></i>Hilfe & Dokumentation</h2>
     <p class="subtitle">Schnellreferenz für alle Dashboard-Bereiche, Konzepte und häufige Fehler</p>
 
     <input class="help-search" type="text" placeholder="🔍 Hilfe durchsuchen…" oninput="helpSearch(this.value)" id="help-search-input">
@@ -1849,19 +1851,19 @@
 
   <!-- DANGER ZONE -->
   <div class="section" id="section-danger">
-    <h2>🔥 Danger Zone</h2>
+    <h2 style="display:flex;align-items:center;gap:10px"><i data-lucide="flame" style="width:22px;height:22px"></i>Danger Zone</h2>
     <p class="subtitle">Sicherheits-Schlüssel, Persönlichkeit und direkte Konfiguration.</p>
 
     <div class="dtab-bar">
-      <button class="dtab-btn active" onclick="showDangerTab('keys', this)">🔐 Sicherheits-Keys</button>
-      <button class="dtab-btn" onclick="showDangerTab('soul', this)">🎭 soul.md</button>
-      <button class="dtab-btn" onclick="showDangerTab('json', this)">📄 config.json</button>
+      <button class="dtab-btn active" onclick="showDangerTab('keys', this)"><i data-lucide="key" style="width:13px;height:13px"></i> Sicherheits-Keys</button>
+      <button class="dtab-btn" onclick="showDangerTab('soul', this)"><i data-lucide="user" style="width:13px;height:13px"></i> soul.md</button>
+      <button class="dtab-btn" onclick="showDangerTab('json', this)"><i data-lucide="file-code" style="width:13px;height:13px"></i> config.json</button>
     </div>
 
     <!-- Tab 1: Sicherheits-Keys -->
     <div class="dtab-content active" id="dtab-keys">
       <div class="panel">
-        <div class="panel-title">🔐 Sicherheits-Schlüssel</div>
+        <div class="panel-title"><i data-lucide="key" style="width:15px;height:15px"></i> Sicherheits-Schlüssel</div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
           <span id="danger-keyring-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(91,141,238,0.12);color:var(--accent);border:1px solid rgba(91,141,238,0.3)">⏳ Laden…</span>
           <span id="danger-keyring-mode" style="font-size:12px;color:var(--muted)"></span>
@@ -1888,25 +1890,25 @@
         </div>
       </div>
       <div class="actions">
-        <button class="btn btn-primary" onclick="saveDangerKeys()">💾 Speichern</button>
+        <button class="btn btn-primary" onclick="saveDangerKeys()"><i data-lucide="save" style="width:14px;height:14px"></i> Speichern</button>
       </div>
     </div>
 
     <!-- Tab 2: SOUL.md -->
     <div class="dtab-content" id="dtab-soul">
       <div class="warn-banner">
-        <span class="warn-icon">⚠️</span>
+        <span class="warn-icon"><i data-lucide="alert-triangle" style="width:18px;height:18px"></i></span>
         <div>
           <strong>Persönlichkeit bearbeiten – mit Bedacht!</strong>
           Diese Datei definiert, wie FluxBot sich in ALLEN Gesprächen verhält. Änderungen erfordern einen Neustart.
         </div>
       </div>
       <div class="panel">
-        <div class="panel-title">🎭 SOUL.md – Persönlichkeit von FluxBot</div>
+        <div class="panel-title"><i data-lucide="user" style="width:15px;height:15px"></i> SOUL.md – Persönlichkeit von FluxBot</div>
         <div class="blur-wrap" id="soul-wrap">
           <div class="blur-overlay" id="soul-overlay" onclick="requestEdit('soul')">
             <div class="blur-hint">
-              <span class="lock-icon">🎭</span>
+              <span class="lock-icon"><i data-lucide="user" style="width:36px;height:36px"></i></span>
               <strong>Zum Bearbeiten klicken</strong>
               <p>Persönlichkeit von FluxBot – beeinflusst alle Gespräche</p>
               <span class="click-btn">Entsperren & Bearbeiten</span>
@@ -1919,26 +1921,26 @@
         ⚠️ Gespeichert – FluxBot muss neu gestartet werden damit die neue Persönlichkeit aktiv wird.
       </div>
       <div class="actions">
-        <button class="btn btn-primary" onclick="saveSoul()">💾 Speichern</button>
-        <button class="btn btn-secondary" onclick="loadSoul()">↺ Verwerfen</button>
+        <button class="btn btn-primary" onclick="saveSoul()"><i data-lucide="save" style="width:14px;height:14px"></i> Speichern</button>
+        <button class="btn btn-secondary" onclick="loadSoul()"><i data-lucide="undo-2" style="width:14px;height:14px"></i> Verwerfen</button>
       </div>
     </div>
 
     <!-- Tab 3: config.json -->
     <div class="dtab-content" id="dtab-json">
       <div class="warn-banner">
-        <span class="warn-icon">⚠️</span>
+        <span class="warn-icon"><i data-lucide="alert-triangle" style="width:18px;height:18px"></i></span>
         <div>
           <strong>Direkter JSON-Zugriff – nur für Experten!</strong>
           Syntaxfehler können FluxBot unbrauchbar machen. Erstelle vor Änderungen immer eine Sicherungskopie.
         </div>
       </div>
       <div class="panel">
-        <div class="panel-title">📄 config.json (direkter Zugriff)</div>
+        <div class="panel-title"><i data-lucide="file-code" style="width:15px;height:15px"></i> config.json (direkter Zugriff)</div>
         <div class="blur-wrap" id="json-wrap">
           <div class="blur-overlay" id="json-overlay" onclick="requestEdit('json')">
             <div class="blur-hint">
-              <span class="lock-icon">🔒</span>
+              <span class="lock-icon"><i data-lucide="lock" style="width:36px;height:36px"></i></span>
               <strong>Zum Bearbeiten klicken</strong>
               <p>Direkter Zugriff auf die Konfigurationsdatei</p>
               <span class="click-btn">Entsperren & Bearbeiten</span>
@@ -1948,7 +1950,7 @@
         </div>
       </div>
       <div class="actions">
-        <button class="btn btn-primary" onclick="saveRawConfig()">💾 Speichern</button>
+        <button class="btn btn-primary" onclick="saveRawConfig()"><i data-lucide="save" style="width:14px;height:14px"></i> Speichern</button>
       </div>
     </div>
   </div>
@@ -1960,13 +1962,13 @@
 <!-- ── Confirmation Modal ── -->
 <div class="modal-overlay" id="edit-modal" style="display:none" onclick="closeModalBg(event)">
   <div class="modal">
-    <h3 id="modal-title">⚠️ Direkte Bearbeitung</h3>
+    <h3 id="modal-title" style="display:flex;align-items:center;gap:8px"><i data-lucide="alert-triangle" style="width:18px;height:18px"></i> Direkte Bearbeitung</h3>
     <p id="modal-text1"></p>
     <p id="modal-text2"></p>
     <p class="modal-confirm-text">Bist du sicher, dass du fortfahren möchtest?</p>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
-      <button class="btn btn-danger" onclick="confirmEditDo()">✏️ Ja, bearbeiten</button>
+      <button class="btn btn-danger" onclick="confirmEditDo()"><i data-lucide="pencil" style="width:14px;height:14px"></i> Ja, bearbeiten</button>
     </div>
   </div>
 </div>
