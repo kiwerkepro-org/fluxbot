@@ -25,6 +25,7 @@ import (
 )
 
 //go:embed dashboard.html
+//go:embed chat.html
 var static embed.FS
 
 // Server ist das FluxBot Web-Dashboard.
@@ -47,8 +48,9 @@ type Server struct {
 	onReload      func()                  // Callback: wird nach Config-Änderung aufgerufen
 	skillsLoader  *skills.Loader          // SkillsLoader für Skill-Verwaltung
 	pairingStore  *pairing.Store          // Pairing-Store für DM-Pairing Mode (P9)
-	sendToChannel func(channel, chatID, text string) error // Callback: Nachricht an Channel senden
-	updater       *system.Updater         // Auto-Update-System (P0)
+	sendToChannel func(channel, chatID, text string) error                          // Callback: Nachricht an Channel senden
+	updater       *system.Updater                                                    // Auto-Update-System (P0)
+	wsHandler     func(ctx context.Context, w http.ResponseWriter, r *http.Request) // P15: WebSocket-Handler
 }
 
 // New erstellt einen neuen Dashboard-Server.
@@ -87,6 +89,12 @@ func New(configPath, workspacePath, password, username string, port int, getChan
 // SetUpdater setzt den Auto-Updater nach der Initialisierung.
 func (s *Server) SetUpdater(u *system.Updater) {
 	s.updater = u
+}
+
+// SetWSHandler setzt den WebSocket-Handler für den Web-Chat (P15).
+// Wird in main.go nach Erstellung des WebChannel aufgerufen.
+func (s *Server) SetWSHandler(h func(ctx context.Context, w http.ResponseWriter, r *http.Request)) {
+	s.wsHandler = h
 }
 
 // UpdateHMACSecret aktualisiert das HMAC-Secret zur Laufzeit (Hot-Reload).
@@ -166,6 +174,12 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/system/check-update", s.auth(s.handleSystemCheckUpdate))                   // POST: Sofortiger Update-Check
 	mux.HandleFunc("/api/system/install-update", s.auth(s.hmacVerify(s.handleSystemInstallUpdate))) // POST: Update installieren (HMAC)
 	mux.HandleFunc("/api/system/restart", s.auth(s.hmacVerify(s.handleSystemRestart)))              // POST: Neustart (HMAC)
+
+	// ── Web-Chat (P15: Standalone Chat App) ─────────────────────────────────
+	mux.HandleFunc("/chat", s.auth(s.handleChatUI))             // Chat-Frontend (HTML)
+	mux.HandleFunc("/ws", s.auth(s.handleChatWS))               // WebSocket-Endpoint
+	mux.HandleFunc("/chat.webmanifest", s.handleChatManifest)   // PWA-Manifest
+	mux.HandleFunc("/chat-sw.js", s.handleChatServiceWorker)    // Service Worker
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),
@@ -342,4 +356,66 @@ func (s *Server) handleUI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Write(content)
+}
+
+// handleChatUI liefert das eingebettete chat.html (P15).
+func (s *Server) handleChatUI(w http.ResponseWriter, r *http.Request) {
+	content, err := fs.ReadFile(static, "chat.html")
+	if err != nil {
+		http.Error(w, "Chat HTML nicht gefunden", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(content)
+}
+
+// handleChatWS leitet WebSocket-Verbindungen an den WebChannel weiter (P15).
+func (s *Server) handleChatWS(w http.ResponseWriter, r *http.Request) {
+	if s.wsHandler == nil {
+		http.Error(w, "Web-Chat nicht aktiv", http.StatusServiceUnavailable)
+		return
+	}
+	s.wsHandler(r.Context(), w, r)
+}
+
+// handleChatManifest liefert das PWA-Manifest (P15).
+func (s *Server) handleChatManifest(w http.ResponseWriter, r *http.Request) {
+	manifest := map[string]interface{}{
+		"name":             "FluxBot Chat",
+		"short_name":       "Fluxi",
+		"description":      "Dein KI-Assistent – direkt im Browser",
+		"start_url":        "/chat",
+		"scope":            "/chat",
+		"display":          "standalone",
+		"orientation":      "portrait-primary",
+		"theme_color":      "#2563eb",
+		"background_color": "#ffffff",
+		"lang":             "de",
+		"icons": []map[string]string{
+			{
+				"src":   "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%232563eb'/><text y='.9em' font-size='80' x='10'>🤖</text></svg>",
+				"sizes": "192x192",
+				"type":  "image/svg+xml",
+			},
+		},
+	}
+	w.Header().Set("Content-Type", "application/manifest+json")
+	w.Header().Set("Cache-Control", "max-age=3600")
+	json.NewEncoder(w).Encode(manifest)
+}
+
+// handleChatServiceWorker liefert den PWA Service Worker (P15).
+func (s *Server) handleChatServiceWorker(w http.ResponseWriter, r *http.Request) {
+	sw := `
+const CACHE = 'fluxbot-chat-v1';
+self.addEventListener('install', e => e.waitUntil(caches.open(CACHE)));
+self.addEventListener('fetch', e => {
+  if (e.request.url.includes('/ws')) return;
+  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+});
+`
+	w.Header().Set("Content-Type", "application/javascript")
+	w.Header().Set("Cache-Control", "no-store")
+	fmt.Fprint(w, sw)
 }

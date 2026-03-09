@@ -191,11 +191,20 @@ git push origin main
 ## Aktueller Stand
 
 - **Letzte Session:** 57 (2026-03-09) – Autostart-System REPARIERT ✅
-- **Nächste Aktion:** Features aus Roadmap (P13 OCR, P14 Multi-Modal)
-- **Aktueller Release:** `v1.2.4` ✅ RELEASED (nächste: v1.2.5)
+- **Nächste Aktion:** **P15 Standalone Chat App (Phase 1)** – Plan genehmigt, Implementierung startet
+- **Aktueller Release:** `v1.2.4` ✅ RELEASED (nächste: v1.2.5 mit P15)
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 - **Dark Mode:** ✅ LIVE – Theme-Toggle im Sidebar-Footer
 - **Autostart:** ✅ FUNKTIONAL – Windows Registry + Task Scheduler
+
+### P15 Status (Standalone Chat App)
+- **Phase 1 – Web App + PWA:** 🚀 GEPLANT (diese Session)
+  - Chat unter `http://localhost:9090/chat`
+  - WebSocket + Streaming
+  - Bild-Upload, Spracheingabe, Chat-Verlauf
+  - Responsive + PWA-Installation auf Handy
+  - Plan: `memory-md/08-p15-plan.md`
+- **Phase 2 – React Native App:** 📋 Spätere Session (eigenes Repo)
 
 ### Session 50 Summary (2026-03-08) – P12 DARK/LIGHT MODE THEME TOGGLE
 - ✅ **Feature:** Dark/Light Mode Theme Toggle implementiert (P12)

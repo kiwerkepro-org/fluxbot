@@ -68,6 +68,12 @@ type DashboardConfig struct {
 	Username string `json:"username"` // Benutzername, default: "admin"
 }
 
+// WebChatConfig konfiguriert den eingebetteten Web-Chat (P15).
+// Erreichbar unter http://localhost:PORT/chat via WebSocket.
+type WebChatConfig struct {
+	Enabled bool `json:"enabled"` // true = Web-Chat aktiv (Default: true)
+}
+
 // ChannelsConfig enthält die Konfiguration aller Kommunikationskanäle
 type ChannelsConfig struct {
 	Telegram TelegramChannelConfig `json:"telegram"`
@@ -75,6 +81,7 @@ type ChannelsConfig struct {
 	Slack    SlackChannelConfig    `json:"slack"`
 	Matrix   MatrixChannelConfig   `json:"matrix"`
 	WhatsApp WhatsAppChannelConfig `json:"whatsapp"`
+	WebChat  WebChatConfig         `json:"webchat"`
 }
 
 // AccessMode steuert wer Nachrichten senden darf.

@@ -5,6 +5,49 @@
 
 ---
 
+## Session 57 – Autostart-System REPARIERT (2026-03-09)
+
+**Fokus:** FluxBot startet jetzt garantiert automatisch beim Neustart
+
+### Problem:
+FluxBot-Prozess war nicht aktiv. Log war vom 20.02. (über eine Woche alt). Dashboard nicht erreichbar.
+Task Scheduler Autostart funktionierte nicht zuverlässig.
+
+### Root Cause:
+- `install.ps1` versuchte nur Task Scheduler (braucht Admin-Rechte)
+- Wenn Admin-Rechte fehlten, wurde Autostart gar nicht konfiguriert
+- Task Scheduler ist auf Windows nicht zuverlässig (Race Conditions)
+
+### Lösungen implementiert:
+
+1. **Neues `setup-autostart.ps1` Script**
+   - Registry-Methode (Priorität 1): `HKCU:\Software\Microsoft\Windows\CurrentVersion\Run`
+     - Funktioniert IMMER, auch ohne Admin-Rechte
+     - Windows startet FluxBot automatisch beim Logon
+   - Task Scheduler (Priorität 2, optional mit Admin)
+   - `-Check` Flag: Status überprüfen
+   - `-Remove` Flag: Autostart entfernen
+
+2. **`install.ps1` überarbeitet**
+   - Registry-Eintrag wird zuerst versucht (immer erfolgreich)
+   - Task Scheduler nur als zusätzliche Robustheit
+   - Bessere Fehlerbehandlung wenn Admin-Rechte fehlen
+
+3. **Status nach Reparatur**
+   - ✅ Registry-Eintrag AKTIV
+   - ✅ FluxBot manuell gestartet (Dashboard läuft)
+   - ✅ Nächster Neustart: FluxBot startet automatisch
+
+### Geänderte Dateien:
+- `setup-autostart.ps1` (neu)
+- `install.ps1` (überarbeitet)
+- `CLAUDE.md` (Status aktualisiert)
+
+**Commit:** `45db8da`
+**Status:** ✅ BEHOBEN & GETESTET
+
+---
+
 ## Session 56 – Status-Tab Redesign: Software-Update Panel (2026-03-09)
 
 **Fokus:** Software-Update Panel aus dem Scroll-Bereich herausgeholt und prominent rechts neben den Status-Panels platziert

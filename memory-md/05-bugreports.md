@@ -6,6 +6,49 @@
 
 ## 🐛 Offene Bugs
 
+---
+
+### 8. Autostart funktioniert nicht – FluxBot startet nicht beim Neustart
+**Reporter:** JJ (Session 57)
+**Severity:** 🔴 High (Produktions-Blocker)
+**Status:** ✅ SESSION 57 GEFIXT & DEPLOYED
+
+**Beschreibung:**
+Nach Windows-Neustart läuft FluxBot nicht automatisch. Dashboard http://localhost:9090 unerreichbar.
+Log vom 20.02. (über eine Woche alt) = FluxBot war lange nicht aktiv.
+
+**Root Cause:**
+- `install.ps1` versuchte nur Task Scheduler-Methode (braucht Admin-Rechte)
+- Wenn Admin-Rechte fehlten → Autostart überhaupt nicht konfiguriert
+- Task Scheduler ist auf Windows nicht zuverlässig
+
+**Fix (Session 57):**
+Zweistufen-Lösung:
+1. **Registry-Methode (Priorität 1):** `HKCU:\Software\Microsoft\Windows\CurrentVersion\Run`
+   - Funktioniert IMMER, auch ohne Admin
+   - Eingetragener Wert: `"C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT\fluxbot.exe"`
+   - Windows startet Eintrag automatisch beim Logon
+
+2. **Task Scheduler (Priorität 2, optional):** Braucht Admin, bietet Auto-Restart
+
+**Neue Dateien:**
+- `setup-autostart.ps1` – Manuelles Setup-Script
+  - `powershell -ExecutionPolicy Bypass -File setup-autostart.ps1` → Autostart einrichten
+  - `powershell -ExecutionPolicy Bypass -File setup-autostart.ps1 -Check` → Status prüfen
+  - `powershell -ExecutionPolicy Bypass -File setup-autostart.ps1 -Remove` → Autostart entfernen
+
+**Geänderte Dateien:**
+- `install.ps1` – Registry-Methode prioritär, Task Scheduler optional
+- `CLAUDE.md` – Dokumentiert dass Autostart funktional ist
+
+**Betroffen:** Installer, Autostart-System
+
+**Status:** ✅ BEHOBEN & GETESTET (Session 57, 2026-03-09)
+
+---
+
+## 🐛 Offene Bugs (Archiv)
+
 ### 1. Kalender: Widerspruch bei Datums-Angabe
 **Reporter:** JJ (Session 30)
 **Severity:** 🟡 Medium (UX-Verwirrung)

@@ -361,6 +361,13 @@ func runBot(ctx context.Context, configPath string, debugMode bool) {
 		}))
 	}
 
+	// P15: Web-Chat Channel (WebSocket, standardmäßig aktiv)
+	var webChannel *channels.WebChannel
+	if cfg.Channels.WebChat.Enabled {
+		webChannel = channels.NewWebChannel()
+		manager.Register(webChannel)
+	}
+
 	log.Printf("[Main] Aktive Kanäle: %s", strings.Join(manager.ActiveChannels(), ", "))
 
 	emailSender := buildEmailSender(cfg)
@@ -527,6 +534,12 @@ func runBot(ctx context.Context, configPath string, debugMode bool) {
 			pairingStore,
 			sendToChannel,
 		)
+		// P15: WebChannel mit Agent verbinden (StreamHandler) + Dashboard-WS-Handler setzen
+		if webChannel != nil {
+			webChannel.SetStreamHandler(fluxAgent.HandleWebChat)
+			dash.SetWSHandler(webChannel.HandleConnection)
+		}
+
 		// Auto-Updater initialisieren und an Dashboard übergeben
 		updater := systempkg.New(version)
 		updater.StartBackgroundCheck(ctx)

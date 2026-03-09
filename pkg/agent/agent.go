@@ -340,6 +340,121 @@ func (a *Agent) handleMessage(ctx context.Context, msg channels.Message) {
 	}
 }
 
+// HandleWebChat verarbeitet eine Web-Chat-Nachricht (P15).
+// Statt manager.Reply() zu nutzen, werden Chunks direkt via sendChunk gesendet.
+func (a *Agent) HandleWebChat(ctx context.Context, msg channels.Message, sendChunk func(string)) {
+	session := a.sessions.GetOrCreate(msg.SenderID, msg.ChannelID)
+
+	// Security-Check (nur bei Text)
+	if a.guard != nil && msg.Type == channels.MessageTypeText {
+		result := a.guard.Check(msg.ChannelID, msg.SenderID, string(msg.Type), msg.Text)
+		if !result.Allowed {
+			sendChunk(result.Response)
+			return
+		}
+		msg.Text = security.SanitizeText(msg.Text, 4000)
+	}
+
+	var response string
+	switch msg.Type {
+	case channels.MessageTypeVoice:
+		if a.transcriber == nil {
+			sendChunk("🎙️ Spracherkennung ist nicht aktiviert.")
+			return
+		}
+		// Voice-Bytes als Temp-Datei speichern (Transcriber erwartet Dateipfad)
+		tmpFile, err := os.CreateTemp("", "fluxweb-voice-*.webm")
+		if err != nil {
+			sendChunk("🎙️ Spracherkennung fehlgeschlagen (temp file).")
+			return
+		}
+		defer os.Remove(tmpFile.Name())
+		if _, err := tmpFile.Write(msg.VoiceData); err != nil {
+			tmpFile.Close()
+			sendChunk("🎙️ Spracherkennung fehlgeschlagen (write).")
+			return
+		}
+		tmpFile.Close()
+		text, err := a.transcriber.Transcribe(ctx, tmpFile.Name(), a.voiceLang)
+		if err != nil {
+			sendChunk("🎙️ Spracherkennung fehlgeschlagen: " + err.Error())
+			return
+		}
+		msg.Type = channels.MessageTypeText
+		msg.Text = text
+		response = a.processText(ctx, msg, session)
+
+	case channels.MessageTypeImage:
+		response = a.analyzeImageWeb(ctx, msg, session)
+
+	case channels.MessageTypeText:
+		response = a.processText(ctx, msg, session)
+
+	default:
+		sendChunk("Unbekannter Nachrichtentyp.")
+		return
+	}
+
+	if response == "" {
+		return
+	}
+	sendChunk(stripInternalMarkers(response))
+}
+
+// analyzeImageWeb ist die Web-Chat-Variante von handleImageAnalysis – gibt String zurück.
+func (a *Agent) analyzeImageWeb(ctx context.Context, msg channels.Message, session *Session) string {
+	if msg.MediaPath == "" {
+		return "❌ Bild konnte nicht geladen werden."
+	}
+	defer os.Remove(msg.MediaPath)
+
+	imageData, err := os.ReadFile(msg.MediaPath)
+	if err != nil {
+		return "❌ Bild konnte nicht gelesen werden."
+	}
+
+	imageMIME := "image/jpeg"
+	if len(msg.MediaPath) >= 4 {
+		ext := strings.ToLower(msg.MediaPath[len(msg.MediaPath)-4:])
+		switch ext {
+		case ".png":
+			imageMIME = "image/png"
+		case ".gif":
+			imageMIME = "image/gif"
+		case "webp":
+			imageMIME = "image/webp"
+		}
+	}
+
+	userPrompt := msg.Text
+	if strings.TrimSpace(userPrompt) == "" {
+		userPrompt = "Was siehst du auf diesem Bild? Beschreibe den Inhalt kurz und präzise."
+	}
+
+	visionModel := a.models["ocr"]
+	if visionModel == "" {
+		visionModel = a.models["default"]
+	}
+
+	req := provider.Request{
+		Model:  visionModel,
+		System: a.buildSystemPrompt(session, ""),
+		Messages: []provider.Message{
+			{Role: "user", Content: userPrompt, ImageData: imageData, ImageMIME: imageMIME},
+		},
+	}
+
+	response, err := a.provider.Complete(ctx, req)
+	if err != nil {
+		return fmt.Sprintf("❌ Bildanalyse fehlgeschlagen: %v", err)
+	}
+
+	response = strings.TrimSpace(response)
+	session.AddToHistory("user", "[Bild] "+userPrompt)
+	session.AddToHistory("assistant", response)
+	return response
+}
+
 // handleVoice verarbeitet Sprachnachrichten
 func (a *Agent) handleVoice(ctx context.Context, msg channels.Message, session *Session) {
 	if a.transcriber == nil {
