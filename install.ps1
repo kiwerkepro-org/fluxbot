@@ -108,34 +108,53 @@ function Install-Native {
         Write-Info "Browser-Installation übersprungen (optional): $_"
     }
 
-    # 5. Autostart via Task Scheduler einrichten
-    Write-Step "5/5" "Richte Autostart ein (Task Scheduler)..."
+    # 5. Autostart einrichten (Registry + Optional Task Scheduler)
+    Write-Step "5/5" "Richte Autostart ein..."
+
+    # Registry Run-Eintrag (funktioniert IMMER, auch ohne Admin-Rechte)
+    $RegistryPath = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+    $RegistryKey = "FluxBot"
+    try {
+        Set-ItemProperty -Path $RegistryPath -Name $RegistryKey -Value $binaryPath -Force -ErrorAction SilentlyContinue
+        Write-OK "Windows Registry Autostart eingerichtet"
+    } catch {
+        Write-Info "Registry-Eintrag konnte nicht gesetzt werden (nicht kritisch)"
+    }
+
+    # Versuche Task Scheduler (benötigt Admin-Rechte)
     $taskName = "FluxBot"
     $configArg = "--config `"$DATA_DIR\config.json`""
 
-    # Bestehende Task entfernen
-    schtasks /delete /tn $taskName /f 2>$null | Out-Null
+    try {
+        # Bestehende Task entfernen
+        $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        if ($existing) {
+            Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+        }
 
-    # Neue Task erstellen (AtLogon, ohne Fenster, mit Auto-Restart)
-    $action  = New-ScheduledTaskAction  -Execute $binaryPath -Argument $configArg -WorkingDirectory $INSTALL_DIR
-    $trigger = New-ScheduledTaskTrigger -AtLogOn
-    $settings = New-ScheduledTaskSettingsSet `
-        -ExecutionTimeLimit 0 `
-        -RestartCount 3 `
-        -RestartInterval (New-TimeSpan -Minutes 1) `
-        -StartWhenAvailable
+        # Neue Task erstellen
+        $action  = New-ScheduledTaskAction  -Execute $binaryPath -Argument $configArg -WorkingDirectory $INSTALL_DIR
+        $trigger = New-ScheduledTaskTrigger -AtLogOn
+        $settings = New-ScheduledTaskSettingsSet `
+            -ExecutionTimeLimit 0 `
+            -RestartCount 3 `
+            -RestartInterval (New-TimeSpan -Minutes 1) `
+            -StartWhenAvailable `
+            -AllowStartIfOnBatteries `
+            -DontStopIfGoingOnBatteries
 
-    Register-ScheduledTask `
-        -TaskName $taskName `
-        -Action $action `
-        -Trigger $trigger `
-        -Settings $settings `
-        -RunLevel Highest `
-        -Force | Out-Null
+        Register-ScheduledTask `
+            -TaskName $taskName `
+            -Action $action `
+            -Trigger $trigger `
+            -Settings $settings `
+            -RunLevel Highest `
+            -Force | Out-Null
 
-    # Sofort starten
-    Start-ScheduledTask -TaskName $taskName
-    Write-OK "Task '$taskName' eingerichtet & gestartet"
+        Write-OK "Task Scheduler zusätzlich konfiguriert"
+    } catch {
+        Write-Info "Task Scheduler nicht verfügbar (kein Problem – Registry-Eintrag reicht aus)"
+    }
 
     # Desktop-Verknüpfung für Dashboard
     $shell   = New-Object -ComObject WScript.Shell
@@ -212,9 +231,12 @@ function Show-NativeSuccess($version, $installDir, $dataDir, $binaryPath) {
     Write-Info "Daten (config, Skills):   $dataDir"
     Write-Info "Binary:                   $binaryPath"
     Write-Info ""
-    Write-Info "Autostart: Task Scheduler → Aufgabe 'FluxBot'"
+    Write-Info "Autostart: Windows Registry + Task Scheduler (beim Logon)"
     Write-Info "Updaten:   Dashboard → Status → Update installieren"
-    Write-Info "Stoppen:   schtasks /end /tn FluxBot"
+    Write-Info "Stoppen:   Prozess beenden oder Task Scheduler deaktivieren"
+    Write-Info ""
+    Write-Info "Tipp: Autostart neu konfigurieren mit:"
+    Write-Info "      powershell -ExecutionPolicy Bypass -File setup-autostart.ps1"
     Write-Host ""
     Start-Sleep -Seconds 3
     try { Start-Process "http://localhost:9090" } catch {}

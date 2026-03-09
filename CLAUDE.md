@@ -190,11 +190,12 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 56 (2026-03-09) – Status-Tab Redesign: Software-Update Panel prominent ✅
+- **Letzte Session:** 57 (2026-03-09) – Autostart-System REPARIERT ✅
 - **Nächste Aktion:** Features aus Roadmap (P13 OCR, P14 Multi-Modal)
 - **Aktueller Release:** `v1.2.4` ✅ RELEASED (nächste: v1.2.5)
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 - **Dark Mode:** ✅ LIVE – Theme-Toggle im Sidebar-Footer
+- **Autostart:** ✅ FUNKTIONAL – Windows Registry + Task Scheduler
 
 ### Session 50 Summary (2026-03-08) – P12 DARK/LIGHT MODE THEME TOGGLE
 - ✅ **Feature:** Dark/Light Mode Theme Toggle implementiert (P12)

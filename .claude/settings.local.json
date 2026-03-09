@@ -26,7 +26,15 @@
       "Bash(C:/Users/jjs-w/AppData/Roaming/Python/Python314/Scripts/git-filter-repo.exe:*)",
       "Bash(find:*)",
       "Bash(do echo:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(netstat:*)",
+      "Bash(cmd:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(curl:*)",
+      "Bash(Get-Process:*)",
+      "Bash(cmd.exe:*)",
+      "Bash(node:*)",
+      "Bash(schtasks:*)"
     ]
   }
 }
