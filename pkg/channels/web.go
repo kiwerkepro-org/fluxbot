@@ -135,6 +135,8 @@ func (c *WebChannel) SendChunk(chatID, chunk string) {
 			wc.writeJSON(WsOutgoing{Type: "typing"}) //nolint:errcheck
 		case len(chunk) > 7 && chunk[:7] == "\x00audio:":
 			wc.writeJSON(WsOutgoing{Type: "audio", Data: chunk[7:], Mime: "audio/ogg"}) //nolint:errcheck
+		case len(chunk) > 12 && chunk[:12] == "\x00transcript:":
+			wc.writeJSON(WsOutgoing{Type: "transcript", Text: chunk[12:]}) //nolint:errcheck
 		default:
 			wc.writeJSON(WsOutgoing{Type: "chunk", Text: chunk}) //nolint:errcheck
 		}

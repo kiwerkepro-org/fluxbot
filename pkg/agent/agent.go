@@ -386,6 +386,9 @@ func (a *Agent) HandleWebChat(ctx context.Context, msg channels.Message, sendChu
 			sendChunk("🎙️ Spracherkennung fehlgeschlagen: " + err.Error())
 			return
 		}
+		log.Printf("[WebChat] STT-Transkription: %q", text)
+		// Transkription an Browser senden damit User sieht was gehört wurde
+		sendChunk("\x00transcript:" + text)
 		msg.Type = channels.MessageTypeText
 		msg.Text = text
 		response = a.processText(ctx, msg, session)

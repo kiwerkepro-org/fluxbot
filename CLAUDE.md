@@ -190,9 +190,9 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 57 (2026-03-09) – Autostart-System REPARIERT ✅
-- **Nächste Aktion:** **P15 Standalone Chat App (Phase 1)** – Plan genehmigt, Implementierung startet
-- **Aktueller Release:** `v1.2.4` ✅ RELEASED (nächste: v1.2.5 mit P15)
+- **Letzte Session:** 58 (2026-03-09) – P15 Web Chat App + Voice Conversation ✅ LIVE
+- **Nächste Aktion:** P15 Phase 2 (React Native, separates Projekt) oder P13/P14 aus Roadmap
+- **Aktueller Release:** `v1.2.5` ✅ RELEASED (nächste: v1.2.6)
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 - **Dark Mode:** ✅ LIVE – Theme-Toggle im Sidebar-Footer
 - **Autostart:** ✅ FUNKTIONAL – Windows Registry + Task Scheduler

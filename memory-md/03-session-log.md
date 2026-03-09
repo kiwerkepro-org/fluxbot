@@ -5,6 +5,32 @@
 
 ---
 
+## Session 58 – P15 Phase 1: Web Chat App + Voice Conversation (2026-03-09)
+
+**Fokus:** Gemini-Style Web Chat mit Spracheingabe + Sprachausgabe
+
+### Implementiert:
+- ✅ `pkg/channels/web.go` – WebChannel mit WebSocket, Mutex-geschützten Writes, Typing-Indikator, Audio-Frame-Support
+- ✅ `pkg/dashboard/chat.html` – Vollständige Chat-UI (Gemini-Stil): Login, Dark/Light Mode, Markdown, Bild-Upload, Spracheingabe
+- ✅ Voice-Konversation: Spracheingabe → STT (Groq) → AI → TTS (Google Chirp) → Sprachausgabe im Browser
+- ✅ Browser speechSynthesis als automatischer Fallback wenn Google TTS Token abgelaufen
+- ✅ PWA: `/chat.webmanifest` + Service Worker → auf Handy installierbar via "Zum Homescreen"
+- ✅ `pkg/config/config.go` – WebChat.Enabled standardmäßig true
+
+### Bugfixes:
+- `appendMessageEl` crash: `null.parentNode` nach `innerHTML=''` → null-Guard + welcome-Element vor Clear retten
+- Concurrent WebSocket writes (Race Condition): Mutex (`wsConn` struct) pro Connection
+- `setSending(false)` bei WS-Disconnect → Input nach Reconnect wieder aktiv
+- WebChat nicht registriert: `cfg.Channels.WebChat.Enabled` war false (Go zero value)
+
+### Root Cause der WS-Probleme war JS-Fehler:
+`container.innerHTML = ''` zerstörte `#welcome` DOM-Element → `getElementById('welcome')` → null → crash in appendMessageEl → JS komplett kaputt
+
+### Commit: `d20d3d1`
+### Release: `v1.2.5` ✅ PUBLISHED
+
+---
+
 ## Session 57 – Autostart-System REPARIERT (2026-03-09)
 
 **Fokus:** FluxBot startet jetzt garantiert automatisch beim Neustart
