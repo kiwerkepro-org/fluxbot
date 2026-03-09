@@ -36,7 +36,7 @@ import (
 
 // version wird per -ldflags="-X main.version=vX.Y.Z" beim Build gesetzt.
 // Lokal / ohne ldflags bleibt der Wert "dev".
-var version = "v1.2.4"
+var version = "v1.2.5"
 
 func main() {
 	configPath        := flag.String("config", "./workspace/config.json", "Pfad zur Konfigurationsdatei")
