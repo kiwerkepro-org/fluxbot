@@ -397,58 +397,69 @@
         <div class="card-value yellow" id="status-channel-count">–</div>
       </div>
     </div>
-    <div class="panel">
-      <div class="panel-title"><i data-lucide="radio" style="width:15px;height:15px"></i> Verbundene Kanäle</div>
-      <div class="channel-list" id="status-channels">Lädt...</div>
-    </div>
-    <div class="panel">
-      <div class="panel-title"><i data-lucide="lock" style="width:15px;height:15px"></i> Secret-Backend</div>
-      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px">
-        <span id="secret-backend-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(91,141,238,0.12);color:var(--accent);border:1px solid rgba(91,141,238,0.3)">⏳ Laden…</span>
-        <span id="secret-backend-mode" style="font-size:12px;color:var(--muted)"></span>
-      </div>
-      <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6">
-        Secrets (API-Keys, Tokens) werden im aktiven Backend sicher gespeichert.<br>
-        <strong>Windows Credential Manager</strong> = lokal, OS-nativ, kein Klartext.<br>
-        <strong>AES-256-GCM Vault</strong> = verschlüsselte Datei (primär im Docker-Betrieb).
-      </p>
-    </div>
-    <button class="btn btn-secondary" onclick="loadStatus()">🔄 Aktualisieren</button>
+    <!-- Zwei-spaltig: links Kanäle/Backend, rechts Update -->
+    <div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;margin-top:0">
 
-    <div id="status-vt-warning" class="warn-banner" style="display:none">
-      <span class="warn-icon"><i data-lucide="alert-triangle" style="width:18px;height:18px"></i></span>
+      <!-- Linke Spalte -->
       <div>
-        <strong>VirusTotal nicht aktiv</strong>
-        Dateien und Links werden ungeprüft weitergeleitet.
-        <br><a href="#" onclick="event.preventDefault();showSection('danger',document.querySelector('[onclick*=danger]'));showDangerTab('keys',null);" style="color:var(--accent);font-size:12px">
-          → API-Key in Danger Zone → Sicherheits-Keys eintragen
-        </a>
+        <div class="panel">
+          <div class="panel-title"><i data-lucide="radio" style="width:15px;height:15px"></i> Verbundene Kanäle</div>
+          <div class="channel-list" id="status-channels">Lädt...</div>
+        </div>
+        <div class="panel" style="margin-top:16px">
+          <div class="panel-title"><i data-lucide="lock" style="width:15px;height:15px"></i> Secret-Backend</div>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px">
+            <span id="secret-backend-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(91,141,238,0.12);color:var(--accent);border:1px solid rgba(91,141,238,0.3)">⏳ Laden…</span>
+            <span id="secret-backend-mode" style="font-size:12px;color:var(--muted)"></span>
+          </div>
+          <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6">
+            Secrets (API-Keys, Tokens) werden im aktiven Backend sicher gespeichert.<br>
+            <strong>Windows Credential Manager</strong> = lokal, OS-nativ, kein Klartext.<br>
+            <strong>AES-256-GCM Vault</strong> = verschlüsselte Datei (primär im Docker-Betrieb).
+          </p>
+        </div>
+        <div style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="loadStatus()">🔄 Aktualisieren</button>
+        </div>
+        <div id="status-vt-warning" class="warn-banner" style="display:none;margin-top:16px">
+          <span class="warn-icon"><i data-lucide="alert-triangle" style="width:18px;height:18px"></i></span>
+          <div>
+            <strong>VirusTotal nicht aktiv</strong>
+            Dateien und Links werden ungeprüft weitergeleitet.
+            <br><a href="#" onclick="event.preventDefault();showSection('danger',document.querySelector('[onclick*=danger]'));showDangerTab('keys',null);" style="color:var(--accent);font-size:12px">
+              → API-Key in Danger Zone → Sicherheits-Keys eintragen
+            </a>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <!-- Update-Panel -->
-    <div id="update-panel" class="panel" style="margin-top:20px">
-      <div class="panel-title"><i data-lucide="refresh-cw" style="width:15px;height:15px"></i> Software-Update</div>
-      <div id="update-content">
-        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:8px">
-          <div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:2px">Aktuelle Version</div>
-            <span id="update-current" style="font-weight:600;color:var(--text)">–</span>
+      <!-- Rechte Spalte: Software-Update prominent -->
+      <div id="update-panel" class="panel" style="position:sticky;top:20px">
+        <div class="panel-title" style="font-size:15px;margin-bottom:12px"><i data-lucide="refresh-cw" style="width:16px;height:16px"></i> Software-Update</div>
+        <div id="update-content">
+          <div style="display:flex;flex-direction:column;gap:12px;margin-top:4px">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-radius:8px;border:1px solid var(--border)">
+              <div>
+                <div style="font-size:11px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Aktuelle Version</div>
+                <span id="update-current" style="font-weight:700;font-size:16px;color:var(--text)">–</span>
+              </div>
+              <i data-lucide="arrow-right" style="width:18px;height:18px;color:var(--muted)"></i>
+              <div style="text-align:right">
+                <div style="font-size:11px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em">Neueste Version</div>
+                <span id="update-latest" style="font-weight:700;font-size:16px">–</span>
+              </div>
+            </div>
+            <p id="update-status-msg" style="font-size:12px;color:var(--muted);margin:0;min-height:18px"></p>
           </div>
-          <div style="color:var(--muted);font-size:18px">→</div>
-          <div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:2px">Neueste Version</div>
-            <span id="update-latest" style="font-weight:600">–</span>
+          <div id="update-notes" style="font-size:12px;color:var(--muted);margin-top:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto;display:none"></div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px">
+            <button class="btn btn-secondary" onclick="checkUpdate()" id="btn-check-update" style="width:100%">🔍 Auf Updates prüfen</button>
+            <button class="btn btn-primary" onclick="installUpdate()" id="btn-install-update" style="display:none;width:100%">⬇️ Update installieren</button>
+            <button class="btn btn-secondary" onclick="restartFluxBot()" id="btn-restart" style="width:100%">🔄 Neu starten</button>
           </div>
         </div>
-        <div id="update-notes" style="font-size:12px;color:var(--muted);margin-top:10px;white-space:pre-wrap;max-height:120px;overflow-y:auto;display:none"></div>
-        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
-          <button class="btn btn-secondary" onclick="checkUpdate()" id="btn-check-update">🔍 Auf Updates prüfen</button>
-          <button class="btn btn-primary" onclick="installUpdate()" id="btn-install-update" style="display:none">⬇️ Update installieren</button>
-          <button class="btn btn-secondary" onclick="restartFluxBot()" id="btn-restart">🔄 Neu starten</button>
-        </div>
-        <p id="update-status-msg" style="font-size:12px;color:var(--muted);margin-top:8px"></p>
       </div>
+
     </div>
   </div>
 

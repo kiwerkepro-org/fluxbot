@@ -5,6 +5,24 @@
 
 ---
 
+## Session 56 – Status-Tab Redesign: Software-Update Panel (2026-03-09)
+
+**Fokus:** Software-Update Panel aus dem Scroll-Bereich herausgeholt und prominent rechts neben den Status-Panels platziert
+
+### Änderung:
+- **`pkg/dashboard/dashboard.html`:** Status-Tab unterhalb der 3 Status-Karten in 2-Spalten-Grid umgebaut
+  - Links: Verbundene Kanäle + Secret-Backend + Aktualisieren-Button + VT-Warning
+  - Rechts: Software-Update Panel (sticky, volle Höhe, immer sichtbar)
+  - Versionsvergleich in eigenem visuellen Block (Aktuelle Version → Neueste Version)
+  - Buttons vertikal gestapelt, volle Breite
+  - `position:sticky;top:20px` → Panel bleibt beim Scrollen im Viewport
+- **`cmd/fluxbot/main.go`:** Version auf `v1.2.4` erhöht
+
+**Geänderte Dateien:** pkg/dashboard/dashboard.html, cmd/fluxbot/main.go
+**Release:** v1.2.4
+
+---
+
 ## Session 55 – Terminal-Unabhängigkeit + Restart-Fix (2026-03-09)
 
 **Fokus:** FluxBot stirbt nicht mehr wenn Terminal geschlossen wird; Restart-Button funktioniert zuverlässig

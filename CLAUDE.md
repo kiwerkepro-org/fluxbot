@@ -190,9 +190,9 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 55 (2026-03-09) – Restart-Fix + Terminal-Unabhängigkeit ✅
+- **Letzte Session:** 56 (2026-03-09) – Status-Tab Redesign: Software-Update Panel prominent ✅
 - **Nächste Aktion:** Features aus Roadmap (P13 OCR, P14 Multi-Modal)
-- **Aktueller Release:** `v1.2.3` ✅ RELEASED (nächste: v1.2.4)
+- **Aktueller Release:** `v1.2.4` ✅ RELEASED (nächste: v1.2.5)
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 - **Dark Mode:** ✅ LIVE – Theme-Toggle im Sidebar-Footer
 
