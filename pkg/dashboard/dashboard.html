@@ -2536,11 +2536,23 @@ async function restartFluxBot() {
   const msg = document.getElementById('update-status-msg');
   if (!confirm('FluxBot jetzt neu starten?')) return;
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Startet neu...'; }
-  if (msg) msg.textContent = 'Neustart läuft – Seite wird in 5 Sekunden neu geladen...';
+  if (msg) msg.textContent = 'Neustart läuft – warte auf Server...';
   try {
     await api('/api/system/restart', 'POST', {});
   } catch(e) { /* Verbindungsabbruch beim Neustart ist normal */ }
-  await new Promise(r => setTimeout(r, 5000));
+  // Aktiv pollen bis der Server wieder antwortet (max. 30s)
+  const deadline = Date.now() + 30000;
+  let dots = 0;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 1000));
+    dots = (dots % 3) + 1;
+    if (msg) msg.textContent = 'Warte auf Server' + '.'.repeat(dots);
+    try {
+      const res = await fetch('/api/status', { cache: 'no-store' });
+      if (res.ok) { location.reload(); return; }
+    } catch(e) { /* noch nicht bereit */ }
+  }
+  // Timeout – trotzdem neu laden
   location.reload();
 }
 
