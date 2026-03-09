@@ -5,6 +5,60 @@
 
 ---
 
+## Session 55 – Terminal-Unabhängigkeit + Restart-Fix (2026-03-09)
+
+**Fokus:** FluxBot stirbt nicht mehr wenn Terminal geschlossen wird; Restart-Button funktioniert zuverlässig
+
+### Root Cause (endlich gefunden):
+Der Updater hatte im Hintergrund v1.2.2 von GitHub heruntergeladen und `fluxbot.exe` überschrieben.
+v1.2.2 war mit `-H windowsgui` gebaut → crashte sofort bei Start (ungültige stderr/stdout-Handles) mit Exit-Code 2.
+Jeder Neustart-Versuch startete die kaputte Binary → Seite nicht erreichbar.
+
+### Fixes:
+1. **`-H windowsgui` entfernt** aus Makefile + release.yml – verursachte Crash wegen ungültigem stderr-Handle
+2. **`FreeConsole()` syscall** in `cmd/fluxbot/console_windows.go` – neues Platform-File
+   - In `main()` aufgerufen nach `printBanner()`, wenn nicht `--debug`
+   - Löst Prozess vom Eltern-Terminal → stirbt nicht wenn Konsolenfenster geschlossen wird
+   - No-Op wenn kein Terminal vorhanden (Task Scheduler, Windows-Dienst)
+3. **Log nur in Datei** (kein `io.MultiWriter` mit os.Stdout) nach `detachConsole()` – stdout ist danach ungültig
+4. **Debug-Modus** behält Konsolenausgabe (`--debug` überspringt FreeConsole)
+5. **`runBot()` Signatur** erweitert: `debugMode bool` Parameter
+6. **v1.2.3 released** – korrekte Binary auf GitHub, Updater installiert nie mehr kaputte v1.2.2
+
+**Neue Dateien:** `cmd/fluxbot/console_windows.go`, `cmd/fluxbot/console_other.go`
+**Geänderte Dateien:** cmd/fluxbot/main.go, service_windows.go, Makefile, .github/workflows/release.yml, CLAUDE.md
+
+---
+
+## Session 54 – P11 Dangerous-Tools Whitelist (2026-03-08)
+
+**Highlights:**
+- P11 Dangerous-Tools implementiert: 5 Kategorien, 80+ DE+EN Muster, Admin-Bypass, Hot-Reload
+- Dashboard: neuer Tab "Dangerous Tools" mit Stats-Karten + Konfig-UI
+- Speichern-Button statt Auto-Save (Auto-Save hatte keine Funktion wegen falschem fetch-Aufruf)
+- Bugfix: Keyring-Crash `CredFreeW not found in Advapi32.dll` – `Find()` vor `.Call()` in `keyring_windows.go`
+- Dashboard-Styling: Textarea + Checkbox-Labels jetzt mit korrekten CSS-Variablen
+
+**Neue Dateien:** `pkg/security/dangerous_tools.go`
+**Geänderte Dateien:** config.go, agent.go, main.go, api.go, server.go, dashboard.html, keyring_windows.go
+
+---
+
+## Session 53 – Update/Restart UI Fixes (2026-03-08)
+
+**Fokus:** Neustart-Button + Update-Panel zuverlässig sichtbar + Restart-Flow
+
+### Fixes:
+1. **Restart-Button immer sichtbar:** Button im Update-Panel, `display:none` vom Panel entfernt
+2. **Auto-Restart entfernt:** Kein komplexes Polling mehr – einfach Signal senden + 5s warten + `location.reload()`
+3. **Windows-Restart:** `restart_windows.go` mit `CREATE_BREAKAWAY_FROM_JOB` + `restart_other.go`
+4. **Cache-Control: no-store** im Dashboard-Handler – Browser lädt immer frische HTML
+5. **Root Cause:** Browser-Cache zeigte alte HTML nach FluxBot-Neustarts → Ctrl+Shift+R hat geholfen, `no-store` verhindert das dauerhaft
+
+### Commits: `7a80ee5`, `3e50939`, `fea6ffa`, `22fe00c`, `78a1d1b`, `c6150dc`
+
+---
+
 ## Session 52 – P10 Granulare DM-Policy (2026-03-08)
 
 **Fokus:** Zentrale Zugriffskontrolle für alle 5 Kanäle (open/allowlist/pairing)

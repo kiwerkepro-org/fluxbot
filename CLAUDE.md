@@ -190,9 +190,9 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 54 (2026-03-08) – P11 Dangerous-Tools Whitelist ✅
+- **Letzte Session:** 55 (2026-03-09) – Restart-Fix + Terminal-Unabhängigkeit ✅
 - **Nächste Aktion:** Features aus Roadmap (P13 OCR, P14 Multi-Modal)
-- **Aktueller Release:** `v1.2.2` ✅ RELEASED (nächste: v1.2.3)
+- **Aktueller Release:** `v1.2.3` ✅ RELEASED (nächste: v1.2.4)
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 - **Dark Mode:** ✅ LIVE – Theme-Toggle im Sidebar-Footer
 
