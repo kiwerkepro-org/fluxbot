@@ -437,6 +437,11 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
+	// ── WebChat Default: immer aktiviert ────────────────────────────────────
+	if !cfg.Channels.WebChat.Enabled {
+		cfg.Channels.WebChat.Enabled = true
+	}
+
 	// ── Skill-Secret auto-generieren wenn noch nicht vorhanden ──────────────
 	if cfg.SkillSecret == "" {
 		cfg.SkillSecret = generateSecret()

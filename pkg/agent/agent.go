@@ -3,6 +3,7 @@ package agent
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -355,7 +356,12 @@ func (a *Agent) HandleWebChat(ctx context.Context, msg channels.Message, sendChu
 		msg.Text = security.SanitizeText(msg.Text, 4000)
 	}
 
+	// Typing-Indikator sofort senden, damit User weiß dass Fluxi "denkt"
+	sendChunk("\x00typing")
+
 	var response string
+	wasVoice := msg.Type == channels.MessageTypeVoice
+
 	switch msg.Type {
 	case channels.MessageTypeVoice:
 		if a.transcriber == nil {
@@ -398,7 +404,21 @@ func (a *Agent) HandleWebChat(ctx context.Context, msg channels.Message, sendChu
 	if response == "" {
 		return
 	}
-	sendChunk(stripInternalMarkers(response))
+	clean := stripInternalMarkers(response)
+	sendChunk(clean)
+
+	// Spracheingabe → Sprachausgabe (TTS)
+	if wasVoice && a.ttsSpeaker != nil {
+		log.Printf("[WebChat] TTS: Generiere Sprachantwort | Provider: %s", a.ttsSpeaker.Name())
+		audioBytes, err := a.ttsSpeaker.Speak(ctx, clean, a.ttsVoice)
+		if err != nil {
+			log.Printf("[WebChat] TTS-Fehler: %v", err)
+		} else {
+			audioB64 := base64.StdEncoding.EncodeToString(audioBytes)
+			sendChunk("\x00audio:" + audioB64)
+			log.Printf("[WebChat] TTS: %d Bytes Audio gesendet", len(audioBytes))
+		}
+	}
 }
 
 // analyzeImageWeb ist die Web-Chat-Variante von handleImageAnalysis – gibt String zurück.

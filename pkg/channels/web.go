@@ -27,14 +27,35 @@ type wsIncoming struct {
 // WsOutgoing ist ein ausgehender WebSocket-Frame an den Browser.
 // Exportiert damit Dashboard-Package es nutzen kann.
 type WsOutgoing struct {
-	Type string `json:"type"` // "chunk", "message", "typing", "done", "error"
+	Type string `json:"type"` // "chunk", "message", "typing", "done", "error", "audio"
 	Text string `json:"text,omitempty"`
+	Data string `json:"data,omitempty"` // base64-kodierte Audio-Bytes (OGG/Opus)
+	Mime string `json:"mime,omitempty"` // z.B. "audio/ogg"
+}
+
+// wsConn bündelt eine WebSocket-Verbindung mit einem exklusiven Schreib-Mutex.
+// gorilla/websocket erlaubt genau einen gleichzeitigen Writer – daher Mutex nötig.
+type wsConn struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
+func (c *wsConn) writeJSON(v interface{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.conn.WriteJSON(v)
+}
+
+func (c *wsConn) writeMessage(msgType int, data []byte) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.conn.WriteMessage(msgType, data)
 }
 
 // WebChannel implementiert Channel für direkten Browser-WebSocket-Zugriff.
 // Anders als andere Channels nutzt er keinen Bus, sondern einen direkten Stream-Handler.
 type WebChannel struct {
-	conns         sync.Map                                                              // connID → *websocket.Conn
+	conns         sync.Map                                                              // connID → *wsConn
 	streamHandler func(ctx context.Context, msg Message, sendChunk func(string))       // Agent-Callback
 	upgrader      websocket.Upgrader
 	tempDir       string // Verzeichnis für temporäre Mediendateien
@@ -71,8 +92,8 @@ func (c *WebChannel) Start(ctx context.Context, bus chan<- Message) error {
 // Stop schließt alle aktiven WebSocket-Verbindungen.
 func (c *WebChannel) Stop() {
 	c.conns.Range(func(key, value interface{}) bool {
-		if conn, ok := value.(*websocket.Conn); ok {
-			conn.Close()
+		if wc, ok := value.(*wsConn); ok {
+			wc.conn.Close()
 		}
 		return true
 	})
@@ -81,8 +102,7 @@ func (c *WebChannel) Stop() {
 // Send schickt eine vollständige Textnachricht an eine WebSocket-Verbindung.
 func (c *WebChannel) Send(chatID string, text string) error {
 	if v, ok := c.conns.Load(chatID); ok {
-		conn := v.(*websocket.Conn)
-		return conn.WriteJSON(WsOutgoing{Type: "message", Text: text})
+		return v.(*wsConn).writeJSON(WsOutgoing{Type: "message", Text: text})
 	}
 	return fmt.Errorf("web: keine Verbindung für chatID %s", chatID)
 }
@@ -99,16 +119,25 @@ func (c *WebChannel) SendPhoto(chatID string, imageURL string, caption string) e
 // TypingIndicator sendet einen Tipp-Indikator an den Browser.
 func (c *WebChannel) TypingIndicator(chatID string) {
 	if v, ok := c.conns.Load(chatID); ok {
-		conn := v.(*websocket.Conn)
-		conn.WriteJSON(WsOutgoing{Type: "typing"}) //nolint:errcheck
+		v.(*wsConn).writeJSON(WsOutgoing{Type: "typing"}) //nolint:errcheck
 	}
 }
 
 // SendChunk sendet einen Streaming-Chunk an eine WebSocket-Verbindung.
+// Sonderfälle (via Präfix-Konvention):
+//   - "\x00typing"      → Typing-Indikator-Frame
+//   - "\x00audio:<b64>" → Audio-Frame (OGG/Opus, base64-kodiert)
 func (c *WebChannel) SendChunk(chatID, chunk string) {
 	if v, ok := c.conns.Load(chatID); ok {
-		conn := v.(*websocket.Conn)
-		conn.WriteJSON(WsOutgoing{Type: "chunk", Text: chunk}) //nolint:errcheck
+		wc := v.(*wsConn)
+		switch {
+		case chunk == "\x00typing":
+			wc.writeJSON(WsOutgoing{Type: "typing"}) //nolint:errcheck
+		case len(chunk) > 7 && chunk[:7] == "\x00audio:":
+			wc.writeJSON(WsOutgoing{Type: "audio", Data: chunk[7:], Mime: "audio/ogg"}) //nolint:errcheck
+		default:
+			wc.writeJSON(WsOutgoing{Type: "chunk", Text: chunk}) //nolint:errcheck
+		}
 	}
 }
 
@@ -123,7 +152,8 @@ func (c *WebChannel) HandleConnection(ctx context.Context, w http.ResponseWriter
 
 	// Eindeutige ConnID
 	connID := fmt.Sprintf("web-%d-%d", time.Now().UnixNano(), rand.Intn(99999))
-	c.conns.Store(connID, conn)
+	wc := &wsConn{conn: conn}
+	c.conns.Store(connID, wc)
 	defer func() {
 		c.conns.Delete(connID)
 		conn.Close()
@@ -132,9 +162,9 @@ func (c *WebChannel) HandleConnection(ctx context.Context, w http.ResponseWriter
 
 	log.Printf("[WebChannel] Neue Verbindung: %s", connID)
 
-	// Ping-Pong Keep-Alive
+	// Ping-Pong Keep-Alive: Pong-Handler setzt nur Read-Deadline zurück (kein Write nötig)
 	conn.SetPongHandler(func(string) error {
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		conn.SetReadDeadline(time.Now().Add(120 * time.Second))
 		return nil
 	})
 
@@ -148,7 +178,7 @@ func (c *WebChannel) HandleConnection(ctx context.Context, w http.ResponseWriter
 				return
 			case <-pingTicker.C:
 				if v, ok := c.conns.Load(connID); ok {
-					v.(*websocket.Conn).WriteMessage(websocket.PingMessage, nil) //nolint:errcheck
+					v.(*wsConn).writeMessage(websocket.PingMessage, nil) //nolint:errcheck
 				} else {
 					return
 				}
@@ -163,7 +193,8 @@ func (c *WebChannel) HandleConnection(ctx context.Context, w http.ResponseWriter
 		default:
 		}
 
-		conn.SetReadDeadline(time.Now().Add(60 * time.Second))
+		// Großzügiges Timeout: 120s – genug für lange AI-Antworten + Ping/Pong
+		conn.SetReadDeadline(time.Now().Add(120 * time.Second))
 
 		var raw json.RawMessage
 		if err := conn.ReadJSON(&raw); err != nil {
@@ -180,26 +211,32 @@ func (c *WebChannel) HandleConnection(ctx context.Context, w http.ResponseWriter
 			continue
 		}
 
+		log.Printf("[WebChannel] Frame empfangen: type=%s connID=%s", frame.Type, connID)
+
 		msg, err := c.buildMessage(connID, frame)
 		if err != nil {
-			conn.WriteJSON(WsOutgoing{Type: "error", Text: err.Error()}) //nolint:errcheck
+			log.Printf("[WebChannel] buildMessage-Fehler: %v", err)
+			wc.writeJSON(WsOutgoing{Type: "error", Text: err.Error()}) //nolint:errcheck
 			continue
 		}
 
 		if c.streamHandler == nil {
-			conn.WriteJSON(WsOutgoing{Type: "error", Text: "Kein Agent verbunden."}) //nolint:errcheck
+			log.Printf("[WebChannel] WARNUNG: kein streamHandler gesetzt!")
+			wc.writeJSON(WsOutgoing{Type: "error", Text: "Kein Agent verbunden."}) //nolint:errcheck
 			continue
 		}
 
 		// Streaming in eigener Goroutine – non-blocking
 		go func(m Message, connID string) {
+			log.Printf("[WebChannel] streamHandler gestartet für %s", connID)
 			sendChunk := func(chunk string) {
 				c.SendChunk(connID, chunk)
 			}
 			c.streamHandler(ctx, m, sendChunk)
+			log.Printf("[WebChannel] streamHandler abgeschlossen für %s", connID)
 			// Stream-Ende signalisieren
 			if v, ok := c.conns.Load(connID); ok {
-				v.(*websocket.Conn).WriteJSON(WsOutgoing{Type: "done"}) //nolint:errcheck
+				v.(*wsConn).writeJSON(WsOutgoing{Type: "done"}) //nolint:errcheck
 			}
 		}(msg, connID)
 	}
