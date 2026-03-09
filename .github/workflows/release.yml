@@ -110,7 +110,7 @@ jobs:
 
           echo "→ Windows amd64"
           GOOS=windows GOARCH=amd64 \
-            go build -ldflags="-s -w -X main.version=${VERSION}" \
+            go build -ldflags="-s -w -X main.version=${VERSION} -H windowsgui" \
             -o dist/fluxbot-windows-amd64.exe ./cmd/fluxbot/
 
           echo "→ Linux amd64"

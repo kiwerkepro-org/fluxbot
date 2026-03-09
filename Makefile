@@ -9,7 +9,9 @@ MODULE  = github.com/ki-werke/fluxbot
 VERSION = $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 
 # Build-Flags: kein CGO, Debug-Symbole entfernen (kleinere Binaries)
-LDFLAGS = -s -w -X main.version=$(VERSION)
+LDFLAGS         = -s -w -X main.version=$(VERSION)
+# Windows: -H windowsgui → kein Konsolenfenster, Prozess unabhängig von Terminal
+LDFLAGS_WINDOWS = -s -w -X main.version=$(VERSION) -H windowsgui
 
 # Ausgabe-Verzeichnis für Cross-Builds
 DIST = dist
@@ -62,11 +64,11 @@ build-linux-arm:
 		./cmd/fluxbot
 	@echo "✅ $(DIST)/fluxbot-linux-arm64"
 
-## build-windows: Windows Binary (amd64)
+## build-windows: Windows Binary (amd64) – läuft ohne Konsolenfenster
 build-windows:
 	@mkdir -p $(DIST)
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
-		-ldflags="$(LDFLAGS)" \
+		-ldflags="$(LDFLAGS_WINDOWS)" \
 		-o $(DIST)/fluxbot-windows-amd64.exe \
 		./cmd/fluxbot
 	@echo "✅ $(DIST)/fluxbot-windows-amd64.exe"
