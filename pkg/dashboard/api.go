@@ -734,15 +734,24 @@ func (s *Server) handleSystemRestart(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"status": "restarting"})
 
 	go func() {
-		time.Sleep(300 * time.Millisecond)
+		// Kurz warten damit HTTP-Antwort den Browser erreicht
+		time.Sleep(500 * time.Millisecond)
+
 		exe, err := os.Executable()
 		if err != nil {
-			log.Printf("[Restart] Executable-Pfad nicht ermittelbar: %v", err)
+			log.Printf("[Restart] FEHLER: os.Executable() fehlgeschlagen: %v", err)
 			os.Exit(1)
 		}
+		log.Printf("[Restart] Starte Neustart: exe=%s", exe)
+
 		if err := startDetached(exe, os.Args[1:]); err != nil {
-			log.Printf("[Restart] Neustart fehlgeschlagen: %v", err)
+			log.Printf("[Restart] FEHLER: startDetached fehlgeschlagen: %v", err)
+			// Trotzdem beenden – PowerShell-Fehler sind selten fatale Fehler
+		} else {
+			log.Printf("[Restart] PowerShell-Restart-Prozess gestartet – beende aktuellen Prozess...")
 		}
+
+		time.Sleep(200 * time.Millisecond)
 		os.Exit(0)
 	}()
 }

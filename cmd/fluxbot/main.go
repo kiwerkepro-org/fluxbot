@@ -87,6 +87,12 @@ func main() {
 
 	printBanner()
 
+	// Vom Terminal lösen damit FluxBot nicht stirbt wenn das Konsolenfenster geschlossen wird.
+	// Im Debug-Modus bleibt die Konsole verbunden (Entwickler sieht Ausgabe direkt).
+	if !*debug {
+		detachConsole()
+	}
+
 	if _, err := os.Stat(*configPath); os.IsNotExist(err) {
 		log.Println("[Main] Keine config.json gefunden – Einrichtungsassistent wird gestartet...")
 		if err := setup.RunWizard(*configPath); err != nil {
@@ -105,7 +111,7 @@ func main() {
 		cancel()
 	}()
 
-	runBot(ctx, *configPath)
+	runBot(ctx, *configPath, *debug)
 	log.Println("[Main] FluxBot beendet. Tschüss!")
 }
 
@@ -116,7 +122,7 @@ func printBanner() {
 	log.Println("╚══════════════════════════════════════╝")
 }
 
-func runBot(ctx context.Context, configPath string) {
+func runBot(ctx context.Context, configPath string, debugMode bool) {
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		log.Fatalf("[Main] Konfigurationsfehler: %v\n  → Kopiere workspace/config.example.json nach workspace/config.json", err)
@@ -130,7 +136,12 @@ func runBot(ctx context.Context, configPath string) {
 	if err := os.MkdirAll(logsDir, 0755); err == nil {
 		logPath := filepath.Join(logsDir, "fluxbot.log")
 		if logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644); err == nil {
-			log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+			if debugMode {
+				log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+			} else {
+				// Nach detachConsole() ist stdout nicht mehr gültig → nur in Datei loggen
+				log.SetOutput(logFile)
+			}
 			log.Printf("[Main] Terminal-Log: %s", logPath)
 		}
 	}

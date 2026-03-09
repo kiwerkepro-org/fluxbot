@@ -164,10 +164,10 @@ BROWSER_ALLOWED_DOMAINS ← kommagetrennte Whitelist (leer = alle, nicht empfohl
 
 ```powershell
 # Neue .exe bauen (nach Code-Änderungen)
-# WICHTIG: -H windowsgui → kein Konsolenfenster, Terminal-unabhängig
+# WICHTIG: KEIN -H windowsgui → FreeConsole() in main.go macht Prozess Terminal-unabhängig
 cd C:\Users\jjs-w\DEVELOPING\F1000-FLUXBOT
 go mod tidy
-go build -ldflags="-s -w -H windowsgui" -o fluxbot.exe ./cmd/fluxbot
+go build -o fluxbot.exe ./cmd/fluxbot
 
 # Laufenden Prozess stoppen + neu starten
 Stop-Process -Name fluxbot -Force -ErrorAction SilentlyContinue

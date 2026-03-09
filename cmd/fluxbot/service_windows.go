@@ -85,7 +85,7 @@ func runAsWindowsService(ctx context.Context, cancel context.CancelFunc, configP
 	// Bot in Goroutine starten
 	go func() {
 		printBanner()
-		runBot(ctx, configPath)
+		runBot(ctx, configPath, false)
 		cancel() // Bot hat sich beendet → Service stoppen
 	}()
 

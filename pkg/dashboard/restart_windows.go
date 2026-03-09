@@ -3,24 +3,39 @@
 package dashboard
 
 import (
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"syscall"
 )
 
 const (
-	createBreakawayFromJob = 0x01000000 // Kind-Prozess verlässt den Job-Object (Task Scheduler)
-	createNoWindow         = 0x08000000 // Kein Konsolenfenster – Prozess stirbt nicht wenn Terminal geschlossen wird
+	createBreakawayFromJob = 0x01000000
+	createNoWindow         = 0x08000000
 )
 
-// startDetached startet einen neuen Prozess, der vollständig vom aktuellen getrennt ist.
-//   - CREATE_NEW_PROCESS_GROUP: eigene Prozessgruppe → kein CTRL+C vom Parent
-//   - CREATE_BREAKAWAY_FROM_JOB: verlässt Task Scheduler Job-Object
-//   - CREATE_NO_WINDOW: kein Konsolenfenster → überlebt das Schließen des Terminals
-//   - cmd.Dir: explizit auf EXE-Verzeichnis gesetzt → korrektes Working Directory nach Restart
+// startDetached startet FluxBot neu über PowerShell Start-Process.
+//
+// Ablauf:
+//  1. PowerShell startet (hidden, kein Fenster, getrennt vom aktuellen Prozess)
+//  2. PowerShell wartet 1.5s (alter FluxBot-Prozess hat Zeit zu sterben + Port freizugeben)
+//  3. Start-Process startet neues fluxbot.exe mit korrektem WorkingDirectory + WindowStyle Hidden
+//
+// Vorteile gegenüber direktem cmd.Start():
+//   - Kein Port-Konflikt: neuer Prozess startet erst nach dem Tod des alten
+//   - Start-Process -WindowStyle Hidden: kein Konsolenfenster, terminal-unabhängig
+//   - Bewährter Windows-Mechanismus (identisch mit install.ps1)
 func startDetached(exe string, args []string) error {
-	cmd := exec.Command(exe, args...)
-	cmd.Dir = filepath.Dir(exe)
+	dir := filepath.Dir(exe)
+	psCmd := fmt.Sprintf(
+		`Start-Sleep -Milliseconds 1500; Start-Process -FilePath '%s' -WorkingDirectory '%s' -WindowStyle Hidden`,
+		exe, dir,
+	)
+	cmd := exec.Command("powershell.exe",
+		"-NonInteractive",
+		"-WindowStyle", "Hidden",
+		"-Command", psCmd,
+	)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP | createBreakawayFromJob | createNoWindow,
 	}

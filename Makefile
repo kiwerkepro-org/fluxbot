@@ -10,8 +10,8 @@ VERSION = $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev"
 
 # Build-Flags: kein CGO, Debug-Symbole entfernen (kleinere Binaries)
 LDFLAGS         = -s -w -X main.version=$(VERSION)
-# Windows: -H windowsgui → kein Konsolenfenster, Prozess unabhängig von Terminal
-LDFLAGS_WINDOWS = -s -w -X main.version=$(VERSION) -H windowsgui
+# Windows: kein -H windowsgui – stattdessen FreeConsole() in main() für Terminal-Unabhängigkeit
+LDFLAGS_WINDOWS = -s -w -X main.version=$(VERSION)
 
 # Ausgabe-Verzeichnis für Cross-Builds
 DIST = dist
