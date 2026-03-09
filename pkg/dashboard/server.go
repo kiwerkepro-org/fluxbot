@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -176,10 +177,11 @@ func (s *Server) Start(ctx context.Context) {
 	mux.HandleFunc("/api/system/restart", s.auth(s.hmacVerify(s.handleSystemRestart)))              // POST: Neustart (HMAC)
 
 	// ── Web-Chat (P15: Standalone Chat App) ─────────────────────────────────
-	mux.HandleFunc("/chat", s.auth(s.handleChatUI))             // Chat-Frontend (HTML)
-	mux.HandleFunc("/ws", s.auth(s.handleChatWS))               // WebSocket-Endpoint
-	mux.HandleFunc("/chat.webmanifest", s.handleChatManifest)   // PWA-Manifest
-	mux.HandleFunc("/chat-sw.js", s.handleChatServiceWorker)    // Service Worker
+	// /chat: öffentlich wie / – Auth erfolgt client-seitig via Login-Overlay
+	mux.HandleFunc("/chat", s.handleChatUI)                    // Chat-Frontend (HTML, kein server-seitiges Auth)
+	mux.HandleFunc("/ws", s.handleChatWS)                      // WebSocket – Auth via Query-Param ?auth=
+	mux.HandleFunc("/chat.webmanifest", s.handleChatManifest)  // PWA-Manifest
+	mux.HandleFunc("/chat-sw.js", s.handleChatServiceWorker)   // Service Worker
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),
@@ -371,7 +373,33 @@ func (s *Server) handleChatUI(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleChatWS leitet WebSocket-Verbindungen an den WebChannel weiter (P15).
+// Auth via ?auth=base64(user:pass) Query-Parameter (WebSocket unterstützt keine custom Headers).
 func (s *Server) handleChatWS(w http.ResponseWriter, r *http.Request) {
+	// Auth prüfen
+	s.passwordMu.RLock()
+	pw := s.password
+	s.passwordMu.RUnlock()
+	if pw != "" {
+		s.usernameMu.RLock()
+		expectedUser := s.username
+		s.usernameMu.RUnlock()
+
+		authParam := r.URL.Query().Get("auth")
+		if authParam == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		decoded, err := base64.StdEncoding.DecodeString(authParam)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		parts := strings.SplitN(string(decoded), ":", 2)
+		if len(parts) != 2 || parts[1] != pw || (expectedUser != "" && parts[0] != expectedUser) {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
 	if s.wsHandler == nil {
 		http.Error(w, "Web-Chat nicht aktiv", http.StatusServiceUnavailable)
 		return
