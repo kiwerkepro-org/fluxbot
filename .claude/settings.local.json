@@ -34,7 +34,8 @@
       "Bash(Get-Process:*)",
       "Bash(cmd.exe:*)",
       "Bash(node:*)",
-      "Bash(schtasks:*)"
+      "Bash(schtasks:*)",
+      "Bash(go get:*)"
     ]
   }
 }

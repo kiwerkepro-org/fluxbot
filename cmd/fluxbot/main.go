@@ -36,7 +36,7 @@ import (
 
 // version wird per -ldflags="-X main.version=vX.Y.Z" beim Build gesetzt.
 // Lokal / ohne ldflags bleibt der Wert "dev".
-var version = "v1.2.5"
+var version = "v1.2.6"
 
 func main() {
 	configPath        := flag.String("config", "./workspace/config.json", "Pfad zur Konfigurationsdatei")
@@ -86,6 +86,17 @@ func main() {
 	}
 
 	printBanner()
+
+	// Working Directory auf das Verzeichnis der EXE setzen.
+	// Registry-Run-Einträge starten ohne WorkingDirectory → CWD wäre das User-Home.
+	// Relative Pfade (z.B. "./workspace/config.json") funktionieren dann nicht.
+	if exe, err := os.Executable(); err == nil {
+		if exeDir := filepath.Dir(exe); exeDir != "." {
+			if err := os.Chdir(exeDir); err == nil {
+				log.Printf("[Main] Working Directory: %s", exeDir)
+			}
+		}
+	}
 
 	// Vom Terminal lösen damit FluxBot nicht stirbt wenn das Konsolenfenster geschlossen wird.
 	// Im Debug-Modus bleibt die Konsole verbunden (Entwickler sieht Ausgabe direkt).

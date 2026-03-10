@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"time"
 )
@@ -89,13 +90,20 @@ func RunWizard(configPath string) error {
 		data, err := json.MarshalIndent(cfg, "", "  ")
 		if err != nil {
 			http.Error(w, "JSON-Fehler: "+err.Error(), http.StatusInternalServerError)
-			done <- err
+			go func() { time.Sleep(500 * time.Millisecond); done <- err }()
+			return
+		}
+
+		// Verzeichnis anlegen falls nicht vorhanden (z.B. erster Start)
+		if err := os.MkdirAll(filepath.Dir(configPath), 0700); err != nil {
+			http.Error(w, "Konnte Verzeichnis nicht anlegen: "+err.Error(), http.StatusInternalServerError)
+			go func() { time.Sleep(500 * time.Millisecond); done <- err }()
 			return
 		}
 
 		if err := os.WriteFile(configPath, data, 0600); err != nil {
 			http.Error(w, "Konnte config.json nicht schreiben: "+err.Error(), http.StatusInternalServerError)
-			done <- err
+			go func() { time.Sleep(500 * time.Millisecond); done <- err }()
 			return
 		}
 
@@ -110,10 +118,12 @@ func RunWizard(configPath string) error {
 	})
 
 	srv := &http.Server{
-		Addr:         listenAddr,
-		Handler:      mux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		Addr:    listenAddr,
+		Handler: mux,
+		// Kein ReadTimeout/WriteTimeout – der User soll sich beim Ausfüllen
+		// so viel Zeit lassen wie er braucht. Ein kurzes Timeout würde die
+		// Keep-Alive-Verbindung schließen und beim POST "Failed to fetch" auslösen.
+		IdleTimeout: 30 * time.Minute,
 	}
 
 	go func() {

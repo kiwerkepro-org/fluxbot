@@ -190,20 +190,26 @@ git push origin main
 
 ## Aktueller Stand
 
-- **Letzte Session:** 58 (2026-03-09) – P15 Web Chat App + Voice Conversation ✅ LIVE
+- **Letzte Session:** 59 (2026-03-10) – KI-WERKE Brand System Redesign + Bugfixes ✅ LIVE
 - **Nächste Aktion:** P15 Phase 2 (React Native, separates Projekt) oder P13/P14 aus Roadmap
-- **Aktueller Release:** `v1.2.5` ✅ RELEASED (nächste: v1.2.6)
+- **Aktueller Release:** `v1.2.6` ✅ RELEASED (nächste: v1.2.7)
 - **Browser Integration:** playwright-go v0.5700.1 ✅ VOLL FUNKTIONAL
 - **Dark Mode:** ✅ LIVE – Theme-Toggle im Sidebar-Footer
 - **Autostart:** ✅ FUNKTIONAL – Windows Registry + Task Scheduler
 
+### Session 59 Summary (2026-03-10) – KI-WERKE BRAND SYSTEM REDESIGN
+- ✅ **Setup-Wizard Bugfix:** `Failed to fetch` → ReadTimeout entfernt, Race-Condition gefixt, `os.MkdirAll()` hinzugefügt
+- ✅ **CWD-Fix:** `main.go` setzt Working Directory auf Exe-Verzeichnis (Registry-Run-Kompatibilität)
+- ✅ **Dashboard Redesign:** KI-WERKE Brand System – Deep Navy, Panel Grey, Cyan Neon, Light/Dark Toggle, kontraststarke Light-Mode-Farben
+- ✅ **Chat Redesign:** Gleiche Palette, CSS-Variable-Bug gefixt (Legacy-Aliases außerhalb `:root`), `--kiw-accent` in Light Mode überschrieben
+- ✅ **Release:** `v1.2.6` getaggt und gepusht
+
 ### P15 Status (Standalone Chat App)
-- **Phase 1 – Web App + PWA:** 🚀 GEPLANT (diese Session)
-  - Chat unter `http://localhost:9090/chat`
-  - WebSocket + Streaming
-  - Bild-Upload, Spracheingabe, Chat-Verlauf
-  - Responsive + PWA-Installation auf Handy
-  - Plan: `memory-md/08-p15-plan.md`
+- **Phase 1 – Web App + PWA:** ✅ LIVE (v1.2.5)
+  - Gemini-Style Chat unter `http://localhost:9090/chat`
+  - Spracheingabe (STT Groq) + Sprachausgabe (Google Chirp TTS + Browser-Fallback)
+  - Transkription in User-Bubble sichtbar, Bild-Upload, Markdown, Chat-Verlauf
+  - PWA – auf Handy installierbar, "Chat öffnen" Button im Dashboard
 - **Phase 2 – React Native App:** 📋 Spätere Session (eigenes Repo)
 
 ### Session 50 Summary (2026-03-08) – P12 DARK/LIGHT MODE THEME TOGGLE

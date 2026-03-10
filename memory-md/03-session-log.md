@@ -5,7 +5,38 @@
 
 ---
 
-## Session 58 – P15 Phase 1: Web Chat App + Voice Conversation (2026-03-09)
+## Session 59 – KI-WERKE Brand System Redesign + Bugfixes (2026-03-10)
+
+**Fokus:** Dashboard & Chat Redesign nach KI-WERKE Brand System + Setup-Wizard-Bugfix + CWD-Fix
+
+### Bugfixes:
+- ✅ **Setup-Wizard `Failed to fetch`** – Root Cause: `ReadTimeout: 10s` schloss Keep-Alive-Verbindungen; Benutzer der länger als 10s das Formular ausfüllte bekam `Failed to fetch` auf POST
+  - `ReadTimeout` + `WriteTimeout` entfernt → `IdleTimeout: 30min`
+  - Race-Condition bei Fehlerfall: `done <- err` jetzt in Goroutine mit 500ms Delay
+  - `os.MkdirAll()` vor `os.WriteFile()` – workspace-Verzeichnis wird ggf. angelegt
+- ✅ **CWD-Fix in main.go** – Working Directory wird beim Start auf Exe-Verzeichnis gesetzt (Registry-Run-Einträge starten ohne WorkingDirectory → relative Pfade funktionierten nicht)
+
+### KI-WERKE Brand System Redesign:
+- ✅ **Dashboard (`dashboard.html`)** – komplett nach KI-WERKE Brand System umgestaltet
+  - Deep Navy `#0A0F1A` als Background, Panel Grey `#111827` für Cards
+  - Cyan Neon `#00E0B8` für Buttons, Icons, Akzente
+  - Lucide Icons alle auf Cyan
+  - Light/Dark Toggle reaktiviert (Sidebar-Footer)
+  - Light Mode: kontraststarke Farben (`--green: #16a34a`, `--accent: #007A65`, `--yellow: #b45309`, `--red: #dc2626`)
+  - Danger Zone `.blur-hint .click-btn`: `color: #0A0F1A` (dunkel auf Cyan)
+- ✅ **Chat (`chat.html`)** – komplett nach KI-WERKE Brand System umgestaltet
+  - Gleiche Farbpalette wie Dashboard
+  - CSS-Variable-Bug gefixt: Legacy-Aliases lagen außerhalb `:root` → jetzt korrekt drin
+  - `--kiw-accent: #007A65` im Light-Mode-Block → Überschriften kontrastreich
+  - Light/Dark Toggle im Chat-Sidebar-Footer
+  - `initTheme()` + `lucide.createIcons()` beim Startup
+
+### Release:
+- ✅ **v1.2.6** – Build + Tag + Push
+
+---
+
+## Session 58 – P15 Phase 1: Web Chat App + Voice Conversation KOMPLETT (2026-03-09)
 
 **Fokus:** Gemini-Style Web Chat mit Spracheingabe + Sprachausgabe
 
@@ -26,8 +57,12 @@
 ### Root Cause der WS-Probleme war JS-Fehler:
 `container.innerHTML = ''` zerstörte `#welcome` DOM-Element → `getElementById('welcome')` → null → crash in appendMessageEl → JS komplett kaputt
 
-### Commit: `d20d3d1`
+### Weitere Commits dieser Session:
+- `e95e112` – Chat-Button im Dashboard + Voice UX (Transkription sichtbar, robusteres Recording)
+- `d4a54ca` – Version auf v1.2.5 gesetzt (Updater-Falschalarm behoben)
+
 ### Release: `v1.2.5` ✅ PUBLISHED
+### Wichtig für Zukunft: `var version` in `cmd/fluxbot/main.go` immer mit Release-Tag synchron halten!
 
 ---
 

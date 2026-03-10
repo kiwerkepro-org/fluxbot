@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="de" data-theme="light">
+<html lang="de">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,18 +11,24 @@
   a:hover { opacity: 0.8; }
   input[type="email"] { background: var(--input-bg) !important; color: var(--text) !important; }
 
-  /* Light Mode (Default) */
+  /* KI-WERKE Brand System */
   :root {
-    --bg: #ffffff; --sidebar: #f8f9fa; --card: #ffffff; --border: #e0e0e0;
-    --accent: #5b8dee; --accent2: #7c5cbf; --green: #3ecf8e;
-    --red: #e25d5d; --yellow: #f5a623; --text: #1a1a1a; --muted: #666666; --input-bg: #f5f5f5;
+    --kiw-bg: #0A0F1A; --kiw-panel: #111827; --kiw-accent: #00E0B8;
+    --kiw-text: #F4F5F7; --kiw-text-muted: #9CA3AF; --kiw-border: #1F2937;
+    /* Semantic aliases */
+    --bg: #0A0F1A; --sidebar: #111827; --card: #111827; --border: #1F2937;
+    --accent: #00E0B8; --accent2: #00b89a; --green: #3ecf8e;
+    --red: #e25d5d; --yellow: #f5a623; --text: #F4F5F7; --muted: #9CA3AF;
+    --input-bg: #0d1424;
   }
-
-  /* Dark Mode */
-  html[data-theme="dark"] {
-    --bg: #0f1117; --sidebar: #161b27; --card: #1e2535; --border: #2a3347;
-    --accent: #5b8dee; --accent2: #7c5cbf; --green: #3ecf8e;
-    --red: #e25d5d; --yellow: #f5a623; --text: #e2e8f0; --muted: #8892a4; --input-bg: #0f1117;
+  html[data-theme="light"] {
+    --kiw-bg: #F4F5F7; --kiw-panel: #FFFFFF; --kiw-border: #E5E7EB;
+    --kiw-text: #0A0F1A; --kiw-text-muted: #6B7280;
+    --bg: #F4F5F7; --sidebar: #FFFFFF; --card: #FFFFFF; --border: #E5E7EB;
+    --text: #0A0F1A; --muted: #6B7280; --input-bg: #F3F4F6;
+    /* Farben für Kontrast auf hellem Hintergrund */
+    --accent: #007A65; --accent2: #006654;
+    --green: #16a34a; --red: #dc2626; --yellow: #b45309;
   }
 
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); display: flex; height: 100vh; overflow: hidden; }
@@ -34,7 +40,7 @@
   .logo span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
   .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 20px; cursor: pointer; color: var(--muted); font-size: 14px; transition: all 0.15s; border-left: 3px solid transparent; }
   .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.04); }
-  .nav-item.active { color: var(--accent); background: rgba(91,141,238,0.1); border-left-color: var(--accent); }
+  .nav-item.active { color: var(--accent); background: rgba(0,224,184,0.08); border-left-color: var(--accent); }
   .nav-icon { font-size: 16px; width: 20px; text-align: center; }
   .sidebar-footer { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
 
@@ -54,7 +60,7 @@
   .card-value.blue { color: var(--accent); }
   .card-value.yellow { color: var(--yellow); }
   .channel-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-  .channel-tag { background: rgba(91,141,238,0.15); color: var(--accent); border: 1px solid rgba(91,141,238,0.3); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 500; }
+  .channel-tag { background: rgba(0,224,184,0.12); color: var(--accent); border: 1px solid rgba(0,224,184,0.3); border-radius: 20px; padding: 4px 12px; font-size: 12px; font-weight: 500; }
 
   /* ── Forms ── */
   .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 24px; margin-bottom: 20px; }
@@ -88,12 +94,12 @@
 
   /* ── Buttons ── */
   .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 7px; font-size: 14px; font-weight: 500; border: none; cursor: pointer; transition: all 0.15s; }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: #4a7ee0; }
+  .btn-primary { background: var(--accent); color: #0A0F1A; font-weight: 600; }
+  .btn-primary:hover { background: #00c4a0; }
   .btn-success { background: var(--green); color: #0f1117; }
   .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
   .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
-  .pair-filter.active { border-color: var(--accent); color: var(--accent); background: rgba(91,141,238,0.1); }
+  .pair-filter.active { border-color: var(--accent); color: var(--accent); background: rgba(0,224,184,0.08); }
   .btn-danger { background: var(--red); color: #fff; }
   .btn-danger:hover { background: #c94f4f; }
   .actions { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
@@ -133,31 +139,30 @@
   /* ── Tile Layout (Provider / Voice) ── */
   .tile-layout { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
   @media(max-width: 900px) { .tile-layout { grid-template-columns: 1fr; } }
-  .info-card { background: linear-gradient(135deg, rgba(91,141,238,0.07), rgba(124,92,191,0.07)); border: 1px solid rgba(91,141,238,0.22); border-radius: 12px; padding: 20px; position: sticky; top: 0; }
+  .info-card { background: linear-gradient(135deg, rgba(0,224,184,0.05), rgba(0,184,154,0.05)); border: 1px solid rgba(0,224,184,0.18); border-radius: 12px; padding: 20px; position: sticky; top: 0; }
   .info-card h4 { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 10px; }
   .info-card p { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 12px; }
-  .info-card .info-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 13px; text-decoration: none; border: 1px solid rgba(91,141,238,0.3); border-radius: 6px; padding: 6px 14px; transition: all 0.15s; }
-  .info-card .info-link:hover { background: rgba(91,141,238,0.12); }
+  .info-card .info-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 13px; text-decoration: none; border: 1px solid rgba(0,224,184,0.3); border-radius: 6px; padding: 6px 14px; transition: all 0.15s; }
+  .info-card .info-link:hover { background: rgba(0,224,184,0.1); }
   .info-card .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
   .info-card .other-list { font-size: 12px; color: var(--muted); line-height: 2.2; }
   .info-card .other-list strong { color: var(--text); }
   .info-card .other-list { line-height: 1.5; }
   .smtp-prov-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 6px 14px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
-  .smtp-prov-btn:hover { background: rgba(91,141,238,0.12); border-color: rgba(91,141,238,0.4); color: var(--accent); }
-  .smtp-prov-btn.active { background: rgba(91,141,238,0.15); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .smtp-prov-btn:hover { background: rgba(0,224,184,0.08); border-color: rgba(0,224,184,0.4); color: var(--accent); }
+  .smtp-prov-btn.active { background: rgba(0,224,184,0.12); border-color: var(--accent); color: var(--accent); font-weight: 600; }
 
   /* ── Blur Overlay (JSON / Soul) ── */
   .blur-wrap { position: relative; border-radius: 8px; overflow: hidden; }
   .blurred { filter: blur(5px); pointer-events: none; user-select: none; }
-  .blur-overlay { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.15); cursor: pointer; transition: background 0.2s; }
-  html[data-theme="dark"] .blur-overlay { background: rgba(15,17,23,0.35); }
-  .blur-overlay:hover { background: rgba(91,141,238,0.1); }
+  .blur-overlay { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; background: rgba(10,15,26,0.5); cursor: pointer; transition: background 0.2s; }
+  .blur-overlay:hover { background: rgba(0,224,184,0.08); }
   .blur-hint { text-align: center; padding: 28px; }
   .blur-hint .lock-icon { font-size: 36px; display: flex; justify-content: center; align-items: center; margin-bottom: 12px; }
   .blur-hint .lock-icon svg { width: 36px; height: 36px; }
   .blur-hint strong { font-size: 16px; color: var(--text); display: block; margin-bottom: 6px; }
   .blur-hint p { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
-  .blur-hint .click-btn { display: inline-block; background: var(--accent); color: #fff; border-radius: 7px; padding: 8px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .blur-hint .click-btn { display: inline-block; background: var(--accent); color: #0A0F1A; border-radius: 7px; padding: 8px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
 
   /* ── Warning Banner ── */
   .warn-banner { background: rgba(226,93,93,0.08); border: 1px solid rgba(226,93,93,0.28); border-radius: 8px; padding: 10px 16px; font-size: 13px; color: #f08080; margin-bottom: 14px; display: flex; gap: 10px; align-items: flex-start; }
@@ -166,10 +171,8 @@
   .warn-banner strong { display: block; color: var(--red); font-size: 13px; margin-bottom: 2px; }
 
   /* ── Confirmation Modal ── */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-  html[data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.72); }
-  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.1); }
-  html[data-theme="dark"] .modal { box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px 32px; max-width: 420px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
   .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 14px; }
   .modal p { font-size: 14px; color: var(--muted); line-height: 1.65; margin-bottom: 8px; }
   .modal-confirm-text { color: var(--text); font-weight: 600; margin-top: 4px; }
@@ -179,23 +182,22 @@
   .os-selector { display: flex; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; }
   .os-btn { padding: 9px 22px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: 1px solid var(--border); background: var(--card); color: var(--muted); transition: all 0.15s; user-select: none; }
   .os-btn:hover { border-color: var(--accent); color: var(--text); }
-  .os-btn.active { background: rgba(91,141,238,0.14); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  .os-btn.active { background: rgba(0,224,184,0.1); border-color: var(--accent); color: var(--accent); font-weight: 700; }
   .system-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   @media(max-width: 700px) { .system-tiles { grid-template-columns: 1fr; } }
   .system-tile { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
   .system-tile h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
   .tile-badge { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; vertical-align: middle; }
   .tile-badge.restart { background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); }
-  .tile-badge.rebuild { background: rgba(91,141,238,0.15); color: var(--accent); border: 1px solid rgba(91,141,238,0.3); }
+  .tile-badge.rebuild { background: rgba(0,224,184,0.12); color: var(--accent); border: 1px solid rgba(0,224,184,0.3); }
   .tile-desc { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 18px; }
-  .cmd-box { background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 42px 12px 14px; font-family: 'Courier New', monospace; font-size: 12px; color: var(--text); word-break: break-all; line-height: 1.6; position: relative; margin-bottom: 14px; min-height: 48px; }
-  html[data-theme="dark"] .cmd-box { color: #a8c0d6; }
+  .cmd-box { background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 12px 42px 12px 14px; font-family: 'Courier New', monospace; font-size: 12px; color: #a8c0d6; word-break: break-all; line-height: 1.6; position: relative; margin-bottom: 14px; min-height: 48px; }
   .copy-btn { position: absolute; top: 8px; right: 8px; background: var(--border); color: var(--muted); border: none; border-radius: 5px; padding: 4px 9px; font-size: 11px; cursor: pointer; transition: all 0.15s; }
   .copy-btn:hover { background: var(--accent); color: #fff; }
-  .howto-box { background: rgba(91,141,238,0.05); border: 1px solid rgba(91,141,238,0.14); border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--muted); line-height: 1.9; }
+  .howto-box { background: rgba(0,224,184,0.04); border: 1px solid rgba(0,224,184,0.14); border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--muted); line-height: 1.9; }
   .howto-box strong { color: var(--text); }
   .howto-box a { color: var(--accent); text-decoration: none; }
-  .step-num { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; border-radius: 50%; width: 17px; height: 17px; font-size: 10px; font-weight: 700; margin-right: 4px; flex-shrink: 0; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #0A0F1A; border-radius: 50%; width: 17px; height: 17px; font-size: 10px; font-weight: 700; margin-right: 4px; flex-shrink: 0; }
   .cache-hint { background: rgba(245,166,35,0.07); border: 1px solid rgba(245,166,35,0.22); border-radius: 8px; padding: 14px 18px; font-size: 13px; color: var(--muted); line-height: 1.7; margin-top: 20px; }
   .cache-hint strong { color: var(--yellow); }
   kbd { background: var(--border); padding: 2px 7px; border-radius: 4px; font-size: 12px; color: var(--text); font-family: 'Courier New', monospace; }
@@ -203,8 +205,7 @@
   /* ── Info-Tooltip (ⓘ) ── */
   .info-btn { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 0 0 0 5px; vertical-align: middle; line-height: 1; transition: color 0.15s; }
   .info-btn:hover { color: var(--accent); }
-  #info-tooltip { position: fixed; z-index: 9000; max-width: 280px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text); line-height: 1.55; box-shadow: 0 8px 28px rgba(0,0,0,0.2); pointer-events: none; opacity: 0; transition: opacity 0.15s; }
-  html[data-theme="dark"] #info-tooltip { box-shadow: 0 8px 28px rgba(0,0,0,0.45); }
+  #info-tooltip { position: fixed; z-index: 9000; max-width: 280px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: var(--text); line-height: 1.55; box-shadow: 0 8px 28px rgba(0,0,0,0.45); pointer-events: none; opacity: 0; transition: opacity 0.15s; }
   #info-tooltip.show { opacity: 1; }
 
   /* ── Hilfe Section ── */
@@ -229,7 +230,7 @@
   .help-table tr:last-child td { border-bottom: none; }
   .help-table td:first-child { color: var(--text); font-weight: 500; white-space: nowrap; }
   .help-code { background: rgba(0,0,0,0.3); border-radius: 5px; padding: 2px 7px; font-family: 'Courier New', monospace; font-size: 12px; color: #a8d8a8; }
-  .help-tag { display: inline-block; background: rgba(91,141,238,0.12); color: var(--accent); border: 1px solid rgba(91,141,238,0.25); border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: 600; margin: 1px; }
+  .help-tag { display: inline-block; background: rgba(0,224,184,0.1); color: var(--accent); border: 1px solid rgba(0,224,184,0.25); border-radius: 10px; padding: 1px 8px; font-size: 11px; font-weight: 600; margin: 1px; }
   .help-tag.red { background: rgba(226,93,93,0.12); color: var(--red); border-color: rgba(226,93,93,0.25); }
   .help-tag.green { background: rgba(62,207,142,0.12); color: var(--green); border-color: rgba(62,207,142,0.25); }
   .help-no-result { text-align: center; padding: 60px 0; color: var(--muted); font-size: 14px; display: none; }
@@ -245,7 +246,7 @@
   .vt-table tr:hover td { background: rgba(255,255,255,0.025); }
   .vt-badge-safe    { display: inline-block; background: rgba(62,207,142,0.15); color: var(--green); border: 1px solid rgba(62,207,142,0.3); border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
   .vt-badge-blocked { display: inline-block; background: rgba(226,93,93,0.15); color: var(--red); border: 1px solid rgba(226,93,93,0.3); border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
-  .vt-badge-cached  { display: inline-block; background: rgba(91,141,238,0.12); color: var(--accent); border: 1px solid rgba(91,141,238,0.25); border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
+  .vt-badge-cached  { display: inline-block; background: rgba(0,224,184,0.1); color: var(--accent); border: 1px solid rgba(0,224,184,0.25); border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; }
   .vt-type-file { color: var(--yellow); font-size: 13px; }
   .vt-type-url  { color: var(--accent); font-size: 13px; }
   .vt-empty { text-align: center; padding: 40px 0; color: var(--muted); font-size: 14px; }
@@ -282,8 +283,8 @@
   .login-field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
   .login-field input { width: 100%; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 14px; outline: none; transition: border-color 0.15s; }
   .login-field input:focus { border-color: var(--accent); }
-  .login-btn { width: 100%; padding: 11px; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background 0.15s; }
-  .login-btn:hover { background: #4a7de0; }
+  .login-btn { width: 100%; padding: 11px; background: var(--accent); color: #0A0F1A; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background 0.15s; }
+  .login-btn:hover { background: #00c4a0; }
   .login-error { color: var(--red); font-size: 13px; text-align: center; margin-top: 10px; min-height: 18px; }
   .login-forgot { text-align: center; margin-top: 14px; font-size: 13px; color: var(--muted); }
   .login-forgot a { color: var(--accent); cursor: pointer; }
@@ -372,7 +373,7 @@
   <div class="sidebar-footer">
     <div style="margin-bottom:8px">KI-WERKE · FluxBot <span id="footer-version">…</span></div>
     <button onclick="window.open('/chat','_blank')" style="width:100%;padding:6px 10px;margin-bottom:8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.25);border-radius:6px;color:#22c55e;font-size:12px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px" onmouseover="this.style.background='rgba(34,197,94,0.2)'" onmouseout="this.style.background='rgba(34,197,94,0.1)'"><i data-lucide="message-circle" style="width:13px;height:13px"></i> Chat öffnen</button>
-    <button onclick="toggleTheme()" style="width:100%;padding:6px 10px;margin-bottom:8px;background:rgba(91,141,238,0.1);border:1px solid rgba(91,141,238,0.25);border-radius:6px;color:var(--accent);font-size:12px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px" onmouseover="this.style.background='rgba(91,141,238,0.2)'" onmouseout="this.style.background='rgba(91,141,238,0.1)'"><i data-lucide="sun" style="width:14px;height:14px" id="theme-icon-sun"></i><i data-lucide="moon" style="width:14px;height:14px;display:none" id="theme-icon-moon"></i> <span id="theme-label">Dark Mode</span></button>
+    <button id="theme-toggle-btn" onclick="toggleTheme()" style="width:100%;padding:6px 10px;margin-bottom:8px;background:rgba(0,224,184,0.08);border:1px solid rgba(0,224,184,0.2);border-radius:6px;color:var(--accent);font-size:12px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px"><i id="theme-icon" data-lucide="sun" style="width:13px;height:13px"></i> <span id="theme-label">Light Mode</span></button>
     <button onclick="doLogout()" style="width:100%;padding:6px 10px;background:rgba(226,93,93,0.1);border:1px solid rgba(226,93,93,0.25);border-radius:6px;color:var(--red);font-size:12px;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;justify-content:center;gap:6px" onmouseover="this.style.background='rgba(226,93,93,0.2)'" onmouseout="this.style.background='rgba(226,93,93,0.1)'"><i data-lucide="log-out" style="width:13px;height:13px"></i> Abmelden</button>
   </div>
 </div>
@@ -410,7 +411,7 @@
         <div class="panel" style="margin-top:16px">
           <div class="panel-title"><i data-lucide="lock" style="width:15px;height:15px"></i> Secret-Backend</div>
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:4px">
-            <span id="secret-backend-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(91,141,238,0.12);color:var(--accent);border:1px solid rgba(91,141,238,0.3)">⏳ Laden…</span>
+            <span id="secret-backend-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(0,224,184,0.1);color:var(--accent);border:1px solid rgba(0,224,184,0.28)">⏳ Laden…</span>
             <span id="secret-backend-mode" style="font-size:12px;color:var(--muted)"></span>
           </div>
           <p style="font-size:12px;color:var(--muted);margin-top:10px;line-height:1.6">
@@ -739,7 +740,7 @@
               <input type="text" id="ai-ollama-model" placeholder="llama3.2, mistral, phi4, qwen2.5 ...">
               <div class="provider-hint">Exakter Name wie in <code>ollama list</code>. Muss zuvor mit <code>ollama pull &lt;modell&gt;</code> geladen werden.</div>
             </div>
-            <div style="margin-top:10px;padding:10px 14px;background:#fffbea;border:1px solid #fbbf24;border-radius:6px;font-size:12px;color:#92400e">
+            <div style="margin-top:10px;padding:10px 14px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.3);border-radius:6px;font-size:12px;color:var(--yellow)">
               ⚠️ <strong>Hardware-Anforderung:</strong> Ollama benötigt ausreichend RAM/VRAM. Empfehlung: mind. 8 GB RAM für 7B-Modelle, GPU für beste Performance.
             </div>
           </div>
@@ -1082,7 +1083,7 @@
           <!-- Panel 1: OAuth2 -->
           <div class="panel" style="margin-bottom:0">
             <div class="panel-title"><i data-lucide="key" style="width:15px;height:15px"></i> Google OAuth2 (Master-Zugangsdaten)</div>
-            <div style="background:rgba(91,141,238,0.07);border:1px solid rgba(91,141,238,0.2);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.7">
+            <div style="background:rgba(0,224,184,0.05);border:1px solid rgba(0,224,184,0.15);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.7">
               FluxBot benötigt ein <strong>Google OAuth2 App-Zugangsdaten</strong> (Client ID + Client Secret) sowie einen <strong>Refresh Token</strong> für deinen Account.<br>
               <strong>Einmalige Einrichtung:</strong>
               <ol style="margin:8px 0 0 16px;padding:0">
@@ -1216,7 +1217,7 @@
             </div>
 
             <!-- Credential-Link (je nach Provider) -->
-            <div id="smtp-cred-hint" style="display:none;background:rgba(91,141,238,0.08);border:1px solid rgba(91,141,238,0.25);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.6"></div>
+            <div id="smtp-cred-hint" style="display:none;background:rgba(0,224,184,0.06);border:1px solid rgba(0,224,184,0.22);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:13px;line-height:1.6"></div>
 
             <!-- Felder -->
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
@@ -1386,7 +1387,7 @@
     </div>
 
     <!-- Info-Banner: Was ist der Unterschied? -->
-    <div id="os-info-banner" style="background:rgba(91,141,238,0.07);border:1px solid rgba(91,141,238,0.2);border-radius:10px;padding:14px 18px;margin-bottom:24px;font-size:13px;line-height:1.7;color:var(--muted)"></div>
+    <div id="os-info-banner" style="background:rgba(0,224,184,0.05);border:1px solid rgba(0,224,184,0.15);border-radius:10px;padding:14px 18px;margin-bottom:24px;font-size:13px;line-height:1.7;color:var(--muted)"></div>
 
     <div class="system-tiles" id="system-os-tiles">
       <!-- Restart -->
@@ -1574,23 +1575,23 @@
         <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
           <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0">
             <input type="checkbox" id="dt-block-system-run" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
-            <span><code style="background:rgba(91,141,238,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">system.run</code> – Shell-Befehle (bash, PowerShell, cmd.exe, rm -rf …)</span>
+            <span><code style="background:rgba(0,224,184,0.1);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">system.run</code> – Shell-Befehle (bash, PowerShell, cmd.exe, rm -rf …)</span>
           </label>
           <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0">
             <input type="checkbox" id="dt-block-file-delete" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
-            <span><code style="background:rgba(91,141,238,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">file.delete</code> – Dateien löschen (os.remove, shutil.rmtree …)</span>
+            <span><code style="background:rgba(0,224,184,0.1);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">file.delete</code> – Dateien löschen (os.remove, shutil.rmtree …)</span>
           </label>
           <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0">
             <input type="checkbox" id="dt-block-file-modify" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
-            <span><code style="background:rgba(91,141,238,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">file.modify</code> – Dateien schreiben/überschreiben (sed -i, open w …)</span>
+            <span><code style="background:rgba(0,224,184,0.1);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">file.modify</code> – Dateien schreiben/überschreiben (sed -i, open w …)</span>
           </label>
           <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0">
             <input type="checkbox" id="dt-block-code-eval" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
-            <span><code style="background:rgba(91,141,238,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">code.eval</code> – Code ausführen (eval, exec, subprocess …)</span>
+            <span><code style="background:rgba(0,224,184,0.1);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">code.eval</code> – Code ausführen (eval, exec, subprocess …)</span>
           </label>
           <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer;color:var(--text);text-transform:none;letter-spacing:0">
             <input type="checkbox" id="dt-block-network" style="width:15px;height:15px;cursor:pointer;accent-color:var(--accent)">
-            <span><code style="background:rgba(91,141,238,0.12);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">network.unrestricted</code> – HTTP ohne Whitelist (curl, wget, requests …)</span>
+            <span><code style="background:rgba(0,224,184,0.1);color:var(--accent);padding:1px 6px;border-radius:4px;font-size:12px">network.unrestricted</code> – HTTP ohne Whitelist (curl, wget, requests …)</span>
           </label>
         </div>
       </div>
@@ -1877,7 +1878,7 @@
       <div class="panel">
         <div class="panel-title"><i data-lucide="key" style="width:15px;height:15px"></i> Sicherheits-Schlüssel</div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
-          <span id="danger-keyring-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(91,141,238,0.12);color:var(--accent);border:1px solid rgba(91,141,238,0.3)">⏳ Laden…</span>
+          <span id="danger-keyring-badge" style="display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600;background:rgba(0,224,184,0.1);color:var(--accent);border:1px solid rgba(0,224,184,0.28)">⏳ Laden…</span>
           <span id="danger-keyring-mode" style="font-size:12px;color:var(--muted)"></span>
         </div>
 
@@ -2433,11 +2434,11 @@ async function loadStatus() {
     const isDocker = backendData.isDocker || false;
 
     // Icon + Farbe je Backend
-    let icon = '🔐', color = 'var(--accent)', bg = 'rgba(91,141,238,0.12)', border = 'rgba(91,141,238,0.3)';
+    let icon = '🔐', color = 'var(--accent)', bg = 'rgba(0,224,184,0.1)', border = 'rgba(0,224,184,0.28)';
     if (name.includes('Credential Manager')) {
       icon = '🗝️'; color = 'var(--green)'; bg = 'rgba(62,207,142,0.12)'; border = 'rgba(62,207,142,0.3)';
     } else if (name.includes('Vault') || name.includes('AES')) {
-      icon = '🏦'; color = 'var(--blue)'; bg = 'rgba(91,141,238,0.12)'; border = 'rgba(91,141,238,0.3)';
+      icon = '🏦'; color = 'var(--accent)'; bg = 'rgba(0,224,184,0.1)'; border = 'rgba(0,224,184,0.28)';
     } else if (name.includes('nicht verfügbar')) {
       icon = '⚠️'; color = 'var(--yellow)'; bg = 'rgba(245,166,35,0.1)'; border = 'rgba(245,166,35,0.3)';
     }
@@ -3169,7 +3170,7 @@ function renderSteps(containerId, steps) {
     el.innerHTML = '<div style="font-size:12px;color:var(--yellow);margin-bottom:8px">⚠️ Jeden Befehl einzeln ausführen – warten bis der vorherige fertig ist:</div>' +
       steps.map((s, i) => `
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <span style="background:rgba(91,141,238,0.2);color:var(--accent);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${i+1}</span>
+          <span style="background:rgba(0,224,184,0.15);color:var(--accent);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0">${i+1}</span>
           <div class="cmd-box" style="flex:1;margin:0"><code>${escHtml(s)}</code><button class="copy-btn" onclick="copyText('${escHtml(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">📋</button></div>
         </div>`
       ).join('');
@@ -3825,7 +3826,7 @@ async function loadDangerKeys() {
     const badge = document.getElementById('danger-keyring-badge');
     const mode  = document.getElementById('danger-keyring-mode');
     const name  = backendData.backend || 'unbekannt';
-    let icon='🔐', color='var(--accent)', bg='rgba(91,141,238,0.12)', border='rgba(91,141,238,0.3)';
+    let icon='🔐', color='var(--accent)', bg='rgba(0,224,184,0.1)', border='rgba(0,224,184,0.28)';
     if (name.includes('Credential Manager')) { icon='🗝️'; color='var(--green)'; bg='rgba(62,207,142,0.12)'; border='rgba(62,207,142,0.3)'; }
     else if (name.includes('Vault')||name.includes('AES')) { icon='🏦'; }
     else if (name.includes('nicht verfügbar')) { icon='⚠️'; color='var(--yellow)'; bg='rgba(245,166,35,0.1)'; border='rgba(245,166,35,0.3)'; }
@@ -3982,44 +3983,32 @@ async function loadInitialData() {
 // ── Theme Toggle ──────────────────────────────────────────────────────
 function initTheme() {
   const saved = localStorage.getItem('fluxbot-theme');
-  const theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  setTheme(theme);
+  const pref = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  setTheme(pref);
 }
-
-function setTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  localStorage.setItem('fluxbot-theme', theme);
-
-  const sunIcon = document.getElementById('theme-icon-sun');
-  const moonIcon = document.getElementById('theme-icon-moon');
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('fluxbot-theme', t);
+  const icon = document.getElementById('theme-icon');
   const label = document.getElementById('theme-label');
-
-  if (theme === 'dark') {
-    sunIcon.style.display = 'none';
-    moonIcon.style.display = 'inline';
-    label.textContent = 'Light Mode';
+  if (t === 'light') {
+    if (icon) { icon.setAttribute('data-lucide', 'moon'); }
+    if (label) label.textContent = 'Dark Mode';
   } else {
-    sunIcon.style.display = 'inline';
-    moonIcon.style.display = 'none';
-    label.textContent = 'Dark Mode';
+    if (icon) { icon.setAttribute('data-lucide', 'sun'); }
+    if (label) label.textContent = 'Light Mode';
   }
-
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
-
 function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme');
-  const next = current === 'dark' ? 'light' : 'dark';
-  setTheme(next);
+  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+  setTheme(cur === 'dark' ? 'light' : 'dark');
 }
 
 // ── Init ──────────────────────────────────────────────────────────────
 (async function init() {
-  // Theme initialisieren
   initTheme();
-  // Lucide Icons rendern (Sidebar ist schon im DOM)
   if (typeof lucide !== 'undefined') lucide.createIcons();
-  // Login-Overlay ist standardmäßig sichtbar – Fokus auf Username-Feld
   document.getElementById('login-user').focus();
 })();
 

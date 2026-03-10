@@ -1,83 +1,102 @@
 <!DOCTYPE html>
-<html lang="de" data-theme="light">
+<html lang="de">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#2563eb">
+<meta name="theme-color" content="#00E0B8">
 <link rel="manifest" href="/chat.webmanifest">
 <title>FluxBot Chat</title>
 <script src="https://unpkg.com/lucide@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
 :root {
-  --bg: #f0f4f8;
-  --sidebar-bg: #1e293b;
-  --sidebar-text: #e2e8f0;
-  --sidebar-hover: rgba(255,255,255,0.08);
-  --sidebar-active: rgba(255,255,255,0.15);
-  --card: #ffffff;
-  --text: #1a202c;
-  --text-muted: #64748b;
-  --border: #e2e8f0;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --user-bubble: #2563eb;
-  --user-text: #ffffff;
-  --bot-bubble: #ffffff;
-  --bot-text: #1a202c;
-  --input-bg: #ffffff;
-  --shadow: 0 1px 3px rgba(0,0,0,0.1);
-  --shadow-lg: 0 4px 16px rgba(0,0,0,0.12);
+  --kiw-bg: #0A0F1A;
+  --kiw-panel: #111827;
+  --kiw-accent: #00E0B8;
+  --kiw-text: #F4F5F7;
+  --kiw-text-muted: #9CA3AF;
+  --kiw-border: #1F2937;
+  /* Legacy aliases */
+  --bg: var(--kiw-bg);
+  --sidebar-bg: #0D1424;
+  --sidebar-text: var(--kiw-text);
+  --sidebar-hover: rgba(0,224,184,0.07);
+  --sidebar-active: rgba(0,224,184,0.13);
+  --card: var(--kiw-panel);
+  --text: var(--kiw-text);
+  --text-muted: var(--kiw-text-muted);
+  --border: var(--kiw-border);
+  --accent: var(--kiw-accent);
+  --accent-hover: #00CCA5;
+  --user-bubble: var(--kiw-panel);
+  --user-text: var(--kiw-text);
+  --bot-bubble: var(--kiw-panel);
+  --bot-text: var(--kiw-text);
+  --input-bg: var(--kiw-panel);
+  --shadow: 0 1px 4px rgba(0,0,0,0.4);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,0.5);
   --radius: 12px;
-  --overlay: rgba(0,0,0,0.5);
+  --overlay: rgba(0,0,0,0.75);
 }
-html[data-theme="dark"] {
-  --bg: #0f1117;
-  --sidebar-bg: #111827;
-  --sidebar-text: #e2e8f0;
-  --sidebar-hover: rgba(255,255,255,0.06);
-  --sidebar-active: rgba(255,255,255,0.12);
-  --card: #1e2535;
-  --text: #e2e8f0;
-  --text-muted: #94a3b8;
-  --border: #2d3748;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --user-bubble: #2563eb;
-  --user-text: #ffffff;
-  --bot-bubble: #1e2535;
-  --bot-text: #e2e8f0;
-  --input-bg: #1e2535;
-  --shadow: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
-  --overlay: rgba(0,0,0,0.7);
+html[data-theme="light"] {
+  --kiw-bg: #F4F5F7; --kiw-panel: #FFFFFF; --kiw-border: #E5E7EB;
+  --kiw-text: #0A0F1A; --kiw-text-muted: #6B7280;
+  --kiw-accent: #007A65;
+  --bg: #F4F5F7; --card: #FFFFFF; --border: #E5E7EB;
+  --text: #0A0F1A; --sidebar-bg: #FFFFFF;
+  --user-bubble: #E8F9F6; --bot-bubble: #FFFFFF;
+  --input-bg: #FFFFFF; --overlay: rgba(0,0,0,0.5);
+  --accent: #007A65; --accent-hover: #006654;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; transition: background 0.3s, color 0.3s; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--kiw-bg);
+  color: var(--kiw-text);
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
 /* ── Login Overlay ── */
 #login-overlay {
   position: fixed; inset: 0; background: var(--overlay);
   display: flex; align-items: center; justify-content: center;
-  z-index: 9999; backdrop-filter: blur(6px);
+  z-index: 9999; backdrop-filter: blur(8px);
 }
 #login-overlay.hidden { display: none; }
 .login-card {
-  background: var(--card); border-radius: 16px; padding: 2rem;
-  width: min(400px, 90vw); box-shadow: var(--shadow-lg);
+  background: var(--kiw-panel);
+  border: 1px solid var(--kiw-border);
+  border-radius: 16px;
+  padding: 2rem;
+  width: min(400px, 90vw);
+  box-shadow: var(--shadow-lg);
 }
-.login-card h2 { font-size: 1.4rem; margin-bottom: 0.25rem; }
-.login-card p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+.login-card h2 {
+  font-size: 1.4rem;
+  margin-bottom: 0.25rem;
+  color: var(--kiw-text);
+}
+.login-card p { color: var(--kiw-text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
 .login-card input {
-  width: 100%; padding: 0.7rem 1rem; border: 1px solid var(--border);
-  border-radius: 8px; background: var(--input-bg); color: var(--text);
+  width: 100%; padding: 0.7rem 1rem;
+  border: 1px solid var(--kiw-border);
+  border-radius: 8px;
+  background: var(--kiw-bg);
+  color: var(--kiw-text);
   font-size: 0.95rem; margin-bottom: 0.75rem; outline: none;
+  transition: border-color 0.2s;
 }
-.login-card input:focus { border-color: var(--accent); }
+.login-card input::placeholder { color: var(--kiw-text-muted); }
+.login-card input:focus { border-color: var(--kiw-accent); }
 .login-btn {
-  width: 100%; padding: 0.75rem; background: var(--accent); color: #fff;
-  border: none; border-radius: 8px; font-size: 1rem; cursor: pointer;
-  transition: background 0.2s;
+  width: 100%; padding: 0.75rem;
+  background: var(--kiw-accent);
+  color: #0A0F1A;
+  border: none; border-radius: 8px; font-size: 1rem; font-weight: 600;
+  cursor: pointer; transition: background 0.2s;
 }
 .login-btn:hover { background: var(--accent-hover); }
 .login-error { color: #ef4444; font-size: 0.85rem; margin-top: 0.5rem; display: none; }
@@ -87,28 +106,41 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
 /* ── Sidebar ── */
 .sidebar {
-  width: 260px; background: var(--sidebar-bg); color: var(--sidebar-text);
+  width: 260px;
+  background: var(--sidebar-bg);
+  border-right: 1px solid var(--kiw-border);
+  color: var(--sidebar-text);
   display: flex; flex-direction: column; flex-shrink: 0;
   transition: transform 0.3s; z-index: 100;
 }
 .sidebar-header {
   padding: 1.25rem 1rem 1rem;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid var(--kiw-border);
   display: flex; align-items: center; gap: 0.6rem;
 }
-.sidebar-header .logo-icon { font-size: 1.5rem; }
-.sidebar-header h1 { font-size: 1.1rem; font-weight: 700; }
-.sidebar-header span { font-size: 0.75rem; opacity: 0.6; }
+.sidebar-header .logo-icon {
+  font-size: 1.5rem;
+  color: var(--kiw-accent);
+  display: flex; align-items: center;
+}
+.sidebar-header h1 {
+  font-size: 1.1rem; font-weight: 700;
+  color: var(--kiw-accent);
+}
+.sidebar-header span { font-size: 0.75rem; color: var(--kiw-text-muted); }
 .new-chat-btn {
   margin: 0.75rem; padding: 0.65rem 1rem;
-  background: rgba(255,255,255,0.1); color: var(--sidebar-text);
-  border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
+  background: rgba(0,224,184,0.08);
+  color: var(--kiw-accent);
+  border: 1px solid rgba(0,224,184,0.25);
+  border-radius: 8px;
   cursor: pointer; display: flex; align-items: center; gap: 0.5rem;
-  font-size: 0.9rem; transition: background 0.2s; flex-shrink: 0;
+  font-size: 0.9rem; font-weight: 500;
+  transition: background 0.2s, border-color 0.2s; flex-shrink: 0;
 }
-.new-chat-btn:hover { background: rgba(255,255,255,0.18); }
+.new-chat-btn:hover { background: rgba(0,224,184,0.15); border-color: rgba(0,224,184,0.4); }
 .chat-list-label {
-  padding: 0.5rem 1rem; font-size: 0.72rem; opacity: 0.5;
+  padding: 0.5rem 1rem; font-size: 0.72rem; color: var(--kiw-text-muted);
   text-transform: uppercase; letter-spacing: 0.08em; flex-shrink: 0;
 }
 .chat-list { flex: 1; overflow-y: auto; padding: 0 0.5rem; }
@@ -116,29 +148,36 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   padding: 0.6rem 0.75rem; border-radius: 8px; cursor: pointer;
   display: flex; align-items: center; justify-content: space-between;
   gap: 0.5rem; font-size: 0.88rem; transition: background 0.15s;
-  overflow: hidden;
+  overflow: hidden; color: var(--kiw-text-muted);
 }
-.chat-item:hover { background: var(--sidebar-hover); }
-.chat-item.active { background: var(--sidebar-active); }
+.chat-item:hover { background: var(--sidebar-hover); color: var(--kiw-text); }
+.chat-item.active { background: var(--sidebar-active); color: var(--kiw-text); }
 .chat-item-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-item-del {
-  opacity: 0; background: none; border: none; color: var(--sidebar-text);
+  opacity: 0; background: none; border: none; color: var(--kiw-text-muted);
   cursor: pointer; padding: 2px; border-radius: 4px; flex-shrink: 0;
   display: flex; align-items: center;
 }
 .chat-item:hover .chat-item-del { opacity: 0.6; }
-.chat-item-del:hover { opacity: 1 !important; background: rgba(255,255,255,0.15); }
+.chat-item-del:hover { opacity: 1 !important; background: rgba(0,224,184,0.1); color: var(--kiw-accent); }
 .sidebar-footer {
-  padding: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1);
+  padding: 0.75rem; border-top: 1px solid var(--kiw-border);
   display: flex; gap: 0.5rem;
 }
 .sidebar-footer button {
-  flex: 1; padding: 0.6rem; background: rgba(255,255,255,0.08);
-  color: var(--sidebar-text); border: none; border-radius: 8px;
+  flex: 1; padding: 0.6rem;
+  background: var(--kiw-bg);
+  color: var(--kiw-text-muted);
+  border: 1px solid var(--kiw-border);
+  border-radius: 8px;
   cursor: pointer; font-size: 0.82rem; display: flex; align-items: center;
-  justify-content: center; gap: 0.4rem; transition: background 0.2s;
+  justify-content: center; gap: 0.4rem; transition: all 0.2s;
 }
-.sidebar-footer button:hover { background: rgba(255,255,255,0.15); }
+.sidebar-footer button:hover {
+  background: rgba(0,224,184,0.08);
+  color: var(--kiw-accent);
+  border-color: rgba(0,224,184,0.25);
+}
 
 /* ── Main Chat Area ── */
 .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
@@ -146,20 +185,24 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ── Topbar (mobile) ── */
 .topbar {
   display: none; padding: 0.75rem 1rem;
-  background: var(--card); border-bottom: 1px solid var(--border);
+  background: var(--kiw-panel);
+  border-bottom: 1px solid var(--kiw-border);
   align-items: center; gap: 0.75rem;
 }
-.topbar-title { font-weight: 600; font-size: 1rem; flex: 1; }
+.topbar-title { font-weight: 600; font-size: 1rem; flex: 1; color: var(--kiw-text); }
 .menu-btn {
-  background: none; border: none; color: var(--text); cursor: pointer;
+  background: none; border: none; color: var(--kiw-text-muted); cursor: pointer;
   padding: 4px; border-radius: 6px; display: flex;
+  transition: color 0.2s;
 }
+.menu-btn:hover { color: var(--kiw-accent); }
 
 /* ── Messages ── */
 .messages {
   flex: 1; overflow-y: auto; padding: 1.5rem 1rem;
   display: flex; flex-direction: column; gap: 1rem;
   scroll-behavior: smooth;
+  background: var(--kiw-bg);
 }
 .message { display: flex; gap: 0.75rem; max-width: 780px; width: 100%; }
 .message.user { flex-direction: row-reverse; align-self: flex-end; }
@@ -173,8 +216,12 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   display: flex; align-items: center; justify-content: center;
   font-size: 1rem; font-weight: 700;
 }
-.avatar.bot { background: var(--accent); color: #fff; }
-.avatar.user { background: #6366f1; color: #fff; }
+.avatar.bot { background: var(--kiw-accent); color: #0A0F1A; }
+.avatar.user {
+  background: var(--kiw-panel);
+  border: 2px solid var(--kiw-accent);
+  color: var(--kiw-accent);
+}
 .bubble {
   padding: 0.75rem 1rem; border-radius: var(--radius);
   display: inline-block; max-width: 100%; line-height: 1.6; font-size: 0.94rem;
@@ -182,22 +229,42 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 }
 .message.user .bubble { max-width: min(520px, 100%); }
 .message.bot .bubble { max-width: min(680px, 100%); }
-.message.user .bubble { background: var(--user-bubble); color: var(--user-text); border-bottom-right-radius: 4px; }
-.message.bot .bubble { background: var(--bot-bubble); color: var(--bot-text); box-shadow: var(--shadow); border-bottom-left-radius: 4px; }
+.message.user .bubble {
+  background: var(--kiw-panel);
+  color: var(--kiw-text);
+  border: 1px solid var(--kiw-accent);
+  border-bottom-right-radius: 4px;
+}
+.message.bot .bubble {
+  background: var(--kiw-panel);
+  color: var(--kiw-text);
+  border: 1px solid var(--kiw-border);
+  box-shadow: var(--shadow);
+  border-bottom-left-radius: 4px;
+}
 .bubble p { margin-bottom: 0.5rem; }
 .bubble p:last-child { margin-bottom: 0; }
-.bubble code { background: rgba(0,0,0,0.08); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.88em; font-family: 'Fira Code', monospace; }
-html[data-theme="dark"] .bubble code { background: rgba(255,255,255,0.1); }
-.bubble pre { background: #1e2535; color: #e2e8f0; padding: 0.75rem 1rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0; }
-.bubble pre code { background: none; padding: 0; font-size: 0.85rem; }
+.bubble code {
+  background: rgba(0,224,184,0.08);
+  color: var(--kiw-accent);
+  padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.88em;
+  font-family: 'Fira Code', monospace;
+}
+.bubble pre {
+  background: var(--kiw-bg);
+  border: 1px solid var(--kiw-border);
+  color: var(--kiw-text);
+  padding: 0.75rem 1rem; border-radius: 8px; overflow-x: auto; margin: 0.5rem 0;
+}
+.bubble pre code { background: none; padding: 0; font-size: 0.85rem; color: var(--kiw-text); }
 .bubble ul, .bubble ol { padding-left: 1.4rem; margin: 0.4rem 0; }
-.bubble a { color: var(--accent); }
-.typing-cursor::after { content: '▌'; animation: blink 0.8s infinite; }
+.bubble a { color: var(--kiw-accent); }
+.typing-cursor::after { content: '▌'; animation: blink 0.8s infinite; color: var(--kiw-accent); }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
-.timestamp { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; }
+.timestamp { font-size: 0.72rem; color: var(--kiw-text-muted); margin-top: 0.25rem; }
 .message.user .timestamp { text-align: right; }
 .message.bot .timestamp { text-align: left; }
-.img-preview { max-width: 220px; border-radius: 8px; margin-top: 0.5rem; display: block; }
+.img-preview { max-width: 220px; border-radius: 8px; margin-top: 0.5rem; display: block; border: 1px solid var(--kiw-border); }
 
 /* ── Welcome ── */
 .welcome {
@@ -205,63 +272,81 @@ html[data-theme="dark"] .bubble code { background: rgba(255,255,255,0.1); }
   justify-content: center; flex: 1; gap: 1rem; padding: 2rem; text-align: center;
 }
 .welcome-icon { font-size: 3rem; }
-.welcome h2 { font-size: 1.5rem; font-weight: 700; }
-.welcome p { color: var(--text-muted); max-width: 380px; line-height: 1.6; }
+.welcome h2 { font-size: 1.5rem; font-weight: 700; color: var(--kiw-text); }
+.welcome p { color: var(--kiw-text-muted); max-width: 380px; line-height: 1.6; }
 .suggestions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; margin-top: 0.5rem; }
 .sug-btn {
-  padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: 20px;
-  background: var(--card); color: var(--text); cursor: pointer; font-size: 0.88rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--kiw-border);
+  border-radius: 20px;
+  background: var(--kiw-panel);
+  color: var(--kiw-text-muted);
+  cursor: pointer; font-size: 0.88rem;
   transition: all 0.2s;
 }
-.sug-btn:hover { border-color: var(--accent); color: var(--accent); background: rgba(37,99,235,0.06); }
+.sug-btn:hover {
+  border-color: var(--kiw-accent);
+  color: var(--kiw-accent);
+  background: rgba(0,224,184,0.07);
+}
 
 /* ── Input Area ── */
 .input-area {
   padding: 0.75rem 1rem 1rem;
-  border-top: 1px solid var(--border);
-  background: var(--bg);
+  border-top: 1px solid var(--kiw-border);
+  background: var(--kiw-bg);
 }
 .input-row {
   display: flex; align-items: flex-end; gap: 0.5rem;
-  background: var(--input-bg); border: 1px solid var(--border);
+  background: var(--kiw-panel);
+  border: 1px solid var(--kiw-border);
   border-radius: 14px; padding: 0.5rem 0.75rem;
   box-shadow: var(--shadow); transition: border-color 0.2s;
 }
-.input-row:focus-within { border-color: var(--accent); }
+.input-row:focus-within { border-color: var(--kiw-accent); }
 .input-actions { display: flex; gap: 0.25rem; flex-shrink: 0; align-items: flex-end; padding-bottom: 2px; }
 .input-actions button {
-  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  background: none; border: none; cursor: pointer;
+  color: var(--kiw-text-muted);
   padding: 6px; border-radius: 8px; display: flex; transition: all 0.2s;
 }
-.input-actions button:hover { color: var(--accent); background: rgba(37,99,235,0.08); }
+.input-actions button:hover {
+  color: var(--kiw-accent);
+  background: rgba(0,224,184,0.08);
+}
 .input-actions button.recording { color: #ef4444; animation: pulse 1.2s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
 #msg-input {
-  flex: 1; border: none; outline: none; background: transparent; color: var(--text);
+  flex: 1; border: none; outline: none; background: transparent;
+  color: var(--kiw-text);
   font-size: 0.95rem; resize: none; max-height: 160px; min-height: 24px;
   line-height: 1.5; padding: 2px 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
+#msg-input::placeholder { color: var(--kiw-text-muted); }
 .send-btn {
-  background: var(--accent); color: #fff; border: none; border-radius: 10px;
+  background: var(--kiw-accent);
+  color: #0A0F1A;
+  border: none; border-radius: 10px;
   width: 36px; height: 36px; flex-shrink: 0; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: background 0.2s; margin-bottom: 2px;
 }
 .send-btn:hover { background: var(--accent-hover); }
-.send-btn:disabled { background: var(--border); cursor: not-allowed; }
+.send-btn:disabled { background: var(--kiw-border); cursor: not-allowed; color: var(--kiw-text-muted); }
 .file-preview-wrap { margin-bottom: 0.5rem; display: none; }
 .file-preview-wrap.show { display: flex; align-items: center; gap: 0.5rem; }
-.file-preview { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; }
+.file-preview { width: 60px; height: 60px; border-radius: 8px; object-fit: cover; border: 1px solid var(--kiw-border); }
 .file-preview-clear {
   background: #ef4444; color: #fff; border: none; border-radius: 50%;
   width: 22px; height: 22px; cursor: pointer; font-size: 0.8rem; display: flex;
   align-items: center; justify-content: center;
 }
-.input-hint { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-top: 0.4rem; }
+.input-hint { font-size: 0.75rem; color: var(--kiw-text-muted); text-align: center; margin-top: 0.4rem; }
 
 /* ── Sidebar Overlay (mobile) ── */
 .sidebar-overlay {
-  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: none; position: fixed; inset: 0; background: var(--overlay);
   z-index: 99;
 }
 .sidebar-overlay.show { display: block; }
@@ -281,9 +366,9 @@ html[data-theme="dark"] .bubble code { background: rgba(255,255,255,0.1); }
 /* ── Scrollbar ── */
 .messages::-webkit-scrollbar { width: 4px; }
 .messages::-webkit-scrollbar-track { background: transparent; }
-.messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.messages::-webkit-scrollbar-thumb { background: var(--kiw-border); border-radius: 2px; }
 .chat-list::-webkit-scrollbar { width: 3px; }
-.chat-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+.chat-list::-webkit-scrollbar-thumb { background: rgba(0,224,184,0.2); border-radius: 2px; }
 
 /* ── Responsive ── */
 @media (max-width: 680px) {
@@ -321,22 +406,24 @@ html[data-theme="dark"] .bubble code { background: rgba(255,255,255,0.1); }
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <span class="logo-icon">🤖</span>
+      <span class="logo-icon">
+        <i data-lucide="zap" style="width:22px;height:22px;stroke:#00E0B8"></i>
+      </span>
       <div>
         <h1>FluxBot</h1>
         <span>Chat</span>
       </div>
     </div>
     <button class="new-chat-btn" onclick="newChat()">
-      <i data-lucide="plus" style="width:16px;height:16px"></i>
+      <i data-lucide="plus" style="width:16px;height:16px;stroke:#00E0B8"></i>
       Neuer Chat
     </button>
     <div class="chat-list-label">Verlauf</div>
     <div class="chat-list" id="chat-list"></div>
     <div class="sidebar-footer">
-      <button onclick="toggleTheme()">
-        <i data-lucide="sun" id="theme-icon" style="width:14px;height:14px"></i>
-        <span id="theme-label">Dark Mode</span>
+      <button id="theme-toggle-btn" onclick="toggleTheme()">
+        <i id="theme-icon" data-lucide="sun" style="width:14px;height:14px"></i>
+        <span id="theme-label">Light Mode</span>
       </button>
       <button onclick="doLogout()">
         <i data-lucide="log-out" style="width:14px;height:14px"></i>
@@ -362,7 +449,7 @@ html[data-theme="dark"] .bubble code { background: rgba(255,255,255,0.1); }
     <div class="messages" id="messages">
       <!-- Welcome screen shown when no messages -->
       <div class="welcome" id="welcome">
-        <div class="welcome-icon">🤖</div>
+        <div class="welcome-icon">⚡</div>
         <h2>Hallo! Ich bin Fluxi.</h2>
         <p>Dein persönlicher KI-Assistent. Stell mir eine Frage, lass mich etwas erstellen oder analysieren.</p>
         <div class="suggestions">
@@ -379,7 +466,7 @@ html[data-theme="dark"] .bubble code { background: rgba(255,255,255,0.1); }
       <div class="file-preview-wrap" id="file-preview-wrap">
         <img class="file-preview" id="file-preview-img" src="" alt="">
         <button class="file-preview-clear" onclick="clearFile()">✕</button>
-        <span style="font-size:0.82rem;color:var(--text-muted)">Bild angehängt</span>
+        <span style="font-size:0.82rem;color:var(--kiw-text-muted)">Bild angehängt</span>
       </div>
     </div>
 
@@ -434,24 +521,6 @@ function doLogout() {
   authUser = ''; authPass = '';
   document.getElementById('login-overlay').classList.remove('hidden');
   disconnectWS();
-}
-
-// ── Theme ─────────────────────────────────────────────────────────────────────
-function initTheme() {
-  const saved = localStorage.getItem('fluxbot-theme');
-  const pref = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-  applyTheme(pref);
-}
-function applyTheme(t) {
-  document.documentElement.setAttribute('data-theme', t);
-  document.getElementById('theme-icon').setAttribute('data-lucide', t === 'dark' ? 'sun' : 'moon');
-  document.getElementById('theme-label').textContent = t === 'dark' ? 'Light Mode' : 'Dark Mode';
-  localStorage.setItem('fluxbot-theme', t);
-  if (typeof lucide !== 'undefined') lucide.createIcons();
-}
-function toggleTheme() {
-  const cur = document.documentElement.getAttribute('data-theme');
-  applyTheme(cur === 'dark' ? 'light' : 'dark');
 }
 
 // ── Chat Storage ──────────────────────────────────────────────────────────────
@@ -555,7 +624,7 @@ function appendMessageEl(role, content, imgSrc, ts, isStreaming) {
 
   const wrap = document.createElement('div');
   wrap.className = `message ${role}`;
-  const avatarChar = role === 'bot' ? '🤖' : (authUser ? authUser[0].toUpperCase() : 'U');
+  const avatarChar = role === 'bot' ? '⚡' : (authUser ? authUser[0].toUpperCase() : 'U');
   const timeStr = ts ? new Date(ts).toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit'}) : '';
 
   let bubbleContent = '';
@@ -905,6 +974,31 @@ function init() {
     newChat();
   }
   renderChatList();
+}
+
+// ── Theme Toggle ─────────────────────────────────────────────────────
+function initTheme() {
+  const saved = localStorage.getItem('fluxbot-theme');
+  const pref = saved || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  setTheme(pref);
+}
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('fluxbot-theme', t);
+  const icon = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (t === 'light') {
+    if (icon) icon.setAttribute('data-lucide', 'moon');
+    if (label) label.textContent = 'Dark Mode';
+  } else {
+    if (icon) icon.setAttribute('data-lucide', 'sun');
+    if (label) label.textContent = 'Light Mode';
+  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+function toggleTheme() {
+  const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+  setTheme(cur === 'dark' ? 'light' : 'dark');
 }
 
 // Startup
